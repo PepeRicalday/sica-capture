@@ -1,0 +1,49 @@
+@import "tailwindcss";
+
+@theme {
+  --color-mobile-dark: #0b1120;
+  --color-mobile-card: #1e293b;
+  --color-mobile-accent: #0ea5e9;
+  --color-mobile-success: #10b981;
+  --color-mobile-warning: #f59e0b;
+  --color-mobile-danger: #ef4444;
+}
+
+@layer base {
+  body {
+    @apply bg-mobile-dark text-slate-100 antialiased overflow-hidden select-none;
+    -webkit-tap-highlight-color: transparent;
+  }
+}
+
+@layer components {
+  .btn-calc {
+    @apply w-full h-full min-h-0 bg-slate-800 rounded-xl flex items-center justify-center text-3xl font-bold shadow transition-transform;
+  }
+
+  .btn-calc:active {
+    @apply scale-95;
+  }
+
+  .btn-calc.primary {
+    @apply bg-mobile-accent text-white;
+  }
+
+  .btn-calc.danger {
+    background-color: rgba(239, 68, 68, 0.2);
+    color: var(--color-mobile-danger);
+  }
+
+  /* Ajustes estéticos para SICA Capture: Mapa Geoespacial Oscuro */
+  .leaflet-popup-content-wrapper,
+  .leaflet-popup-tip {
+    background-color: var(--color-mobile-card) !important;
+    color: #e2e8f0 !important;
+    border: 1px solid #334155;
+    box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.5) !important;
+  }
+
+  .leaflet-popup-content {
+    margin: 10px 14px !important;
+  }
+}
