@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { useNavigate } from 'react-router-dom';
-import { LogIn, Lock, Mail, Droplets, ShieldCheck } from 'lucide-react';
+import { LogIn, Lock, Mail, ShieldCheck } from 'lucide-react';
 import './Login.css';
 
 const Login: React.FC = () => {
@@ -38,10 +38,10 @@ const Login: React.FC = () => {
             <div className="mobile-login-card">
                 <div className="mobile-brand">
                     <div className="mobile-brand-icon">
-                        <Droplets className="water-icon" />
+                        <img src="/logo-srl.png" alt="S.R.L. Unidad Conchos" className="brand-logo-login" />
                     </div>
-                    <h1>SICA Capture</h1>
-                    <p>Red Mayor del Distrito 005</p>
+                    <h1>Captura Operativa</h1>
+                    <p>S.R.L. Unidad Conchos</p>
                 </div>
 
                 <form onSubmit={handleLogin} className="mobile-login-form">
@@ -91,7 +91,7 @@ const Login: React.FC = () => {
 
                 <div className="mobile-login-footer">
                     <ShieldCheck size={14} />
-                    <span>Conchos S. de R.L. - Control Operativo</span>
+                    <span>S.R.L. Unidad Conchos - Control Operativo</span>
                 </div>
             </div>
         </div>

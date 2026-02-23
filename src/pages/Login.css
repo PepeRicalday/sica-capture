@@ -22,19 +22,22 @@
 }
 
 .mobile-brand-icon {
-    width: 64px;
-    height: 64px;
-    background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
-    border-radius: 16px;
+    width: 220px;
+    height: auto;
     display: flex;
     align-items: center;
     justify-content: center;
     margin: 0 auto 16px;
-    box-shadow: 0 8px 16px rgba(37, 99, 235, 0.4);
+    background: white;
+    border-radius: 8px;
+    padding: 8px;
+    box-shadow: 0 8px 16px rgba(120, 53, 15, 0.4);
 }
 
-.water-icon {
-    color: white;
+.brand-logo-login {
+    width: 100%;
+    height: auto;
+    object-fit: contain;
 }
 
 .mobile-brand h1 {
@@ -45,7 +48,8 @@
 
 .mobile-brand p {
     font-size: 0.875rem;
-    color: #60a5fa;
+    color: #fdba74;
+    /* Terracota light hint */
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.05em;
@@ -97,7 +101,7 @@
 
 .mobile-input-wrapper input:focus {
     outline: none;
-    border-color: #3b82f6;
+    border-color: #f97316;
     background: #0f172a;
 }
 
@@ -112,7 +116,8 @@
 
 .mobile-login-btn {
     margin-top: 10px;
-    background: #2563eb;
+    background: #b45309;
+    /* Terracota/Marrón button */
     color: white;
     border: none;
     border-radius: 12px;

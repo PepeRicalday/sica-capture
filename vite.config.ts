@@ -12,9 +12,9 @@ export default defineConfig({
     VitePWA({
       registerType: 'autoUpdate',
       manifest: {
-        name: 'SICA Capture',
-        short_name: 'SICA',
-        description: 'Aplicación de captura offline para Distrito 005',
+        name: 'S.R.L. Unidad Conchos - Captura',
+        short_name: 'SRL Conchos',
+        description: 'Aplicación operativa oficial S.R.L. Unidad Conchos',
         theme_color: '#0b1120',
         background_color: '#0b1120',
         display: 'standalone',
