@@ -133,10 +133,10 @@ const Capture = () => {
     return (
         <div className="flex flex-col h-full bg-mobile-dark">
             {/* Header */}
-            <header className="bg-mobile-card px-4 py-3 flex justify-between items-center shadow-md">
+            <header className="bg-mobile-card px-3 py-2 flex justify-between items-center shadow-md pb-1 shrink-0">
                 <div className="flex flex-col">
-                    <h1 className="text-xl font-bold leading-tight">Captura de Campo</h1>
-                    <span className="text-mobile-accent font-mono text-xs font-semibold tracking-wider">
+                    <h1 className="text-lg font-bold leading-none">Captura de Campo</h1>
+                    <span className="text-mobile-accent font-mono text-[10px] font-semibold tracking-wider mt-0.5">
                         {dateStr} • {timeStr}
                     </span>
                 </div>
@@ -170,12 +170,12 @@ const Capture = () => {
             <div className="flex-1 flex flex-col p-3 overflow-hidden">
 
                 {/* 1. Selector de Tipo */}
-                <div className="flex bg-slate-800 rounded-lg p-1 mb-4 flex-shrink-0 text-[10px] sm:text-xs">
+                <div className="flex bg-slate-800 rounded-lg p-0.5 mb-2 flex-shrink-0 text-[10px] sm:text-xs">
                     {(['escala', 'toma', 'aforo'] as const).map(tab => (
                         <button
                             key={tab}
                             onClick={() => { setActiveTab(tab); setSelectedPoint(''); }}
-                            className={`flex-1 py-2 px-1 rounded-md font-bold uppercase transition-colors ${activeTab === tab ? 'bg-mobile-dark text-mobile-accent' : 'text-slate-400'
+                            className={`flex-1 py-1.5 px-1 rounded-md font-bold uppercase transition-colors ${activeTab === tab ? 'bg-mobile-dark text-mobile-accent' : 'text-slate-400'
                                 }`}
                         >
                             {tab === 'escala' ? 'Control de Niveles' : tab === 'toma' ? 'Distribución' : 'Aforos'}
@@ -184,13 +184,13 @@ const Capture = () => {
                 </div>
 
                 {/* 2. Selector de Punto */}
-                <div className="mb-4 relative flex-shrink-0">
-                    <label className="block text-slate-400 text-xs mb-1 uppercase tracking-wider font-semibold">
+                <div className="mb-2 relative flex-shrink-0">
+                    <label className="block text-slate-400 text-[10px] mb-0.5 uppercase tracking-wider font-semibold">
                         SELECCIONAR UBICACIÓN
                     </label>
                     <div className="relative">
                         <select
-                            className="w-full bg-slate-800 border-2 border-slate-700 rounded-xl p-3 text-white appearance-none focus:border-mobile-accent outline-none font-bold text-base"
+                            className="w-full bg-slate-800 border.5 border-slate-700 rounded-lg p-2 text-white appearance-none focus:border-mobile-accent outline-none font-bold text-sm"
                             value={selectedPoint}
                             onChange={(e) => setSelectedPoint(e.target.value)}
                         >
@@ -225,8 +225,8 @@ const Capture = () => {
 
                 {/* 2.1 Mini-Widget: Hora Manual de Escala (Solo Escalas) */}
                 {activeTab === 'escala' && (
-                    <div className="mb-4 flex-shrink-0 flex justify-end items-center">
-                        <div className="flex items-center gap-2 bg-slate-800/50 backdrop-blur border border-slate-700/50 p-2 rounded-lg">
+                    <div className="mb-2 flex-shrink-0 flex justify-end items-center">
+                        <div className="flex items-center gap-2 bg-slate-800/50 backdrop-blur border border-slate-700/50 px-2 py-1 rounded-lg">
                             <label className="text-slate-500 text-[10px] font-bold uppercase tracking-wider">Hora Reporte:</label>
                             <input
                                 type="time"
@@ -240,7 +240,7 @@ const Capture = () => {
 
                 {/* 2.2 Mini-Widget: Volumen Acumulado de la Zona (Solo Tomas) */}
                 {activeTab === 'toma' && selectedPoint && (
-                    <div className="mb-4 bg-slate-800/50 backdrop-blur border border-slate-700/50 p-2 rounded-lg flex items-center justify-between">
+                    <div className="mb-2 bg-slate-800/50 backdrop-blur border border-slate-700/50 p-1.5 px-2 rounded-lg flex items-center justify-between">
                         <div className="flex flex-col">
                             <span className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">
                                 Volumen Entregado Hoy - {puntos.find(p => p.id === selectedPoint)?.seccion || 'Zona General'}
@@ -272,7 +272,7 @@ const Capture = () => {
 
                 {/* 2.3 Panel Flotante: Tomas Activas en la Red */}
                 {activeTab === 'toma' && (
-                    <div className="mb-4 bg-slate-800 rounded-lg p-2 border border-slate-700 flex-shrink-0">
+                    <div className="mb-2 bg-slate-800 rounded-lg p-1.5 px-2 border border-slate-700 flex-shrink-0">
                         <div className="flex justify-between items-center mb-2 border-b border-slate-700 pb-1">
                             <span className="text-[10px] text-amber-400 font-bold uppercase tracking-wider flex items-center gap-1">
                                 <span className="relative flex h-2 w-2">

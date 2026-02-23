@@ -20,16 +20,16 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
             </main>
 
             {/* Bottom Nav */}
-            <nav className="fixed bottom-0 w-full bg-mobile-card border-t border-slate-800 pb-safe">
-                <div className="flex justify-around items-center h-16">
+            <nav className="fixed bottom-0 w-full bg-mobile-card border-t border-slate-800 pb-safe z-50">
+                <div className="flex justify-around items-center h-14">
                     <NavLink
                         to="/monitor"
                         className={({ isActive }) => `flex flex-col items-center justify-center w-full h-full transition-colors ${isActive ? 'text-mobile-accent bg-slate-800/50' : 'text-slate-400'}`}
                     >
                         {({ isActive }) => (
                             <>
-                                <Activity size={24} />
-                                <span className={`text-[10px] mt-1 ${isActive ? 'font-bold' : ''}`}>Monitor</span>
+                                <Activity size={22} className={isActive ? '-translate-y-0.5 transition-transform' : ''} />
+                                <span className={`text-[9px] mt-0.5 ${isActive ? 'font-bold' : ''}`}>Monitor</span>
                             </>
                         )}
                     </NavLink>
@@ -39,8 +39,8 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
                     >
                         {({ isActive }) => (
                             <>
-                                <Droplets size={24} />
-                                <span className={`text-[10px] mt-1 ${isActive ? 'font-bold' : ''}`}>Hidro</span>
+                                <Droplets size={22} className={isActive ? '-translate-y-0.5 transition-transform' : ''} />
+                                <span className={`text-[9px] mt-0.5 ${isActive ? 'font-bold' : ''}`}>Hidro</span>
                             </>
                         )}
                     </NavLink>
@@ -50,8 +50,8 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
                     >
                         {({ isActive }) => (
                             <>
-                                <MapPin size={24} />
-                                <span className={`text-[10px] mt-1 ${isActive ? 'font-bold' : ''}`}>Captura</span>
+                                <MapPin size={22} className={isActive ? '-translate-y-0.5 transition-transform' : ''} />
+                                <span className={`text-[9px] mt-0.5 ${isActive ? 'font-bold' : ''}`}>Captura</span>
                             </>
                         )}
                     </NavLink>
@@ -59,8 +59,8 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
                         onClick={handleLogout}
                         className="flex flex-col items-center justify-center w-full h-full text-slate-400 hover:text-red-400 transition-colors"
                     >
-                        <LogOut size={24} />
-                        <span className="text-[10px] mt-1">Salir</span>
+                        <LogOut size={22} />
+                        <span className="text-[9px] mt-0.5">Salir</span>
                     </button>
                 </div>
             </nav>

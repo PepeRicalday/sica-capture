@@ -157,102 +157,102 @@ export const AforoForm = ({ selectedPoint, isOnline, onSaveSuccess }: AforoFormP
     };
 
     return (
-        <div className="flex flex-col h-full overflow-y-auto pb-6">
-            <h2 className="text-xl font-bold mb-4 flex items-center gap-2"><Calculator size={24} className="text-mobile-accent" /> Captura Método Área-Velocidad</h2>
+        <div className="flex flex-col h-full overflow-y-auto pb-4">
+            <h2 className="text-lg font-bold mb-2 flex items-center gap-2 px-1"><Calculator size={20} className="text-mobile-accent" /> Captura Método Área-Velocidad</h2>
 
             {/* Metadatos Generales */}
-            <div className="bg-slate-800 rounded-xl p-3 mb-4 space-y-3">
-                <div className="grid grid-cols-2 gap-3">
+            <div className="bg-slate-800 rounded-lg p-2.5 mb-3 space-y-2">
+                <div className="grid grid-cols-2 gap-2">
                     <div>
-                        <label className="text-xs text-slate-400 font-bold uppercase">Hora Inicial</label>
-                        <input type="time" value={horaInicial} onChange={e => setHoraInicial(e.target.value)} className="w-full bg-slate-900 border border-slate-700 rounded-md p-2 text-white" />
+                        <label className="text-[10px] text-slate-400 font-bold uppercase">Hora Inicial</label>
+                        <input type="time" value={horaInicial} onChange={e => setHoraInicial(e.target.value)} className="w-full bg-slate-900 border border-slate-700 rounded p-1.5 text-white text-sm" />
                     </div>
                     <div>
-                        <label className="text-xs text-slate-400 font-bold uppercase">Hora Final</label>
-                        <input type="time" value={horaFinal} onChange={e => setHoraFinal(e.target.value)} className="w-full bg-slate-900 border border-slate-700 rounded-md p-2 text-white" />
+                        <label className="text-[10px] text-slate-400 font-bold uppercase">Hora Final</label>
+                        <input type="time" value={horaFinal} onChange={e => setHoraFinal(e.target.value)} className="w-full bg-slate-900 border border-slate-700 rounded p-1.5 text-white text-sm" />
                     </div>
                 </div>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-2 gap-2">
                     <div>
-                        <label className="text-xs text-slate-400 font-bold uppercase">Escala In. (m)</label>
-                        <input type="number" step="0.01" value={escalaInicial} onChange={e => setEscalaInicial(parseFloat(e.target.value))} className="w-full bg-slate-900 border border-slate-700 rounded-md p-2 text-white" placeholder="Ej. 2.65" />
+                        <label className="text-[10px] text-slate-400 font-bold uppercase">Escala In. (m)</label>
+                        <input type="number" step="0.01" value={escalaInicial} onChange={e => setEscalaInicial(parseFloat(e.target.value))} className="w-full bg-slate-900 border border-slate-700 rounded p-1.5 text-white text-sm" placeholder="Ej. 2.65" />
                     </div>
                     <div>
-                        <label className="text-xs text-slate-400 font-bold uppercase">Escala Fin. (m)</label>
-                        <input type="number" step="0.01" value={escalaFinal} onChange={e => setEscalaFinal(parseFloat(e.target.value))} className="w-full bg-slate-900 border border-slate-700 rounded-md p-2 text-white" placeholder="Ej. 2.65" />
+                        <label className="text-[10px] text-slate-400 font-bold uppercase">Escala Fin. (m)</label>
+                        <input type="number" step="0.01" value={escalaFinal} onChange={e => setEscalaFinal(parseFloat(e.target.value))} className="w-full bg-slate-900 border border-slate-700 rounded p-1.5 text-white text-sm" placeholder="Ej. 2.65" />
                     </div>
                 </div>
                 <div>
-                    <label className="text-xs text-slate-400 font-bold uppercase">Espejo T (m)</label>
-                    <input type="number" step="0.01" value={espejo} onChange={e => setEspejo(parseFloat(e.target.value))} className="w-full bg-slate-900 border border-slate-700 rounded-md p-2 text-white" placeholder="Opcional Ej. 22.48" />
+                    <label className="text-[10px] text-slate-400 font-bold uppercase">Espejo T (m)</label>
+                    <input type="number" step="0.01" value={espejo} onChange={e => setEspejo(parseFloat(e.target.value))} className="w-full bg-slate-900 border border-slate-700 rounded p-1.5 text-white text-sm" placeholder="Opcional Ej. 22.48" />
                 </div>
             </div>
 
             {/* Dobelas Dinámicas */}
-            <h3 className="text-sm font-bold text-slate-300 uppercase tracking-widest mb-2 border-b border-slate-700 pb-1">Medición por Dobela</h3>
+            <h3 className="text-xs font-bold text-slate-300 uppercase tracking-widest mb-2 border-b border-slate-700 pb-1 px-1">Medición por Dobela</h3>
 
             {datosCalculados.dobelas.map((dobela, idx) => (
-                <div key={idx} className="bg-slate-800/80 border border-slate-700 p-3 mb-3 rounded-lg relative">
-                    <div className="flex justify-between items-center mb-2">
-                        <span className="font-bold text-mobile-accent bg-mobile-accent/10 px-2 py-0.5 rounded text-xs">V{idx + 1}</span>
+                <div key={idx} className="bg-slate-800/80 border border-slate-700 p-2 mb-2 rounded-lg relative">
+                    <div className="flex justify-between items-center mb-1.5">
+                        <span className="font-bold text-mobile-accent bg-mobile-accent/10 px-2 py-0.5 rounded text-[10px]">V{idx + 1}</span>
                         {dobelas.length > 1 && (
-                            <button onClick={() => removeDobela(idx)} className="text-mobile-danger p-1/2 bg-red-500/10 rounded">
-                                <Trash2 size={16} />
+                            <button onClick={() => removeDobela(idx)} className="text-mobile-danger p-1 bg-red-500/10 rounded">
+                                <Trash2 size={14} />
                             </button>
                         )}
                     </div>
 
-                    <div className="grid grid-cols-2 gap-2 mb-3">
+                    <div className="grid grid-cols-2 gap-2 mb-2">
                         <div>
                             <label className="text-[10px] text-slate-400 font-bold">Base (m)</label>
-                            <input type="number" step="0.01" value={dobela.base_m || ''} onChange={e => updateDobela(idx, 'base_m', parseFloat(e.target.value))} className="w-full bg-slate-900/50 border border-slate-700/50 rounded p-1 text-sm text-white" />
+                            <input type="number" step="0.01" value={dobela.base_m || ''} onChange={e => updateDobela(idx, 'base_m', parseFloat(e.target.value))} className="w-full bg-slate-900/50 border border-slate-700/50 rounded px-1.5 py-1 text-sm text-white" />
                         </div>
                         <div>
                             <label className="text-[10px] text-slate-400 font-bold">Tirante y (m)</label>
-                            <input type="number" step="0.01" value={dobela.tirante_m || ''} onChange={e => updateDobela(idx, 'tirante_m', parseFloat(e.target.value))} className="w-full bg-slate-900/50 border border-slate-700/50 rounded p-1 text-sm text-white" />
+                            <input type="number" step="0.01" value={dobela.tirante_m || ''} onChange={e => updateDobela(idx, 'tirante_m', parseFloat(e.target.value))} className="w-full bg-slate-900/50 border border-slate-700/50 rounded px-1.5 py-1 text-sm text-white" />
                         </div>
                     </div>
 
-                    <div className="text-[10px] text-slate-500 font-bold mb-1">Molinete (Rev / Seg)</div>
-                    <div className="space-y-1 bg-slate-900/40 p-1.5 rounded">
+                    <div className="text-[10px] text-slate-500 font-bold mb-0.5 mt-1 border-t border-slate-700/50 pt-1">Molinete (Rev / Seg)</div>
+                    <div className="bg-slate-900/40 p-1 rounded grid grid-cols-3 gap-1">
                         {[0, 1, 2].map(lecIdx => (
-                            <div key={lecIdx} className="grid grid-cols-2 gap-2">
-                                <input type="number" placeholder="Revs" value={dobela.velocidades_revoluciones[lecIdx] || ''} onChange={e => updateMolinete(idx, lecIdx, parseFloat(e.target.value), dobela.velocidades_segundos[lecIdx])} className="w-full bg-transparent border-b border-slate-700 text-xs text-indigo-300 placeholder-indigo-300/30 p-1 text-center" />
-                                <input type="number" placeholder="Segs" value={dobela.velocidades_segundos[lecIdx] || ''} onChange={e => updateMolinete(idx, lecIdx, dobela.velocidades_revoluciones[lecIdx], parseFloat(e.target.value))} className="w-full bg-transparent border-b border-slate-700 text-xs text-blue-300 placeholder-blue-300/30 p-1 text-center" />
+                            <div key={lecIdx} className="flex flex-col gap-1 border-r last:border-0 border-slate-700/30 pr-1 last:pr-0">
+                                <input type="number" placeholder="Rev" value={dobela.velocidades_revoluciones[lecIdx] || ''} onChange={e => updateMolinete(idx, lecIdx, parseFloat(e.target.value), dobela.velocidades_segundos[lecIdx])} className="w-full bg-transparent border-b border-slate-700/50 text-xs text-indigo-300 placeholder-indigo-300/30 px-1 py-0.5 text-center" />
+                                <input type="number" placeholder="Seg" value={dobela.velocidades_segundos[lecIdx] || ''} onChange={e => updateMolinete(idx, lecIdx, dobela.velocidades_revoluciones[lecIdx], parseFloat(e.target.value))} className="w-full bg-transparent border-b border-slate-700/50 text-xs text-blue-300 placeholder-blue-300/30 px-1 py-0.5 text-center" />
                             </div>
                         ))}
                     </div>
 
                     {/* Resultados Locales */}
-                    <div className="mt-2 flex justify-between bg-black/20 p-1.5 rounded border border-slate-700/30">
-                        <span className="text-[10px] text-slate-400">A={dobela.area.toFixed(3)}m² | <span className="text-white">v={dobela.velocidadMedia.toFixed(3)}m/s</span></span>
+                    <div className="mt-1.5 flex justify-between bg-black/20 px-1.5 py-1 rounded border border-slate-700/30">
+                        <span className="text-[9px] text-slate-400">A={dobela.area.toFixed(2)}m² <span className="text-white">v={dobela.velocidadMedia.toFixed(2)}</span></span>
                         <span className="text-[10px] text-green-400 font-bold">Q={dobela.gasto.toFixed(3)}m³/s</span>
                     </div>
                 </div>
             ))}
 
-            <button onClick={addDobela} className="w-full py-3 mt-1 mb-6 border-2 border-dashed border-slate-700 text-slate-400 rounded-xl flex items-center justify-center gap-2 font-bold text-sm hover:border-mobile-accent hover:text-mobile-accent transition-colors">
-                <Plus size={16} /> AÑADIR DOBELA / SECCIÓN
+            <button onClick={addDobela} className="w-full py-2.5 mt-1 mb-4 border-2 border-dashed border-slate-700 text-slate-400 rounded-lg flex items-center justify-center gap-2 font-bold text-xs hover:border-mobile-accent hover:text-mobile-accent transition-colors">
+                <Plus size={16} /> NUEVA LECTURA (V)
             </button>
 
             {/* Dashboard Final Flotante Integrado */}
-            <div className="sticky bottom-0 bg-slate-900 border-t-2 border-mobile-accent p-4 -mx-3 shadow-[0_-10px_20px_rgba(0,0,0,0.5)]">
-                <div className="flex justify-between items-end mb-3">
+            <div className="sticky bottom-0 bg-slate-900 border-t-2 border-mobile-accent p-3 -mx-3 shadow-[0_-10px_20px_rgba(0,0,0,0.5)] z-10">
+                <div className="flex justify-between items-end mb-2">
                     <div>
-                        <div className="text-xs text-slate-400 font-bold uppercase">Área Total</div>
-                        <div className="text-lg font-mono text-white">{datosCalculados.areaTotal.toFixed(3)} m²</div>
+                        <div className="text-[10px] text-slate-400 font-bold uppercase">Área Total</div>
+                        <div className="text-base font-mono text-white leading-none">{datosCalculados.areaTotal.toFixed(3)}m²</div>
                     </div>
                     <div className="text-right">
-                        <div className="text-xs text-mobile-accent font-bold uppercase tracking-wider mb-1">Gasto Total Obtenido</div>
-                        <div className="text-3xl font-mono text-white font-bold leading-none">{datosCalculados.gastoTotal.toFixed(3)} <span className="text-sm text-slate-500 font-sans">m³/s</span></div>
+                        <div className="text-[10px] text-mobile-accent font-bold uppercase tracking-wider mb-0.5">Gasto Total Obtenido</div>
+                        <div className="text-2xl font-mono text-white font-bold leading-none">{datosCalculados.gastoTotal.toFixed(3)} <span className="text-xs text-slate-500 font-sans">m³/s</span></div>
                     </div>
                 </div>
 
                 <button
-                    className="w-full bg-mobile-accent text-white py-4 rounded-xl flex items-center justify-center gap-2 font-bold shadow-lg active:scale-95 transition-transform text-lg"
+                    className="w-full bg-mobile-accent text-white py-2.5 rounded-lg flex items-center justify-center gap-2 font-bold shadow-lg active:scale-95 transition-transform text-base"
                     onClick={handleSave}
                 >
-                    <Save size={20} /> ALMACENAR AFORO
+                    <Save size={18} /> ALMACENAR AFORO
                 </button>
             </div>
 
