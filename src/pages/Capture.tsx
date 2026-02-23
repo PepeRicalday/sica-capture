@@ -141,15 +141,15 @@ const Capture = () => {
             <div className="flex-1 flex flex-col p-3 overflow-hidden">
 
                 {/* 1. Selector de Tipo */}
-                <div className="flex bg-slate-800 rounded-lg p-1 mb-4 flex-shrink-0 text-xs">
+                <div className="flex bg-slate-800 rounded-lg p-1 mb-4 flex-shrink-0 text-[10px] sm:text-xs">
                     {(['escala', 'toma', 'aforo'] as const).map(tab => (
                         <button
                             key={tab}
                             onClick={() => { setActiveTab(tab); setSelectedPoint(''); }}
-                            className={`flex-1 py-2 px-1 rounded-md font-semibold capitalize transition-colors ${activeTab === tab ? 'bg-mobile-dark text-mobile-accent' : 'text-slate-400'
+                            className={`flex-1 py-2 px-1 rounded-md font-bold uppercase transition-colors ${activeTab === tab ? 'bg-mobile-dark text-mobile-accent' : 'text-slate-400'
                                 }`}
                         >
-                            {tab}
+                            {tab === 'escala' ? 'Control de Niveles' : tab === 'toma' ? 'Distribución' : 'Aforos'}
                         </button>
                     ))}
                 </div>
@@ -167,19 +167,24 @@ const Capture = () => {
                         >
                             <option value="" disabled>-- Elige una Opción --</option>
                             {activeTab === 'escala' || activeTab === 'aforo' ? (
-                                puntos.filter(p => p.type === 'escala').map(p => <option key={p.id} value={p.id}>{p.name}</option>)
+                                puntos
+                                    .filter(p => p.type === 'escala')
+                                    .sort((a, b) => (a.km || 0) - (b.km || 0))
+                                    .map(p => <option key={p.id} value={p.id}>{p.name} (km {p.km?.toFixed(3)})</option>)
                             ) : (
-                                puntos.filter(p => p.type !== 'escala').map(p => {
-                                    const modSec = [p.modulo && `Mod: ${p.modulo}`, p.seccion && `Sec: ${p.seccion}`].filter(Boolean).join(' | ');
-                                    const suffix = modSec ? ` [${modSec}]` : '';
-                                    const isOpen = ['inicio', 'reabierto', 'continua'].includes(p.estado_hoy || '');
-                                    const icon = isOpen ? '🟢' : '🔴';
-                                    return (
-                                        <option key={p.id} value={p.id}>
-                                            {icon} {p.name}{suffix}
-                                        </option>
-                                    );
-                                })
+                                puntos
+                                    .filter(p => p.type !== 'escala')
+                                    .sort((a, b) => (a.km || 0) - (b.km || 0))
+                                    .map(p => {
+                                        const modSec = [p.modulo && `Mod: ${p.modulo}`, p.seccion && `Sec: ${p.seccion}`].filter(Boolean).join(' | ');
+                                        const suffix = modSec ? ` [${modSec}]` : '';
+                                        const icon = ['inicio', 'reabierto', 'continua'].includes(p.estado_hoy || '') ? '🟢' : '🔴';
+                                        return (
+                                            <option key={p.id} value={p.id}>
+                                                {icon} km {p.km?.toFixed(3)} - {p.name}{suffix}
+                                            </option>
+                                        );
+                                    })
                             )}
                         </select>
                         <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
@@ -288,7 +293,7 @@ const Capture = () => {
                 {activeTab !== 'aforo' && (
                     <div className="flex-1 flex flex-col justify-end min-h-0">
                         <div className="text-right text-slate-400 text-xs font-semibold mb-1 flex-shrink-0">
-                            {activeTab === 'escala' ? 'ESCALA (metros)' : 'GASTO (l/s o m³/s)'}
+                            {activeTab === 'escala' ? 'Lectura de Nivel (m)' : 'Captura de Gasto (m³/s o L/s)'}
                         </div>
                         <div className="text-right text-5xl sm:text-6xl font-mono font-bold text-white mb-2 tracking-tighter truncate flex-shrink-0">
                             {val}

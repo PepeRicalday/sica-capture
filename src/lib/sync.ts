@@ -11,7 +11,7 @@ export const downloadCatalogs = async () => {
         // A. Puntos de Entrega (Escalas)
         const { data: escalas } = await supabase
             .from('escalas')
-            .select('id, nombre, latitud, longitud')
+            .select('id, nombre, latitud, longitud, km')
             .eq('activa', true);
 
         const mappedPuntos: any[] = [];
@@ -20,6 +20,7 @@ export const downloadCatalogs = async () => {
                 id: p.id,
                 name: p.nombre,
                 type: 'escala',
+                km: parseFloat(p.km || 0),
                 lat: p.latitud,
                 lng: p.longitud
             })));
@@ -33,6 +34,7 @@ export const downloadCatalogs = async () => {
                 nombre, 
                 tipo,
                 seccion_id,
+                km,
                 coords_x,
                 coords_y,
                 modulos ( codigo_corto, nombre ),
@@ -58,6 +60,7 @@ export const downloadCatalogs = async () => {
                     modulo: p.modulos?.codigo_corto || p.modulos?.nombre || 'General',
                     seccion: p.secciones?.nombre || 'S/S',
                     seccion_id: p.seccion_id,
+                    km: parseFloat(p.km || 0),
                     estado_hoy: reporte?.estado || 'cerrado',
                     volumen_hoy_mm3: parseFloat(reporte?.volumen_total_mm3 || 0),
                     lat: p.coords_y,

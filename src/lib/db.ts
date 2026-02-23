@@ -10,6 +10,7 @@ export interface OfflinePoint {
     seccion_id?: string;
     estado_hoy?: string;
     volumen_hoy_mm3?: number;
+    km?: number;
     lat?: number;
     lng?: number;
 }
