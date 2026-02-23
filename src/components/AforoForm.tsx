@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react';
 import { Save, Plus, Trash2, Calculator } from 'lucide-react';
 import { toast } from 'sonner';
 import { db, type SicaAforoRecord, type AforoDobela } from '../lib/db';
+import { syncPendingRecords } from '../lib/sync';
 
 interface AforoFormProps {
     selectedPoint: string;
@@ -129,7 +130,17 @@ export const AforoForm = ({ selectedPoint, isOnline, onSaveSuccess }: AforoFormP
 
         try {
             await db.records.add(payload as SicaAforoRecord);
-            toast.success('Aforo guardado ' + (isOnline ? 'localmente (Sync Online)' : 'offline (Mochila)'));
+
+            if (isOnline) {
+                toast.promise(syncPendingRecords(), {
+                    loading: '🚀 Sincronizando Aforo...',
+                    success: '✅ Aforo en la Nube',
+                    error: '💾 Guardado en Mochila'
+                });
+            } else {
+                toast.warning('💾 Aforo guardado en Mochila (Offline)');
+            }
+
             onSaveSuccess();
         } catch (e) {
             toast.error('Error al guardar el aforo en la base local.');

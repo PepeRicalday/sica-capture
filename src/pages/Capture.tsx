@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Save, Wifi, WifiOff, UploadCloud, ChevronDown } from 'lucide-react';
 import { db, type SicaRecord } from '../lib/db';
+import { syncPendingRecords } from '../lib/sync';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { toast } from 'sonner';
 import { AforoForm } from '../components/AforoForm';
@@ -97,8 +98,12 @@ const Capture = () => {
             if (!isOnline) {
                 toast.warning('💾 Guardado Offline (En Mochila)');
             } else {
-                // Aquí se llamará al Sync Engine para subir en línea en futuras mejoras
-                toast.success('✅ Resguardado Localmente (Esperando Sync Online)');
+                // Sincronización Proactiva: Intentar subir de inmediato
+                toast.promise(syncPendingRecords(), {
+                    loading: '🚀 Sincronizando con Red Mayor...',
+                    success: '✅ Sincronizado en Tiempo Real',
+                    error: '💾 Resguardado Localmente (Pendiente de Sync)'
+                });
             }
             setRawValue(0);
             setManualTime('');
