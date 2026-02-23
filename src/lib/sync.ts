@@ -79,6 +79,7 @@ export const downloadCatalogs = async () => {
         console.log('Catalogs updated successfully.');
     } catch (error) {
         console.error('Failed to download catalogs:', error);
+        throw error;
     }
 };
 

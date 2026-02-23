@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
-import { Save, Wifi, WifiOff, UploadCloud, ChevronDown } from 'lucide-react';
+import { Save, Wifi, WifiOff, UploadCloud, ChevronDown, RefreshCw } from 'lucide-react';
 import { db, type SicaRecord } from '../lib/db';
-import { syncPendingRecords } from '../lib/sync';
+import { syncPendingRecords, downloadCatalogs } from '../lib/sync';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { toast } from 'sonner';
 import { v4 as uuidv4 } from 'uuid';
@@ -141,6 +141,18 @@ const Capture = () => {
                     </span>
                 </div>
                 <div className="flex gap-3">
+                    <button
+                        onClick={() => {
+                            toast.promise(downloadCatalogs(), {
+                                loading: 'Descargando catálogos...',
+                                success: 'Catálogos actualizados',
+                                error: (err) => `Error: ${err.message || 'No se pudo actualizar'}`
+                            });
+                        }}
+                        className="flex items-center justify-center bg-slate-800 text-slate-300 p-2 rounded-full active:scale-95 transition-transform"
+                    >
+                        <RefreshCw size={18} />
+                    </button>
                     {pendingCount > 0 && (
                         <div className="flex items-center gap-1 text-mobile-warning bg-mobile-warning/10 px-2 py-1 rounded-full text-xs font-bold ring-1 ring-mobile-warning/30">
                             <UploadCloud size={14} />
