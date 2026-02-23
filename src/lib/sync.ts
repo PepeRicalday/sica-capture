@@ -159,6 +159,9 @@ export const syncPendingRecords = async () => {
         if (syncSuccessIds.length > 0) {
             await db.records.where('id').anyOf(syncSuccessIds).modify({ sincronizado: 'true' });
             console.log(`Sync complete. Successfully synced ${syncSuccessIds.length}/${pending.length} records.`);
+
+            // 🔥 CRITICAL: Refresh catalogs to get the new 'estado_hoy' computed by DB triggers
+            await downloadCatalogs();
         } else {
             console.log('Sync attempted but no records were successfully transmitted.');
         }
