@@ -9,6 +9,8 @@ import Login from './pages/Login';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { downloadCatalogs, syncPendingRecords } from './lib/sync';
 import { Toaster } from 'sonner';
+// @ts-ignore
+import { useRegisterSW } from 'virtual:pwa-register/react';
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { session, loading } = useAuth();
@@ -29,6 +31,27 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
 };
 
 function AppContent() {
+  const {
+    needRefresh: [needRefresh],
+    updateServiceWorker,
+  } = useRegisterSW({
+    onRegistered(r: any) {
+      console.log('SW Registered: ' + r);
+      // Forzar chequeo de actualización en cada recarga
+      r && setInterval(() => { r.update(); }, 60 * 1000);
+    },
+    onRegisterError(error: any) {
+      console.log('SW registration error', error);
+    },
+  });
+
+  useEffect(() => {
+    // Si la PWA detecta que hay nueva versión, forzamos recarga sin preguntar
+    if (needRefresh) {
+      updateServiceWorker(true);
+    }
+  }, [needRefresh, updateServiceWorker]);
+
   useEffect(() => {
     downloadCatalogs();
     const handleOnline = () => syncPendingRecords();
