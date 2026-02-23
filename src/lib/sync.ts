@@ -45,7 +45,7 @@ export const downloadCatalogs = async () => {
         const todayStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Chihuahua' }).format(new Date());
         const { data: reportesHoy } = await supabase
             .from('reportes_diarios')
-            .select('punto_id, estado, volumen_total_mm3')
+            .select('punto_id, estado, volumen_total_mm3, hora_apertura, caudal_promedio')
             .eq('fecha', todayStr);
 
         const mapReportes = new Map(reportesHoy?.map(r => [r.punto_id, r]) || []);
@@ -63,6 +63,8 @@ export const downloadCatalogs = async () => {
                     km: parseFloat(p.km || 0),
                     estado_hoy: reporte?.estado || 'cerrado',
                     volumen_hoy_mm3: parseFloat(reporte?.volumen_total_mm3 || 0),
+                    hora_apertura: reporte?.hora_apertura,
+                    caudal_promedio: parseFloat(reporte?.caudal_promedio || 0),
                     lat: p.coords_y,
                     lng: p.coords_x
                 };
@@ -102,7 +104,7 @@ export const syncPendingRecords = async () => {
             turno: parseInt(p.hora_captura.split(':')[0]) < 14 ? 'am' : 'pm'
         }));
 
-        let syncSuccessIds: number[] = [];
+        let syncSuccessIds: string[] = [];
 
         if (escalasPayload.length > 0) {
             const { error } = await supabase.from('lecturas_escalas').insert(escalasPayload);
@@ -110,7 +112,7 @@ export const syncPendingRecords = async () => {
                 console.error('Error insertando escalas:', error.message);
             } else {
                 // Agregar IDs a la lista de éxitos
-                syncSuccessIds.push(...escalasPending.map(p => p.id as number));
+                syncSuccessIds.push(...escalasPending.map(p => p.id as string));
             }
         }
 
@@ -130,12 +132,12 @@ export const syncPendingRecords = async () => {
                 console.error('Error insertando tomas:', error.message);
             } else {
                 // Agregar IDs a la lista de éxitos
-                syncSuccessIds.push(...tomasPending.map(p => p.id as number));
+                syncSuccessIds.push(...tomasPending.map(p => p.id as string));
             }
         }
 
         // 1C. Aforos (van a aforos)
-        const aforosPending = pending.filter(p => p.tipo === 'aforo') as (SicaAforoRecord & { id: number })[];
+        const aforosPending = pending.filter(p => p.tipo === 'aforo') as (SicaAforoRecord & { id: string })[];
         const aforosPayload = aforosPending.map(p => ({
             punto_control_id: p.punto_id, // Asumiendo que es estación
             fecha: p.fecha_captura,

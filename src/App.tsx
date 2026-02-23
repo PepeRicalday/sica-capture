@@ -4,6 +4,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import Layout from './components/Layout';
 import Capture from './pages/Capture';
 import Monitor from './pages/Monitor';
+import Hidrometria from './pages/Hidrometria';
 import Login from './pages/Login';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { downloadCatalogs, syncPendingRecords } from './lib/sync';
@@ -39,6 +40,7 @@ function AppContent() {
     <Routes>
       <Route path="/login" element={<Login />} />
       <Route path="/monitor" element={<ProtectedRoute><Monitor /></ProtectedRoute>} />
+      <Route path="/hidrometria" element={<ProtectedRoute><Hidrometria /></ProtectedRoute>} />
       <Route path="/captura" element={<ProtectedRoute><Capture /></ProtectedRoute>} />
       <Route path="/" element={<Navigate to="/monitor" replace />} />
       <Route path="*" element={<Navigate to="/monitor" replace />} />

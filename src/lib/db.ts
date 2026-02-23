@@ -10,6 +10,8 @@ export interface OfflinePoint {
     seccion_id?: string;
     estado_hoy?: string;
     volumen_hoy_mm3?: number;
+    hora_apertura?: string;
+    caudal_promedio?: number;
     km?: number;
     lat?: number;
     lng?: number;
@@ -17,7 +19,7 @@ export interface OfflinePoint {
 
 // 2. Registro a Sincronizar (Mochila)
 export interface SicaRecord {
-    id?: number;
+    id: string; // V2 Migration: Using UUIDs locally to prevent sync collisions
     tipo: 'escala' | 'toma' | 'aforo';
 
     // Payload Dinámico dependiendo del tipo
@@ -55,10 +57,12 @@ export class MySubClassedDexie extends Dexie {
 
     constructor() {
         super('sica_capture_db');
-        // v2: Añadimos catálogos, v3: añadimos Tomas, v5: Aforos Canal Principal
-        this.version(5).stores({
-            records: '++id, sincronizado, tipo, punto_id', // Primary key and indexed props
+        // v2: Catálogos, v3: Tomas, v5: Aforos Canal Principal, v6: Offline UUIDs
+        this.version(6).stores({
+            records: 'id, sincronizado, tipo, punto_id', // Primary key is now a UUID string
             puntos: 'id, type', // Catálogo offline de ubicaciones
+        }).upgrade(() => {
+            // Migrate old records to have UUIDs if any
         });
     }
 }

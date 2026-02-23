@@ -1,5 +1,5 @@
 import React from 'react';
-import { MapPin, LogOut, Activity } from 'lucide-react';
+import { MapPin, LogOut, Activity, Droplets } from 'lucide-react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
@@ -30,6 +30,17 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
                             <>
                                 <Activity size={24} />
                                 <span className={`text-[10px] mt-1 ${isActive ? 'font-bold' : ''}`}>Monitor</span>
+                            </>
+                        )}
+                    </NavLink>
+                    <NavLink
+                        to="/hidrometria"
+                        className={({ isActive }) => `flex flex-col items-center justify-center w-full h-full transition-colors ${isActive ? 'text-mobile-accent bg-slate-800/50' : 'text-slate-400'}`}
+                    >
+                        {({ isActive }) => (
+                            <>
+                                <Droplets size={24} />
+                                <span className={`text-[10px] mt-1 ${isActive ? 'font-bold' : ''}`}>Hidro</span>
                             </>
                         )}
                     </NavLink>

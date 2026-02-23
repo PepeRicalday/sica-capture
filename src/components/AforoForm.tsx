@@ -3,6 +3,7 @@ import { Save, Plus, Trash2, Calculator } from 'lucide-react';
 import { toast } from 'sonner';
 import { db, type SicaAforoRecord, type AforoDobela } from '../lib/db';
 import { syncPendingRecords } from '../lib/sync';
+import { v4 as uuidv4 } from 'uuid';
 
 interface AforoFormProps {
     selectedPoint: string;
@@ -112,10 +113,17 @@ export const AforoForm = ({ selectedPoint, isOnline, onSaveSuccess }: AforoFormP
             return;
         }
 
-        const payload: Omit<SicaAforoRecord, 'id'> = {
+        const now = new Date();
+        const y = now.getFullYear();
+        const m = String(now.getMonth() + 1).padStart(2, '0');
+        const d = String(now.getDate()).padStart(2, '0');
+        const captureDateStr = `${y}-${m}-${d}`;
+
+        const payload: SicaAforoRecord = {
+            id: uuidv4(),
             tipo: 'aforo',
             punto_id: selectedPoint,
-            fecha_captura: new Date().toISOString().split('T')[0],
+            fecha_captura: captureDateStr,
             hora_captura: horaFinal,
             sincronizado: isOnline ? 'true' : 'false',
             // Campos específicos Aforo
@@ -129,7 +137,7 @@ export const AforoForm = ({ selectedPoint, isOnline, onSaveSuccess }: AforoFormP
         };
 
         try {
-            await db.records.add(payload as SicaAforoRecord);
+            await db.records.add(payload);
 
             if (isOnline) {
                 toast.promise(syncPendingRecords(), {

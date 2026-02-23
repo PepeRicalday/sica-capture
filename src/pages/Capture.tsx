@@ -4,6 +4,7 @@ import { db, type SicaRecord } from '../lib/db';
 import { syncPendingRecords } from '../lib/sync';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { toast } from 'sonner';
+import { v4 as uuidv4 } from 'uuid';
 import { AforoForm } from '../components/AforoForm';
 
 const Capture = () => {
@@ -63,8 +64,13 @@ const Capture = () => {
         }
 
         // Validación de hora futura
-        const captureDateStr = new Date().toISOString().split('T')[0];
-        const captureTimeStr = manualTime ? `${manualTime}:00` : new Date().toTimeString().split(' ')[0];
+        const now = new Date();
+        const y = now.getFullYear();
+        const m = String(now.getMonth() + 1).padStart(2, '0');
+        const d = String(now.getDate()).padStart(2, '0');
+        const captureDateStr = `${y}-${m}-${d}`; // Local Date
+
+        const captureTimeStr = manualTime ? `${manualTime}:00` : now.toTimeString().split(' ')[0];
 
         if (manualTime) {
             const now = new Date();
@@ -75,7 +81,8 @@ const Capture = () => {
             }
         }
 
-        const payload: Omit<SicaRecord, 'id'> = {
+        const payload: SicaRecord = {
+            id: uuidv4(),
             tipo: activeTab,
             fecha_captura: captureDateStr,
             hora_captura: captureTimeStr,
@@ -93,7 +100,17 @@ const Capture = () => {
         }
 
         try {
-            await db.records.add(payload as SicaRecord);
+            await db.records.add(payload);
+
+            // Actualización Optimista del UI (Cambia el punto a Verde Localmente de inmediato)
+            if (activeTab === 'toma' && selectedPoint) {
+                const pt = await db.puntos.get(selectedPoint);
+                if (pt) {
+                    await db.puntos.update(selectedPoint, {
+                        estado_hoy: ['suspension', 'cierre'].includes(estadoToma) ? 'cierre' : 'inicio'
+                    });
+                }
+            }
 
             if (!isOnline) {
                 toast.warning('💾 Guardado Offline (En Mochila)');
@@ -238,6 +255,37 @@ const Capture = () => {
                                 Cerrada
                             </span>
                         )}
+                    </div>
+                )}
+
+                {/* 2.3 Panel Flotante: Tomas Activas en la Red */}
+                {activeTab === 'toma' && (
+                    <div className="mb-4 bg-slate-800 rounded-lg p-2 border border-slate-700 flex-shrink-0">
+                        <div className="flex justify-between items-center mb-2 border-b border-slate-700 pb-1">
+                            <span className="text-[10px] text-amber-400 font-bold uppercase tracking-wider flex items-center gap-1">
+                                <span className="relative flex h-2 w-2">
+                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                                    <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
+                                </span>
+                                Tomas Abiertas en la Red
+                            </span>
+                            <span className="bg-amber-500/20 text-amber-500 px-2 py-0.5 rounded-full text-[10px] font-bold">
+                                {puntos.filter(p => p.type === 'toma' && ['inicio', 'reabierto', 'continua'].includes(p.estado_hoy || '')).length} Activas
+                            </span>
+                        </div>
+                        <div className="flex gap-2 overflow-x-auto pb-1 min-h-[44px]">
+                            {puntos
+                                .filter(p => p.type === 'toma' && ['inicio', 'reabierto', 'continua'].includes(p.estado_hoy || ''))
+                                .map(p => (
+                                    <div key={p.id} className="flex-shrink-0 bg-slate-900 border border-slate-700 rounded p-1.5 min-w-[120px] max-w-[150px]">
+                                        <div className="text-[10px] text-amber-400 font-bold truncate">{p.name}</div>
+                                        <div className="text-[8px] text-slate-400 truncate">Sec: {p.seccion}</div>
+                                    </div>
+                                ))}
+                            {puntos.filter(p => p.type === 'toma' && ['inicio', 'reabierto', 'continua'].includes(p.estado_hoy || '')).length === 0 && (
+                                <div className="text-[10px] text-slate-500 italic px-1 flex items-center h-full">Ninguna toma registrada como abierta hoy.</div>
+                            )}
+                        </div>
                     </div>
                 )}
 
