@@ -10,7 +10,7 @@ const Capture = () => {
     // Formularios Dinámicos
     const [activeTab, setActiveTab] = useState<'escala' | 'toma' | 'aforo'>('escala');
     const [currentTime, setCurrentTime] = useState(new Date());
-    const [estadoToma, setEstadoToma] = useState<'inicio' | 'suspension' | 'reabierto' | 'cierre'>('inicio');
+    const [estadoToma, setEstadoToma] = useState<'inicio' | 'modificacion' | 'suspension' | 'reabierto' | 'cierre'>('inicio');
     const [manualTime, setManualTime] = useState<string>('');
 
     // Método de Captura: Estilo "Cajero Automático" (Evita decimales rotos y números infinitos)
@@ -259,14 +259,16 @@ const Capture = () => {
                             </div>
                         </div>
                         <div className="flex bg-slate-800 rounded-lg p-1">
-                            {(['inicio', 'suspension', 'reabierto', 'cierre'] as const).map(estado => (
+                            {(['inicio', 'modificacion', 'suspension', 'reabierto', 'cierre'] as const).map(estado => (
                                 <button
                                     key={estado}
                                     onClick={() => setEstadoToma(estado)}
-                                    className={`flex-1 py-1 px-1 rounded-md text-xs font-bold capitalize transition-colors ${estadoToma === estado ? 'bg-mobile-accent text-white shadow' : 'text-slate-400'
+                                    className={`flex-1 py-1 px-1 rounded-md text-[10px] font-bold uppercase transition-all ${estadoToma === estado
+                                        ? 'bg-mobile-accent text-mobile-dark shadow-lg scale-105'
+                                        : 'bg-slate-800 text-slate-400 border border-slate-700 hover:bg-slate-700'
                                         }`}
                                 >
-                                    {estado}
+                                    {estado === 'modificacion' ? 'Modif.' : estado}
                                 </button>
                             ))}
                         </div>
