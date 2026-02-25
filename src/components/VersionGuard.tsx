@@ -107,18 +107,34 @@ export const VersionGuard: React.FC<{ children: React.ReactNode }> = ({ children
 
     if (status === 'hard_update' && serverInfo) {
         return (
-            <>
-                <div className="bg-red-600 text-white text-[10px] py-1 px-4 flex items-center justify-between font-bold uppercase tracking-wider sticky top-0 z-[9999] shadow-lg">
-                    <div className="flex items-center gap-2">
-                        <ShieldAlert size={12} />
-                        <span>SICA Desactualizado (v{CURRENT_VERSION} &lt; v{serverInfo.min_supported_version})</span>
-                    </div>
-                    <button onClick={handleHardUpdate} className="bg-white text-red-600 px-2 py-0.5 rounded-md hover:bg-slate-100 transition-colors cursor-pointer">
-                        Forzar Redecarga
-                    </button>
+            <div className="fixed inset-0 z-[99999] bg-[#0b1120] flex flex-col items-center justify-center p-6 text-center overflow-hidden">
+                <div className="bg-red-500/10 p-6 rounded-full mb-6 animate-pulse">
+                    <ShieldAlert size={64} className="text-red-500" />
                 </div>
-                {children}
-            </>
+
+                <h2 className="text-white text-2xl font-bold mb-2">RECARGA OBLIGATORIA</h2>
+                <p className="text-slate-400 text-sm mb-8 max-w-xs">
+                    Estamos actualizando SICA (v{CURRENT_VERSION} → v{serverInfo.min_supported_version}) para activar el nuevo Balance de Canal.
+                </p>
+
+                <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 mb-10 w-full max-w-xs text-left">
+                    <div className="flex justify-between items-center mb-2">
+                        <span className="text-slate-500 text-[10px] font-bold uppercase">Estado</span>
+                        <span className="bg-red-500 text-white text-[9px] px-2 py-0.5 rounded-full font-bold uppercase">Desactualizado</span>
+                    </div>
+                </div>
+
+                <button
+                    onClick={handleHardUpdate}
+                    className="w-full max-w-xs bg-orange-600 hover:bg-orange-700 text-white font-bold py-4 rounded-2xl transition-all shadow-xl shadow-orange-900/40 active:scale-95 text-lg"
+                >
+                    Actualizar Ahora
+                </button>
+
+                <p className="mt-8 text-[10px] text-slate-600 font-mono">
+                    ID: {serverInfo.build_hash}
+                </p>
+            </div>
         );
     }
 
