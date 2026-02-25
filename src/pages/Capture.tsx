@@ -3,20 +3,22 @@ import { Save, Wifi, WifiOff, UploadCloud, ChevronDown, RefreshCw } from 'lucide
 import { db, type SicaRecord } from '../lib/db';
 import { syncPendingRecords, downloadCatalogs } from '../lib/sync';
 import { useLiveQuery } from 'dexie-react-hooks';
+import { useAuth } from '../context/AuthContext';
 import { toast } from 'sonner';
 import { v4 as uuidv4 } from 'uuid';
 import { AforoForm } from '../components/AforoForm';
 
 const Capture = () => {
+    const { profile } = useAuth();
     // Formularios Dinámicos
     const [activeTab, setActiveTab] = useState<'escala' | 'toma' | 'aforo'>('escala');
     const [currentTime, setCurrentTime] = useState(new Date());
-    const [estadoToma, setEstadoToma] = useState<'inicio' | 'modificacion' | 'suspension' | 'reabierto' | 'cierre'>('inicio');
+    const [estadoToma, setEstadoToma] = useState<'inicio' | 'modificacion' | 'suspension' | 'reabierto' | 'cierre' | 'continua'>('inicio');
     const [manualTime, setManualTime] = useState<string>('');
 
     // Método de Captura: Estilo "Cajero Automático" (Evita decimales rotos y números infinitos)
     const [rawValue, setRawValue] = useState<number>(0);
-    const val = (rawValue / 100).toFixed(2); // Derivado automáticamente
+    const val = activeTab === 'toma' ? rawValue.toString() : (rawValue / 100).toFixed(2); // Litros/seg para Tomas, Metros para Escalas
 
     // Selectores Offline
     const [selectedPoint, setSelectedPoint] = useState<string>('');
@@ -73,9 +75,9 @@ const Capture = () => {
         const captureTimeStr = manualTime ? `${manualTime}:00` : now.toTimeString().split(' ')[0];
 
         if (manualTime) {
-            const now = new Date();
+            const currentNow = new Date();
             const inputDate = new Date(`${captureDateStr}T${captureTimeStr}`);
-            if (inputDate > now) {
+            if (inputDate > currentNow) {
                 toast.error('La hora seleccionada no puede ser en el futuro.');
                 return;
             }
@@ -86,7 +88,9 @@ const Capture = () => {
             tipo: activeTab,
             fecha_captura: captureDateStr,
             hora_captura: captureTimeStr,
-            sincronizado: isOnline ? 'true' : 'false'
+            sincronizado: 'false', // ALWAYS start as false so syncPendingRecords picks it up
+            responsable_id: profile?.id,
+            responsable_nombre: profile?.nombre || 'Operador Móvil'
         };
 
         // Agregar valores según tipo
@@ -95,7 +99,7 @@ const Capture = () => {
             payload.valor_q = parseFloat(val);
         } else if (activeTab === 'toma') {
             payload.punto_id = selectedPoint;
-            payload.valor_q = parseFloat(val); // Aquí se captura L/s u otra medida, sync asume valor_q
+            payload.valor_q = parseFloat(val) / 1000; // Aquí se captura L/s, guardamos en la DB / sync como m3/s
             payload.estado_operativo = estadoToma;
         }
 
@@ -107,7 +111,7 @@ const Capture = () => {
                 const pt = await db.puntos.get(selectedPoint);
                 if (pt) {
                     await db.puntos.update(selectedPoint, {
-                        estado_hoy: ['suspension', 'cierre'].includes(estadoToma) ? 'cierre' : 'inicio'
+                        estado_hoy: estadoToma
                     });
                 }
             }
@@ -131,7 +135,7 @@ const Capture = () => {
     };
 
     return (
-        <div className="flex flex-col h-full bg-mobile-dark">
+        <div className="flex flex-col min-h-full bg-mobile-dark">
             {/* Header */}
             <header className="bg-mobile-card px-3 py-2 flex justify-between items-center shadow-md pb-1 shrink-0">
                 <div className="flex flex-col">
@@ -167,7 +171,7 @@ const Capture = () => {
                 </div>
             </header>
 
-            <div className="flex-1 flex flex-col p-3 overflow-hidden">
+            <div className="flex-1 flex flex-col p-3 pb-8">
 
                 {/* 1. Selector de Tipo */}
                 <div className="flex bg-slate-800 rounded-lg p-0.5 mb-2 flex-shrink-0 text-[10px] sm:text-xs">
@@ -195,7 +199,12 @@ const Capture = () => {
                             onChange={(e) => setSelectedPoint(e.target.value)}
                         >
                             <option value="" disabled>-- Elige una Opción --</option>
-                            {activeTab === 'escala' || activeTab === 'aforo' ? (
+                            {activeTab === 'aforo' ? (
+                                <>
+                                    <option value="CANAL-000">🟢 CANAL K- 0+000 (ENTRADA)</option>
+                                    <option value="CANAL-104">🔴 CANAL K-104+000 (SALIDA FINAL)</option>
+                                </>
+                            ) : activeTab === 'escala' ? (
                                 puntos
                                     .filter(p => p.type === 'escala')
                                     .sort((a, b) => (a.km || 0) - (b.km || 0))
@@ -207,7 +216,7 @@ const Capture = () => {
                                     .map(p => {
                                         const modSec = [p.modulo && `Mod: ${p.modulo}`, p.seccion && `Sec: ${p.seccion}`].filter(Boolean).join(' | ');
                                         const suffix = modSec ? ` [${modSec}]` : '';
-                                        const icon = ['inicio', 'reabierto', 'continua'].includes(p.estado_hoy || '') ? '🟢' : '🔴';
+                                        const icon = ['inicio', 'reabierto', 'continua', 'modificacion'].includes(p.estado_hoy || '') ? '🟢' : '🔴';
                                         return (
                                             <option key={p.id} value={p.id}>
                                                 {icon} km {p.km?.toFixed(3)} - {p.name}{suffix}
@@ -250,14 +259,21 @@ const Capture = () => {
                                 {(() => {
                                     const currentPt = puntos.find(p => p.id === selectedPoint);
                                     if (!currentPt?.seccion_id) return '0.00 Mm³';
-                                    const volTotal = puntos
+
+                                    // 1. Volumen de catálogo (descargado)
+                                    const volCatalogo = puntos
                                         .filter(p => p.seccion_id === currentPt.seccion_id)
                                         .reduce((acc, curr) => acc + (curr.volumen_hoy_mm3 || 0), 0);
-                                    return `${(volTotal / 1000000).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 })} Mm³`;
+
+                                    // 2. Volumen de récords pendientes (no sincronizados aún)
+                                    // Nota: Como no tenemos una función de cálculo de volumen JS idéntica al trigger,
+                                    // mostramos esto como una ayuda visual, pero lo ideal es el sync.
+                                    // Por ahora solo sumamos lo que viene del catálogo.
+                                    return `${(volCatalogo / 1000000).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 })} Mm³`;
                                 })()}
                             </span>
                         </div>
-                        {['inicio', 'reabierto', 'continua'].includes(puntos.find(p => p.id === selectedPoint)?.estado_hoy || '') && (
+                        {['inicio', 'reabierto', 'continua', 'modificacion'].includes(puntos.find(p => p.id === selectedPoint)?.estado_hoy || '') && (
                             <span className="text-[10px] bg-green-500/20 text-green-400 px-2 py-0.5 rounded uppercase font-bold border border-green-500/30">
                                 Abierta
                             </span>
@@ -270,36 +286,7 @@ const Capture = () => {
                     </div>
                 )}
 
-                {/* 2.3 Panel Flotante: Tomas Activas en la Red */}
-                {activeTab === 'toma' && (
-                    <div className="mb-2 bg-slate-800 rounded-lg p-1.5 px-2 border border-slate-700 flex-shrink-0">
-                        <div className="flex justify-between items-center mb-2 border-b border-slate-700 pb-1">
-                            <span className="text-[10px] text-amber-400 font-bold uppercase tracking-wider flex items-center gap-1">
-                                <span className="relative flex h-2 w-2">
-                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
-                                    <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
-                                </span>
-                                Tomas Abiertas en la Red
-                            </span>
-                            <span className="bg-amber-500/20 text-amber-500 px-2 py-0.5 rounded-full text-[10px] font-bold">
-                                {puntos.filter(p => p.type === 'toma' && ['inicio', 'reabierto', 'continua'].includes(p.estado_hoy || '')).length} Activas
-                            </span>
-                        </div>
-                        <div className="flex gap-2 overflow-x-auto pb-1 min-h-[44px]">
-                            {puntos
-                                .filter(p => p.type === 'toma' && ['inicio', 'reabierto', 'continua'].includes(p.estado_hoy || ''))
-                                .map(p => (
-                                    <div key={p.id} className="flex-shrink-0 bg-slate-900 border border-slate-700 rounded p-1.5 min-w-[120px] max-w-[150px]">
-                                        <div className="text-[10px] text-amber-400 font-bold truncate">{p.name}</div>
-                                        <div className="text-[8px] text-slate-400 truncate">Sec: {p.seccion}</div>
-                                    </div>
-                                ))}
-                            {puntos.filter(p => p.type === 'toma' && ['inicio', 'reabierto', 'continua'].includes(p.estado_hoy || '')).length === 0 && (
-                                <div className="text-[10px] text-slate-500 italic px-1 flex items-center h-full">Ninguna toma registrada como abierta hoy.</div>
-                            )}
-                        </div>
-                    </div>
-                )}
+
 
                 {/* 2.5 Selector de Estado (Solo Tomas) */}
                 {activeTab === 'toma' && (
@@ -319,7 +306,7 @@ const Capture = () => {
                             </div>
                         </div>
                         <div className="flex bg-slate-800 rounded-lg p-1">
-                            {(['inicio', 'modificacion', 'suspension', 'reabierto', 'cierre'] as const).map(estado => (
+                            {(['inicio', 'modificacion', 'continua', 'suspension', 'reabierto', 'cierre'] as const).map(estado => (
                                 <button
                                     key={estado}
                                     onClick={() => setEstadoToma(estado)}
@@ -328,7 +315,7 @@ const Capture = () => {
                                         : 'bg-slate-800 text-slate-400 border border-slate-700 hover:bg-slate-700'
                                         }`}
                                 >
-                                    {estado === 'modificacion' ? 'Modif.' : estado}
+                                    {estado === 'modificacion' ? 'Modif.' : estado === 'continua' ? 'Cont.' : estado}
                                 </button>
                             ))}
                         </div>
@@ -353,16 +340,26 @@ const Capture = () => {
 
                 {/* 3. Main Display Numérico (SOLO SI NO ES AFORO) */}
                 {activeTab !== 'aforo' && (
-                    <div className="flex-1 flex flex-col justify-end min-h-0">
+                    <div className="flex-1 flex flex-col justify-end mt-4">
                         <div className="text-right text-slate-400 text-xs font-semibold mb-1 flex-shrink-0">
-                            {activeTab === 'escala' ? 'Lectura de Nivel (m)' : 'Captura de Gasto (m³/s o L/s)'}
+                            {activeTab === 'escala' ? 'Lectura de Nivel (m)' : 'Captura de Gasto (L/s)'}
                         </div>
-                        <div className="text-right text-5xl sm:text-6xl font-mono font-bold text-white mb-2 tracking-tighter truncate flex-shrink-0">
+                        <div className="text-right text-5xl sm:text-6xl font-mono font-bold text-white mb-4 tracking-tighter truncate flex-shrink-0">
                             {val}
                         </div>
 
+                        {/* Guardar Button Movido Arriba del Numpad para Accesibilidad */}
+                        <div className="mb-6 flex-shrink-0">
+                            <button
+                                className="bg-mobile-accent text-white w-full text-lg sm:text-xl h-14 rounded-xl flex items-center justify-center gap-2 font-bold shadow-lg active:scale-95 transition-transform"
+                                onClick={handleSave}
+                            >
+                                <Save size={20} /> GUARDAR CAPTURA
+                            </button>
+                        </div>
+
                         {/* Numpad */}
-                        <div className="grid grid-cols-3 grid-rows-4 gap-2 mb-4 flex-1 min-h-0">
+                        <div className="grid grid-cols-3 grid-rows-4 gap-2 mb-2 flex-1">
                             {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((num) => (
                                 <button
                                     key={num}
@@ -376,13 +373,6 @@ const Capture = () => {
                             <button className="btn-calc" onClick={() => handleKeypad(0)}>0</button>
                             <button className="btn-calc text-slate-400" onClick={handleBackspace}>⌫</button>
                         </div>
-
-                        <button
-                            className="bg-mobile-accent text-white w-full text-lg sm:text-xl h-14 rounded-xl flex items-center justify-center gap-2 font-bold shadow flex-shrink-0 active:scale-95 transition-transform"
-                            onClick={handleSave}
-                        >
-                            <Save size={20} /> GUARDAR CAPTURA
-                        </button>
                     </div>
                 )}
 
