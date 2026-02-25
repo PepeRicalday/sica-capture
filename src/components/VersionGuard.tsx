@@ -98,30 +98,11 @@ export const VersionGuard: React.FC<{ children: React.ReactNode }> = ({ children
         );
     }
 
-    const handleHardUpdate = async () => {
-        try {
-            if ('serviceWorker' in navigator) {
-                const registrations = await navigator.serviceWorker.getRegistrations();
-                for (let registration of registrations) {
-                    await registration.unregister();
-                }
-            }
-            if ('caches' in window) {
-                const cacheNames = await caches.keys();
-                for (let name of cacheNames) {
-                    await caches.delete(name);
-                }
-            }
-            // Give the browser a moment to process the SW unregistration before navigating
-            setTimeout(() => {
-                window.location.href = window.location.origin + window.location.pathname + '?hard_refresh=' + Date.now();
-            }, 800);
-        } catch (e) {
-            console.error('Error in hard update:', e);
-            setTimeout(() => {
-                window.location.reload();
-            }, 800);
-        }
+    const handleHardUpdate = () => {
+        // Redirigir a la ruta de limpieza profunda (Nuke) 
+        // Esta ruta envía el header "Clear-Site-Data: *" lo cual es 
+        // la forma más agresiva posible de borrar SW, Cache y LocalStorage.
+        window.location.href = "/nuke";
     };
 
     if (status === 'hard_update' && serverInfo) {
