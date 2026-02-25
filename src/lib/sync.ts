@@ -8,22 +8,46 @@ export const downloadCatalogs = async () => {
 
     try {
         console.log('Downloading catalogs...');
+        const todayForEscalas = new Date();
+        const localOffsetMsE = todayForEscalas.getTimezoneOffset() * 60000;
+        const localDateE = new Date(todayForEscalas.getTime() - localOffsetMsE);
+        const todayStrE = localDateE.toISOString().split('T')[0];
+
         // A. Puntos de Entrega (Escalas)
-        const { data: escalas } = await supabase
+        const { data: baseEscalas } = await supabase
             .from('escalas')
-            .select('id, nombre, latitud, longitud, km')
+            .select('id, nombre, latitud, longitud, km, nivel_min_operativo, nivel_max_operativo')
             .eq('activa', true);
 
+        // Fetch daily summary for scales
+        const { data: resumenEscalas } = await supabase
+            .from('resumen_escalas_diario')
+            .select('escala_id, nivel_actual, delta_12h, estado')
+            .eq('fecha', todayStrE);
+
+        const dictResumenEscalas = new Map<string, any>();
+        if (resumenEscalas) {
+            resumenEscalas.forEach((r: any) => dictResumenEscalas.set(r.escala_id, r));
+        }
+
         const mappedPuntos: any[] = [];
-        if (escalas) {
-            mappedPuntos.push(...escalas.map((p: any) => ({
-                id: p.id,
-                name: p.nombre,
-                type: 'escala',
-                km: parseFloat(p.km || 0),
-                lat: p.latitud,
-                lng: p.longitud
-            })));
+        if (baseEscalas) {
+            mappedPuntos.push(...baseEscalas.map((p: any) => {
+                const resumen = dictResumenEscalas.get(p.id);
+                return {
+                    id: p.id,
+                    name: p.nombre,
+                    type: 'escala',
+                    km: parseFloat(p.km || 0),
+                    lat: p.latitud,
+                    lng: p.longitud,
+                    nivel_min_operativo: parseFloat(p.nivel_min_operativo || 0),
+                    nivel_max_operativo: parseFloat(p.nivel_max_operativo || 0),
+                    nivel_actual: resumen ? parseFloat(resumen.nivel_actual || 0) : undefined,
+                    delta_12h: resumen ? parseFloat(resumen.delta_12h || 0) : undefined,
+                    escala_estado: resumen?.estado || 'normal'
+                };
+            }));
         }
 
         // B. Puntos de Entrega (Tomas, Laterales, Cárcamos)
@@ -41,14 +65,43 @@ export const downloadCatalogs = async () => {
                 secciones ( nombre )
             `);
 
-        // C. Traer Estado Operativo de Hoy para Ayudas Visuales
-        const todayStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Chihuahua' }).format(new Date());
+        // C. Traer Estado Operativo de Hoy para Ayudas Visuales (Usando el offset local para consistencia)
+        const now = new Date();
+        const localTimeOffsetMs = now.getTimezoneOffset() * 60000;
+        const localDate = new Date(now.getTime() - localTimeOffsetMs);
+        const todayStr = localDate.toISOString().split('T')[0];
+        // Fetch operational reports directly for the current day to get pre-calculated volumes and state
         const { data: reportesHoy } = await supabase
-            .from('reportes_diarios')
-            .select('punto_id, estado, volumen_total_mm3, hora_apertura, caudal_promedio')
+            .from('reportes_operacion')
+            .select('punto_id, caudal_promedio, volumen_acumulado, hora_apertura, estado')
             .eq('fecha', todayStr);
 
-        const mapReportes = new Map(reportesHoy?.map(r => [r.punto_id, r]) || []);
+        const mapReportes = new Map<string, any>();
+        if (reportesHoy) {
+            reportesHoy.forEach((r: any) => {
+                const caudalM3s = Number(r.caudal_promedio || 0);
+                let volumenM3 = Number(r.volumen_acumulado || 0) * 1000000; // DB stores Mm³ → convert to m³
+
+                // Si el volumen del DB es 0 pero hay caudal y hora_apertura,
+                // calculamos dinámicamente: V = Q × t (m³/s × segundos)
+                // Esto sucede en registros 'continua' generados por el rollover de medianoche
+                if (volumenM3 === 0 && caudalM3s > 0 && r.hora_apertura) {
+                    const apertura = new Date(r.hora_apertura);
+                    const ahora = new Date();
+                    const segundosTranscurridos = Math.max(0, (ahora.getTime() - apertura.getTime()) / 1000);
+                    volumenM3 = caudalM3s * segundosTranscurridos; // m³
+                }
+
+                mapReportes.set(r.punto_id, {
+                    punto_id: r.punto_id,
+                    estado: r.estado || 'cerrado',
+                    volumen_total_mm3: volumenM3, // Already in m³ from calculation
+                    hora_apertura: r.hora_apertura,
+                    caudal_promedio_m3s: caudalM3s
+                });
+            });
+        }
+
 
         if (tomas) {
             mappedPuntos.push(...tomas.map((p: any) => {
@@ -64,9 +117,9 @@ export const downloadCatalogs = async () => {
                     estado_hoy: reporte?.estado || 'cerrado',
                     volumen_hoy_mm3: parseFloat(reporte?.volumen_total_mm3 || 0),
                     hora_apertura: reporte?.hora_apertura,
-                    caudal_promedio: parseFloat(reporte?.caudal_promedio || 0),
-                    lat: p.coords_y,
-                    lng: p.coords_x
+                    caudal_promedio: parseFloat(reporte?.caudal_promedio_m3s || 0),
+                    lat: p.coords_y ? Number(p.coords_y) : 0,
+                    lng: p.coords_x ? Number(p.coords_x) : 0
                 };
             }));
         }
@@ -101,7 +154,7 @@ export const syncPendingRecords = async () => {
             fecha: p.fecha_captura,
             nivel_m: p.valor_q,
             hora_lectura: p.hora_captura,
-            responsable: 'Operador Móvil', // Esto vendría del Auth en un entorno real
+            responsable: p.responsable_nombre || 'Operador Móvil', // Real UUID linked
             turno: parseInt(p.hora_captura.split(':')[0]) < 14 ? 'am' : 'pm'
         }));
 
@@ -117,14 +170,22 @@ export const syncPendingRecords = async () => {
             }
         }
 
+        // Obtener el offset local (Ej. -06:00 o -07:00 para Chihuahua)
+        const dateOffset = new Date().getTimezoneOffset();
+        const offsetHours = Math.floor(Math.abs(dateOffset) / 60).toString().padStart(2, '0');
+        const offsetMinutes = (Math.abs(dateOffset) % 60).toString().padStart(2, '0');
+        const offsetString = `${dateOffset <= 0 ? '+' : '-'}${offsetHours}:${offsetMinutes}`;
+
         // 1B. Tomas y Laterales (van a mediciones)
         const tomasPending = pending.filter(p => p.tipo === 'toma');
-        const tomasPayload = tomasPending.map(p => ({
+        const tomasPayload: any[] = tomasPending.map(p => ({
+            id: p.id,
             punto_id: p.punto_id,
-            valor_q: p.valor_q,
-            fecha_hora: `${p.fecha_captura}T${p.hora_captura}Z`, // Ajuste requerido por PostgreSQL timestamp with time zone (depende de config)
+            valor_q: p.valor_q ?? 0,
+            fecha_hora: `${p.fecha_captura}T${p.hora_captura}${offsetString}`,
             tipo_ubicacion: 'canal',
-            estado_evento: p.estado_operativo || null
+            estado_evento: p.estado_operativo || null,
+            usuario_id: p.responsable_id || null
         }));
 
         if (tomasPayload.length > 0) {
@@ -139,8 +200,9 @@ export const syncPendingRecords = async () => {
 
         // 1C. Aforos (van a aforos)
         const aforosPending = pending.filter(p => p.tipo === 'aforo') as (SicaAforoRecord & { id: string })[];
-        const aforosPayload = aforosPending.map(p => ({
-            punto_control_id: p.punto_id, // Asumiendo que es estación
+        const aforosPayload: any[] = aforosPending.map(p => ({
+            id: p.id,
+            punto_control_id: p.punto_id,
             fecha: p.fecha_captura,
             hora_inicio: p.hora_inicial,
             hora_fin: p.hora_final,
@@ -148,7 +210,7 @@ export const syncPendingRecords = async () => {
             nivel_escala_fin_m: p.tirante_final_m,
             espejo_agua_m: p.espejo_m,
             gasto_calculado_m3s: p.gasto_total_m3s,
-            dobelas_data: p.dobelas // JSONB en Supabase
+            dobelas_data: p.dobelas as any
         }));
 
         if (aforosPayload.length > 0) {
