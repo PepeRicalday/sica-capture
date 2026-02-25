@@ -8,8 +8,33 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="SICA Captura">
+
+  <!-- Aggressive Caching Prevention -->
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+  <meta http-equiv="Pragma" content="no-cache" />
+  <meta http-equiv="Expires" content="0" />
+
   <link rel="apple-touch-icon" href="/icon-512.png">
-  <title>S.R.L. Unidad Conchos - Captura</title>
+  <title>SICA Captura | S.R.L. Unidad Conchos</title>
+
+  <script>
+    // CACHE NUKE TRINITY - SICA 2026
+    (function () {
+      // If we are already on a hard refresh, don't loop
+      if (window.location.search.indexOf('hard_refresh=') !== -1) {
+        return;
+      }
+
+      // Check for service worker registration and force update
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.getRegistrations().then(function (registrations) {
+          for (var i = 0; i < registrations.length; i++) {
+            registrations[i].update();
+          }
+        });
+      }
+    })();
+  </script>
 </head>
 
 <body>
