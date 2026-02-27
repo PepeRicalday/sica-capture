@@ -9,18 +9,29 @@ export interface OfflinePoint {
     seccion?: string;
     seccion_id?: string;
     estado_hoy?: string;
-    volumen_hoy_mm3?: number;
+    volumen_hoy_m3?: number;
     hora_apertura?: string;
     caudal_promedio?: number;
+    capacidad_max_lps?: number;
     km?: number;
     lat?: number;
     lng?: number;
+    // Escala Graph metrics
+    nivel_min_operativo?: number;
+    nivel_max_operativo?: number;
+    nivel_actual?: number;
+    delta_12h?: number;
+    escala_estado?: string;
 }
 
 // 2. Registro a Sincronizar (Mochila)
 export interface SicaRecord {
     id: string; // V2 Migration: Using UUIDs locally to prevent sync collisions
     tipo: 'escala' | 'toma' | 'aforo';
+
+    // Auditoría
+    responsable_id?: string;
+    responsable_nombre?: string;
 
     // Payload Dinámico dependiendo del tipo
     punto_id?: string; // UUID
@@ -51,12 +62,12 @@ export interface SicaAforoRecord extends SicaRecord {
     gasto_total_m3s: number; // Resultado calculado
 }
 
-export class MySubClassedDexie extends Dexie {
+export class SicaCaptureDB extends Dexie {
     records!: Table<SicaRecord>;
     puntos!: Table<OfflinePoint>;
 
     constructor() {
-        super('sica_capture_db');
+        super('sica_capture_db_v2');
         // v2: Catálogos, v3: Tomas, v5: Aforos Canal Principal, v6: Offline UUIDs, v7: Hidrometria metrics
         this.version(7).stores({
             records: 'id, sincronizado, tipo, punto_id', // Primary key is now a UUID string
@@ -67,4 +78,4 @@ export class MySubClassedDexie extends Dexie {
     }
 }
 
-export const db = new MySubClassedDexie();
+export const db = new SicaCaptureDB();

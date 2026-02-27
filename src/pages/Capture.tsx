@@ -15,6 +15,7 @@ const Capture = () => {
     const [currentTime, setCurrentTime] = useState(new Date());
     const [estadoToma, setEstadoToma] = useState<'inicio' | 'modificacion' | 'suspension' | 'reabierto' | 'cierre' | 'continua'>('inicio');
     const [manualTime, setManualTime] = useState<string>('');
+    const [showSuccessAnim, setShowSuccessAnim] = useState(false);
 
     // Método de Captura: Estilo "Cajero Automático" (Evita decimales rotos y números infinitos)
     const [rawValue, setRawValue] = useState<number>(0);
@@ -98,8 +99,17 @@ const Capture = () => {
             payload.punto_id = selectedPoint;
             payload.valor_q = parseFloat(val);
         } else if (activeTab === 'toma') {
+            const numVal = parseFloat(val);
+            const refPt = puntos.find(p => p.id === selectedPoint);
+
+            if (refPt?.type !== 'canal' && refPt?.capacidad_max_lps && numVal > refPt.capacidad_max_lps) {
+                toast.error(`Excede capacidad máxima de diseño (${refPt.capacidad_max_lps} L/s)`);
+                return;
+            }
+
             payload.punto_id = selectedPoint;
-            payload.valor_q = parseFloat(val) / 1000; // Aquí se captura L/s, guardamos en la DB / sync como m3/s
+            // Solo divide entre 1000 si NO es canal (el canal captura directo en m3/s)
+            payload.valor_q = refPt?.type === 'canal' ? numVal : numVal / 1000;
             payload.estado_operativo = estadoToma;
         }
 
@@ -126,6 +136,10 @@ const Capture = () => {
                     error: '💾 Resguardado Localmente (Pendiente de Sync)'
                 });
             }
+
+            setShowSuccessAnim(true);
+            setTimeout(() => setShowSuccessAnim(false), 1500);
+
             setRawValue(0);
             setManualTime('');
         } catch (e) {
@@ -194,7 +208,7 @@ const Capture = () => {
                     </label>
                     <div className="relative">
                         <select
-                            className="w-full bg-slate-800 border.5 border-slate-700 rounded-lg p-2 text-white appearance-none focus:border-mobile-accent outline-none font-bold text-sm"
+                            className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-white appearance-none focus:border-mobile-accent outline-none font-bold text-sm"
                             value={selectedPoint}
                             onChange={(e) => setSelectedPoint(e.target.value)}
                         >
@@ -263,12 +277,9 @@ const Capture = () => {
                                     // 1. Volumen de catálogo (descargado)
                                     const volCatalogo = puntos
                                         .filter(p => p.seccion_id === currentPt.seccion_id)
-                                        .reduce((acc, curr) => acc + (curr.volumen_hoy_mm3 || 0), 0);
+                                        .reduce((acc, curr) => acc + (curr.volumen_hoy_m3 || 0), 0);
 
-                                    // 2. Volumen de récords pendientes (no sincronizados aún)
-                                    // Nota: Como no tenemos una función de cálculo de volumen JS idéntica al trigger,
-                                    // mostramos esto como una ayuda visual, pero lo ideal es el sync.
-                                    // Por ahora solo sumamos lo que viene del catálogo.
+                                    // 2. Mostrar formateado en Mm³ (millones de m³)
                                     return `${(volCatalogo / 1000000).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 })} Mm³`;
                                 })()}
                             </span>
@@ -349,7 +360,14 @@ const Capture = () => {
                         </div>
 
                         {/* Guardar Button Movido Arriba del Numpad para Accesibilidad */}
-                        <div className="mb-6 flex-shrink-0">
+                        <div className="mb-6 flex-shrink-0 relative">
+                            {showSuccessAnim && (
+                                <div className="absolute inset-0 z-10 flex items-center justify-center bg-mobile-success rounded-xl animate-in zoom-in spin-in-12 duration-300">
+                                    <svg className="w-10 h-10 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                                    </svg>
+                                </div>
+                            )}
                             <button
                                 className="bg-mobile-accent text-white w-full text-lg sm:text-xl h-14 rounded-xl flex items-center justify-center gap-2 font-bold shadow-lg active:scale-95 transition-transform"
                                 onClick={handleSave}

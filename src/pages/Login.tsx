@@ -1,22 +1,20 @@
-import React, { useState } from 'react';
+import { useState, type FormEvent } from 'react';
 import { supabase } from '../lib/supabase';
 import { useNavigate } from 'react-router-dom';
 import { LogIn, Lock, Mail } from 'lucide-react';
-import './Login.css';
 
-// @ts-ignore
+
 const APP_VERSION = __APP_VERSION__;
-// @ts-ignore
 const BUILD_HASH = __BUILD_HASH__;
 
-const Login: React.FC = () => {
+const Login = () => {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const navigate = useNavigate();
 
-    const handleLogin = async (e: React.FormEvent) => {
+    const handleLogin = async (e: FormEvent) => {
         e.preventDefault();
         setLoading(true);
         setError(null);
@@ -82,7 +80,7 @@ const Login: React.FC = () => {
                                 value={email}
                                 onChange={(e) => setEmail(e.target.value)}
                                 required
-                                className="w-full bg-[#1e293b] border border-slate-700 text-white rounded-2xl py-3.5 pl-11 pr-4 text-[15px] focus:outline-none focus:border-[#ea580c] focus:ring-1 focus:ring-[#ea580c] transition-all shadow-inner"
+                                className="w-full bg-[#1e293b] border border-slate-700 text-white rounded-2xl py-3.5 pl-11 pr-4 text-[15px] focus:outline-none focus:border-mobile-primary focus:ring-1 focus:ring-mobile-primary transition-all shadow-inner"
                             />
                         </div>
                     </div>
@@ -99,7 +97,7 @@ const Login: React.FC = () => {
                                 value={password}
                                 onChange={(e) => setPassword(e.target.value)}
                                 required
-                                className="w-full bg-[#1e293b] border border-slate-700 text-white rounded-2xl py-3.5 pl-11 pr-4 text-[15px] focus:outline-none focus:border-[#ea580c] focus:ring-1 focus:ring-[#ea580c] transition-all shadow-inner"
+                                className="w-full bg-[#1e293b] border border-slate-700 text-white rounded-2xl py-3.5 pl-11 pr-4 text-[15px] focus:outline-none focus:border-mobile-primary focus:ring-1 focus:ring-mobile-primary transition-all shadow-inner"
                             />
                         </div>
                     </div>
@@ -113,7 +111,7 @@ const Login: React.FC = () => {
                     <button
                         type="submit"
                         disabled={loading}
-                        className={`w-full mt-4 bg-[#ea580c] hover:bg-[#c2410c] shadow-lg shadow-orange-900/20 text-white font-bold py-4 rounded-2xl flex items-center justify-center gap-2 transition-all active:scale-[0.98] ${loading ? 'opacity-70 cursor-not-allowed' : ''}`}
+                        className={`w-full mt-4 bg-mobile-primary hover:bg-mobile-primary-hover shadow-lg shadow-orange-900/20 text-white font-bold py-4 rounded-2xl flex items-center justify-center gap-2 transition-all active:scale-[0.98] ${loading ? 'opacity-70 cursor-not-allowed' : ''}`}
                     >
                         {loading ? (
                             <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>

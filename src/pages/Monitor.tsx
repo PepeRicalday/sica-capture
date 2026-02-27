@@ -100,7 +100,7 @@ const Monitor = () => {
     // 2. Calcular volumen total por módulo
     const volPorModulo = tomas.reduce((acc, current) => {
         const mod = current.modulo || 'Sin Módulo';
-        const vol = current.volumen_hoy_mm3 || 0;
+        const vol = current.volumen_hoy_m3 || 0;
         if (!acc[mod]) acc[mod] = 0;
         acc[mod] += vol;
         return acc;
@@ -233,7 +233,7 @@ const Monitor = () => {
                                                     <strong className={`block uppercase border-b border-slate-700 pb-1 mb-1 ${theme.twText}`}>{p.name}</strong>
                                                     <span className="block text-slate-400">MOD {p.modulo} | {p.seccion}</span>
                                                     <span className="block mt-1 font-mono text-white font-bold text-sm">
-                                                        Vol: {((p.volumen_hoy_mm3 || 0) / 1000000).toLocaleString(undefined, { minimumFractionDigits: 3, maximumFractionDigits: 3 })} Mm³
+                                                        Vol: {((p.volumen_hoy_m3 || 0) / 1000000).toLocaleString(undefined, { minimumFractionDigits: 3, maximumFractionDigits: 3 })} Mm³
                                                     </span>
                                                 </div>
                                             </Popup>
@@ -260,7 +260,7 @@ const Monitor = () => {
                                                     <span className="text-[10px] text-slate-500">MOD {p.modulo} | {p.seccion}</span>
                                                 </div>
                                                 <span className="text-xs font-mono text-white font-bold">
-                                                    {((p.volumen_hoy_mm3 || 0) / 1000000).toLocaleString(undefined, { minimumFractionDigits: 3, maximumFractionDigits: 3 })} Mm³
+                                                    {((p.volumen_hoy_m3 || 0) / 1000000).toLocaleString(undefined, { minimumFractionDigits: 3, maximumFractionDigits: 3 })} Mm³
                                                 </span>
                                             </div>
                                         );

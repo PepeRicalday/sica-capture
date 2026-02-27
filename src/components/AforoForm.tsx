@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react';
 import { Save, Plus, Trash2, Calculator } from 'lucide-react';
 import { toast } from 'sonner';
 import { db, type SicaAforoRecord, type AforoDobela } from '../lib/db';
+import { useAuth } from '../context/AuthContext';
 import { syncPendingRecords } from '../lib/sync';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -12,6 +13,8 @@ interface AforoFormProps {
 }
 
 export const AforoForm = ({ selectedPoint, isOnline, onSaveSuccess }: AforoFormProps) => {
+    const { profile } = useAuth();
+
     // 1. Estados Simples Genéricos de Aforo
     const [horaInicial, setHoraInicial] = useState('');
     const [horaFinal, setHoraFinal] = useState('');
@@ -83,9 +86,9 @@ export const AforoForm = ({ selectedPoint, isOnline, onSaveSuccess }: AforoFormP
         }
     };
 
-    const updateDobela = (index: number, field: keyof AforoDobela, value: any) => {
+    const updateDobela = (index: number, field: keyof AforoDobela, value: number) => {
         const newDobelas = [...dobelas];
-        newDobelas[index] = { ...newDobelas[index], [field]: value };
+        newDobelas[index] = { ...newDobelas[index], [field]: isNaN(value) ? 0 : value };
         setDobelas(newDobelas);
     };
 
@@ -94,8 +97,8 @@ export const AforoForm = ({ selectedPoint, isOnline, onSaveSuccess }: AforoFormP
         const newRevs = [...newDobelas[index].velocidades_revoluciones];
         const newSegs = [...newDobelas[index].velocidades_segundos];
 
-        newRevs[lecIndex] = rev;
-        newSegs[lecIndex] = seg;
+        newRevs[lecIndex] = isNaN(rev) ? 0 : rev;
+        newSegs[lecIndex] = isNaN(seg) ? 0 : seg;
 
         newDobelas[index].velocidades_revoluciones = newRevs;
         newDobelas[index].velocidades_segundos = newSegs;
@@ -124,8 +127,10 @@ export const AforoForm = ({ selectedPoint, isOnline, onSaveSuccess }: AforoFormP
             tipo: 'aforo',
             punto_id: selectedPoint,
             fecha_captura: captureDateStr,
-            hora_captura: horaFinal,
-            sincronizado: isOnline ? 'true' : 'false',
+            hora_captura: now.toTimeString().split(' ')[0],
+            sincronizado: 'false', // ALWAYS start as false — syncPendingRecords() marks as 'true' AFTER successful upload
+            responsable_id: profile?.id,
+            responsable_nombre: profile?.nombre || 'Operador Móvil',
             // Campos específicos Aforo
             hora_inicial: horaInicial,
             hora_final: horaFinal,
@@ -157,7 +162,7 @@ export const AforoForm = ({ selectedPoint, isOnline, onSaveSuccess }: AforoFormP
     };
 
     return (
-        <div className="flex flex-col h-full overflow-y-auto pb-4">
+        <div className="flex flex-col pb-12">
             <h2 className="text-lg font-bold mb-2 flex items-center gap-2 px-1"><Calculator size={20} className="text-mobile-accent" /> Captura Método Área-Velocidad</h2>
 
             {/* Metadatos Generales */}
@@ -235,9 +240,9 @@ export const AforoForm = ({ selectedPoint, isOnline, onSaveSuccess }: AforoFormP
                 <Plus size={16} /> NUEVA LECTURA (V)
             </button>
 
-            {/* Dashboard Final Flotante Integrado */}
-            <div className="sticky bottom-0 bg-slate-900 border-t-2 border-mobile-accent p-3 -mx-3 shadow-[0_-10px_20px_rgba(0,0,0,0.5)] z-10">
-                <div className="flex justify-between items-end mb-2">
+            {/* Dashboard Final Integrado (Flujo regular, previniendo bloqueo por teclado) */}
+            <div className="mt-4 bg-slate-900 border-t-2 border-mobile-accent p-3 -mx-3 shadow-lg z-10 pb-12">
+                <div className="flex justify-between items-end mb-4">
                     <div>
                         <div className="text-[10px] text-slate-400 font-bold uppercase">Área Total</div>
                         <div className="text-base font-mono text-white leading-none">{datosCalculados.areaTotal.toFixed(3)}m²</div>
@@ -249,10 +254,10 @@ export const AforoForm = ({ selectedPoint, isOnline, onSaveSuccess }: AforoFormP
                 </div>
 
                 <button
-                    className="w-full bg-mobile-accent text-white py-2.5 rounded-lg flex items-center justify-center gap-2 font-bold shadow-lg active:scale-95 transition-transform text-base"
+                    className="w-full bg-mobile-accent text-white py-3.5 rounded-lg flex items-center justify-center gap-2 font-bold shadow-lg active:scale-95 transition-transform text-lg"
                     onClick={handleSave}
                 >
-                    <Save size={18} /> ALMACENAR AFORO
+                    <Save size={20} /> ALMACENAR AFORO
                 </button>
             </div>
 

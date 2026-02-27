@@ -9,9 +9,7 @@ interface VersionInfo {
     build_hash: string;
 }
 
-// @ts-ignore
 const CURRENT_VERSION = __APP_VERSION__;
-// @ts-ignore
 const BUILD_HASH = __BUILD_HASH__;
 
 export const VersionGuard: React.FC<{ children: React.ReactNode }> = ({ children }) => {

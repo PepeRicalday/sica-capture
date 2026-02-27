@@ -11,7 +11,6 @@ import { downloadCatalogs, syncPendingRecords } from './lib/sync';
 import { supabase } from './lib/supabase';
 import { Toaster } from 'sonner';
 import { VersionGuard } from './components/VersionGuard';
-// @ts-ignore
 import { useRegisterSW } from 'virtual:pwa-register/react';
 import { UpdateBanner } from './components/UpdateBanner';
 
@@ -38,7 +37,6 @@ function AppContent() {
   const [showUpdateBanner, setShowUpdateBanner] = useState(true);
   const [manualUpdateAvailable, setManualUpdateAvailable] = useState(false);
 
-  // @ts-ignore
   const CURRENT_VERSION = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '0.0.0';
 
   const {
@@ -49,7 +47,7 @@ function AppContent() {
       console.log('SW Registered: ' + r);
       if (r) {
         r.update();
-        setInterval(() => { r.update(); }, 60 * 1000);
+        setInterval(() => { r.update(); }, 5 * 60 * 1000); // Check every 5 min (was 60s — too aggressive for mobile data)
       }
     },
     onRegisterError(error: any) {

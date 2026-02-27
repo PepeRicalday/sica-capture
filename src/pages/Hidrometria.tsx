@@ -1,16 +1,20 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../lib/db';
-import { Droplets, Trophy, Clock, AlertTriangle, Activity } from 'lucide-react';
+import { Droplets, Trophy, Clock, AlertTriangle, Activity, TrendingUp, AlertCircle } from 'lucide-react';
+import { ResponsiveContainer, ComposedChart, Line, XAxis, YAxis, CartesianGrid, Tooltip } from 'recharts';
 import clsx from 'clsx';
+import { TomaHistoryModal } from '../components/TomaHistoryModal';
+import { formatCaudalLps } from '../lib/formatters';
 
 const Hidrometria: React.FC = () => {
+    const [selectedToma, setSelectedToma] = useState<any | null>(null);
     // 1. Fetch points from offline DB
     const allPoints = useLiveQuery(() => db.puntos.toArray()) || [];
 
     // 2. Compute the Widgets logic
-    const { totalGastoM3s, seccionData, top5, olvidadas, totalVolumenMm3 } = useMemo(() => {
-        const activas = allPoints.filter(p => p.type === 'toma' && ['inicio', 'reabierto', 'continua'].includes(p.estado_hoy || ''));
+    const { totalGastoM3s, seccionData, top5, olvidadas, totalVolumenMm3, tomasPorZona, escalasGraphData, escalasAlertas } = useMemo(() => {
+        const activas = allPoints.filter(p => ['toma', 'lateral'].includes(p.type || '') && ['inicio', 'reabierto', 'continua', 'modificacion'].includes(p.estado_hoy || ''));
 
         // Sum total Gasto
         let totalGastoM3s = 0;
@@ -20,7 +24,7 @@ const Hidrometria: React.FC = () => {
         activas.forEach(p => {
             const flow = p.caudal_promedio || 0;
             totalGastoM3s += flow;
-            totalVolumenMm3 += (p.volumen_hoy_mm3 || 0);
+            totalVolumenMm3 += (p.volumen_hoy_m3 || 0);
 
             const sec = p.seccion || 'Zona General';
             if (!seccionMap[sec]) seccionMap[sec] = { totalFlow: 0, count: 0 };
@@ -51,11 +55,64 @@ const Hidrometria: React.FC = () => {
             return { ...p, hoursOpen: Math.floor(diffHours) };
         }).sort((a, b) => b.hoursOpen - a.hoursOpen);
 
-        return { totalGastoM3s, seccionData, top5, olvidadas, totalVolumenMm3 };
+        // Group tomas by Zona for new Widget
+        const tomasPorZona: Record<string, typeof activas> = {};
+        activas.forEach(p => {
+            const sec = p.seccion || 'Zona General';
+            if (!tomasPorZona[sec]) tomasPorZona[sec] = [];
+            tomasPorZona[sec].push(p);
+        });
+
+        // WIDGET ESCALAS: Profile Data
+        const escalasPoints = allPoints
+            .filter(p => p.type === 'escala' && p.km !== undefined)
+            .sort((a, b) => (a.km || 0) - (b.km || 0));
+
+        const escalasGraphData = escalasPoints.map(p => ({
+            nombre: p.name,
+            km: p.km,
+            nivel_actual: p.nivel_actual, // can be undefined
+            min: p.nivel_min_operativo,
+            max: p.nivel_max_operativo,
+            delta: p.delta_12h,
+            estado: p.escala_estado
+        }));
+
+        const escalasAlertas = escalasPoints.filter(p => p.escala_estado === 'alto' || p.escala_estado === 'bajo');
+
+        return { totalGastoM3s, seccionData, top5, olvidadas, totalVolumenMm3, tomasPorZona, escalasGraphData, escalasAlertas };
     }, [allPoints]);
 
+    // Custom Tooltip for Escalas Graph
+    const EscalasTooltip = ({ active, payload }: any) => {
+        if (active && payload && payload.length) {
+            const data = payload[0].payload;
+            return (
+                <div className="bg-slate-900 border border-slate-700 p-2 rounded-lg shadow-xl text-xs">
+                    <p className="text-white font-bold mb-1 border-b border-slate-700 pb-1">{data.nombre}</p>
+                    <p className="text-slate-400">Km: <span className="text-white font-mono">{data.km}</span></p>
+                    {data.nivel_actual !== undefined ? (
+                        <>
+                            <p className="text-cyan-400 font-bold mt-1">Nivel: {data.nivel_actual.toFixed(2)}m</p>
+                            <p className="text-slate-500">Min: {data.min?.toFixed(2)}m | Max: {data.max?.toFixed(2)}m</p>
+                            {data.delta !== 0 && data.delta !== undefined && (
+                                <p className={clsx("mt-1 flex items-center gap-1 font-bold", data.delta > 0 ? "text-emerald-400" : "text-amber-400")}>
+                                    <TrendingUp size={12} className={data.delta < 0 ? "rotate-180" : ""} />
+                                    {Math.abs(data.delta).toFixed(2)}m (12h)
+                                </p>
+                            )}
+                        </>
+                    ) : (
+                        <p className="text-amber-500/70 italic mt-1">Sin lectura reciente</p>
+                    )}
+                </div>
+            );
+        }
+        return null;
+    };
+
     return (
-        <div className="flex flex-col h-full bg-mobile-dark">
+        <div className="flex flex-col h-[100dvh] bg-mobile-dark">
             <header className="px-4 py-3 bg-mobile-card border-b border-slate-800 shrink-0">
                 <h1 className="text-sm font-bold text-white tracking-wide uppercase flex items-center justify-between">
                     <div>
@@ -83,6 +140,95 @@ const Hidrometria: React.FC = () => {
                     </div>
                 </div>
 
+                {/* WIDGET ESCALAS: Perfil Hidráulico */}
+                <div className="bg-mobile-card rounded-xl border border-slate-700/50 shadow-xl overflow-hidden">
+                    <div className="p-3 border-b border-slate-800/50">
+                        <h2 className="text-xs font-bold text-cyan-400 uppercase tracking-wider flex items-center gap-2">
+                            <TrendingUp size={14} className="text-cyan-500" />
+                            Perfil Hidráulico Red Mayor
+                        </h2>
+                        <p className="text-[9px] text-slate-500 font-mono mt-0.5">Comportamiento del Canal Principal Conchos</p>
+                    </div>
+
+                    <div className="p-2 pt-4 bg-[#0b1120]/50" style={{ height: 220, width: '100%' }}>
+                        {escalasGraphData.length === 0 ? (
+                            <div className="h-full flex items-center justify-center text-slate-500 text-xs italic">
+                                Sincroniza para descargar las escalas
+                            </div>
+                        ) : (
+                            <ResponsiveContainer>
+                                <ComposedChart data={escalasGraphData} margin={{ top: 5, right: 10, left: -25, bottom: 0 }}>
+                                    <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
+                                    <XAxis
+                                        dataKey="km"
+                                        type="number"
+                                        domain={['dataMin', 'dataMax']}
+                                        tick={{ fill: '#64748b', fontSize: 9 }}
+                                        tickFormatter={(val: number) => `K-${val}`}
+                                    />
+                                    <YAxis
+                                        tick={{ fill: '#64748b', fontSize: 9 }}
+                                        domain={['auto', 'auto']}
+                                        tickFormatter={(val: number) => val.toFixed(1)}
+                                    />
+                                    <Tooltip content={<EscalasTooltip />} />
+
+                                    <Line
+                                        type="monotone"
+                                        dataKey="max"
+                                        stroke="#ef4444"
+                                        strokeWidth={1.5}
+                                        strokeDasharray="4 4"
+                                        dot={false}
+                                        name="Máximo Operativo"
+                                    />
+                                    <Line
+                                        type="monotone"
+                                        dataKey="min"
+                                        stroke="#f59e0b"
+                                        strokeWidth={1.5}
+                                        strokeDasharray="4 4"
+                                        dot={false}
+                                        name="Mínimo Operativo"
+                                    />
+                                    <Line
+                                        type="monotone"
+                                        dataKey="nivel_actual"
+                                        stroke="#06b6d4"
+                                        strokeWidth={3}
+                                        dot={{ r: 4, fill: '#06b6d4', strokeWidth: 0 }}
+                                        activeDot={{ r: 6, fill: '#fff', stroke: '#06b6d4', strokeWidth: 2 }}
+                                        name="Nivel M"
+                                    />
+                                </ComposedChart>
+                            </ResponsiveContainer>
+                        )}
+                    </div>
+
+                    {/* Alertas Operativas de Escalas */}
+                    {escalasAlertas.length > 0 && (
+                        <div className="bg-red-950/30 p-3 border-t border-red-900/40">
+                            <h3 className="text-[10px] font-bold text-red-400 uppercase tracking-widest mb-2 flex items-center gap-1.5">
+                                <AlertCircle size={12} className="text-red-500" />
+                                Alertas Operativas
+                            </h3>
+                            <div className="space-y-1.5">
+                                {escalasAlertas.map(e => (
+                                    <div key={e.id} className="flex justify-between items-center text-xs bg-red-900/20 px-2 py-1.5 rounded">
+                                        <span className="text-red-200 font-medium truncate pr-2 flex-1">{e.name}</span>
+                                        <div className="flex items-center gap-2 shrink-0">
+                                            <span className={clsx("text-[9px] uppercase px-1.5 py-0.5 rounded font-bold", e.escala_estado === 'alto' ? "bg-red-500/20 text-red-400" : "bg-orange-500/20 text-orange-400")}>
+                                                {e.escala_estado}
+                                            </span>
+                                            <span className="font-mono font-bold text-white">{e.nivel_actual?.toFixed(2)}m</span>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+                </div>
+
                 {/* WIDGET 1: Distribución por Zona */}
                 <div className="bg-mobile-card rounded-xl p-3 border border-slate-700/50 shadow-lg">
                     <h2 className="text-xs font-bold text-white uppercase tracking-wider mb-3 flex items-center gap-2">
@@ -96,7 +242,7 @@ const Hidrometria: React.FC = () => {
                             seccionData.map(sec => (
                                 <div key={sec.name}>
                                     <div className="flex justify-between items-end mb-1">
-                                        <span className="text-[10px] text-slate-300 font-bold truncation flex-1 pr-2 uppercase">{sec.name}</span>
+                                        <span className="text-[10px] text-slate-300 font-bold truncate flex-1 pr-2 uppercase">{sec.name}</span>
                                         <div className="text-right flex-shrink-0">
                                             <span className="text-xs font-bold text-emerald-400">{sec.totalFlow.toFixed(3)} m³/s</span>
                                             <span className="text-[9px] text-slate-500 ml-2">({sec.count} tomas)</span>
@@ -114,18 +260,69 @@ const Hidrometria: React.FC = () => {
                     </div>
                 </div>
 
+                {/* NUEVO WIDGET: Tomas Abiertas en la Red (Por Zona) */}
+                <div className="bg-mobile-card rounded-xl p-3 border border-slate-700/50 shadow-lg">
+                    <div className="flex justify-between items-center mb-3">
+                        <h2 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-2">
+                            <span className="relative flex h-2 w-2">
+                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75"></span>
+                                <span className="relative inline-flex rounded-full h-2 w-2 bg-cyan-500"></span>
+                            </span>
+                            Tomas Abiertas en la Red
+                        </h2>
+                    </div>
+                    <div className="space-y-4">
+                        {Object.keys(tomasPorZona).length === 0 ? (
+                            <p className="text-[10px] text-slate-500 italic">Ninguna toma registrada como abierta hoy.</p>
+                        ) : (
+                            Object.entries(tomasPorZona).map(([zona, tomas]) => (
+                                <div key={zona} className="bg-slate-800/50 rounded-lg p-2 border border-slate-700/30">
+                                    <h3 className="text-[10px] font-bold text-cyan-400 uppercase tracking-wider mb-2 border-b border-cyan-900/50 pb-1">
+                                        {zona} <span className="text-slate-500 ml-1 font-normal">({tomas.length})</span>
+                                    </h3>
+                                    <div className="flex gap-2 overflow-x-auto pb-1 custom-scrollbar min-h-[44px]">
+                                        {tomas.map(p => (
+                                            <div
+                                                key={p.id}
+                                                onClick={() => setSelectedToma(p)}
+                                                className="flex-shrink-0 bg-slate-900 border border-slate-700 rounded p-1.5 min-w-[120px] max-w-[150px] cursor-pointer hover:bg-slate-800 transition-colors"
+                                            >
+                                                <div className="text-[10px] text-white font-bold truncate flex justify-between items-center">
+                                                    <span className="truncate pr-1">{p.name}</span>
+                                                </div>
+                                                <div className="mt-1 flex justify-between items-center">
+                                                    <span className="text-[9px] text-cyan-400 bg-cyan-900/30 px-1 rounded">
+                                                        {formatCaudalLps(p.caudal_promedio)}
+                                                    </span>
+                                                    <span className="text-[8px] text-slate-500">
+                                                        Mod: {p.modulo}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            ))
+                        )}
+                    </div>
+                </div>
+
                 {/* WIDGET 2: Top 5 Consumo */}
                 <div className="bg-mobile-card rounded-xl p-3 border border-slate-700/50 shadow-lg">
                     <h2 className="text-xs font-bold text-white uppercase tracking-wider mb-3 flex items-center gap-2">
                         <Trophy size={14} className="text-amber-400" />
-                        Top 5 Mayor Extracción
+                        Top 5 Mayor Volumen Entregado
                     </h2>
                     <div className="divide-y divide-slate-800">
                         {top5.length === 0 ? (
                             <p className="text-xs text-slate-500 italic py-2">Sin tomas activas.</p>
                         ) : (
                             top5.map((p, i) => (
-                                <div key={p.id} className="py-2.5 flex items-center justify-between">
+                                <div
+                                    key={p.id}
+                                    onClick={() => setSelectedToma(p)}
+                                    className="py-2.5 flex items-center justify-between cursor-pointer hover:bg-slate-800/50 px-2 -mx-2 rounded transition-colors"
+                                >
                                     <div className="flex flex-col w-[70%]">
                                         <div className="flex items-center gap-2">
                                             <span className="text-[10px] font-black text-slate-500 bg-slate-800 w-4 h-4 rounded-full flex items-center justify-center shrink-0">
@@ -139,11 +336,10 @@ const Hidrometria: React.FC = () => {
                                     </div>
                                     <div className="flex flex-col items-end">
                                         <span className="text-xs font-bold text-amber-400">
-                                            {p.caudal_promedio?.toFixed(3)}
-                                            <span className="text-[9px] text-amber-500/70 ml-0.5">m³/s</span>
+                                            {formatCaudalLps(p.caudal_promedio)}
                                         </span>
                                         <span className="text-[9px] text-blue-400">
-                                            {((p.volumen_hoy_mm3 || 0) / 1000).toFixed(1)} m³
+                                            {(p.volumen_hoy_m3 || 0).toLocaleString(undefined, { maximumFractionDigits: 0 })} m³
                                         </span>
                                     </div>
                                 </div>
@@ -194,6 +390,12 @@ const Hidrometria: React.FC = () => {
                 {/* Footer Spacer */}
                 <div className="h-6"></div>
             </div>
+
+            <TomaHistoryModal
+                isOpen={!!selectedToma}
+                onClose={() => setSelectedToma(null)}
+                punto={selectedToma}
+            />
         </div>
     );
 };

@@ -1,9 +1,12 @@
-import React from 'react';
+import type { ReactNode } from 'react';
 import { MapPin, LogOut, Activity, Droplets } from 'lucide-react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
-const Layout = ({ children }: { children: React.ReactNode }) => {
+const APP_VERSION = __APP_VERSION__;
+const BUILD_HASH = __BUILD_HASH__;
+
+const Layout = ({ children }: { children: ReactNode }) => {
     const { signOut } = useAuth();
     const navigate = useNavigate();
 
@@ -13,7 +16,7 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
     };
 
     return (
-        <div className="flex flex-col h-screen fixed inset-0 overflow-hidden bg-mobile-dark">
+        <div className="flex flex-col h-[100dvh] fixed inset-0 overflow-hidden bg-mobile-dark">
             {/* Main Content */}
             <main className="flex-1 overflow-y-auto pb-20">
                 {children}
@@ -62,6 +65,12 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
                         <LogOut size={22} />
                         <span className="text-[9px] mt-0.5">Salir</span>
                     </button>
+                </div>
+                {/* Version Badge */}
+                <div className="flex justify-center pb-1 -mt-1">
+                    <span className="text-[8px] text-slate-600 font-mono tracking-wider">
+                        SICA v{APP_VERSION} • {BUILD_HASH}
+                    </span>
                 </div>
             </nav>
         </div>

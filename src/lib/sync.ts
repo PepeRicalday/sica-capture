@@ -95,7 +95,7 @@ export const downloadCatalogs = async () => {
                 mapReportes.set(r.punto_id, {
                     punto_id: r.punto_id,
                     estado: r.estado || 'cerrado',
-                    volumen_total_mm3: volumenM3, // Already in m³ from calculation
+                    volumen_total_m3: volumenM3, // Already in m³ from calculation
                     hora_apertura: r.hora_apertura,
                     caudal_promedio_m3s: caudalM3s
                 });
@@ -115,7 +115,7 @@ export const downloadCatalogs = async () => {
                     seccion_id: p.seccion_id,
                     km: parseFloat(p.km || 0),
                     estado_hoy: reporte?.estado || 'cerrado',
-                    volumen_hoy_mm3: parseFloat(reporte?.volumen_total_mm3 || 0),
+                    volumen_hoy_m3: parseFloat(reporte?.volumen_total_m3 || 0),
                     hora_apertura: reporte?.hora_apertura,
                     caudal_promedio: parseFloat(reporte?.caudal_promedio_m3s || 0),
                     lat: p.coords_y ? Number(p.coords_y) : 0,
@@ -125,8 +125,11 @@ export const downloadCatalogs = async () => {
         }
 
         if (mappedPuntos.length > 0) {
-            await db.puntos.clear(); // Limpiar antes de poblar
-            await db.puntos.bulkPut(mappedPuntos);
+            // A-06: Atomic transaction — prevents empty IndexedDB if crash occurs between clear and bulkPut
+            await db.transaction('rw', db.puntos, async () => {
+                await db.puntos.clear();
+                await db.puntos.bulkPut(mappedPuntos);
+            });
         }
 
         console.log('Catalogs updated successfully.');
