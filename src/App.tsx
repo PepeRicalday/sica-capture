@@ -41,7 +41,6 @@ function AppContent() {
 
   const {
     needRefresh: [needRefresh],
-    updateServiceWorker,
   } = useRegisterSW({
     onRegistered(r: any) {
       console.log('SW Registered: ' + r);
@@ -118,22 +117,25 @@ function AppContent() {
       </Routes>
       {(needRefresh || manualUpdateAvailable) && showUpdateBanner && (
         <UpdateBanner
-          onUpdate={() => {
-            if (needRefresh) {
-              updateServiceWorker(true);
-            } else {
-              // Forced manual update if SW didn't trigger
+          onUpdate={async () => {
+            try {
               if ('serviceWorker' in navigator) {
-                navigator.serviceWorker.getRegistrations().then(registrations => {
-                  for (let registration of registrations) {
-                    registration.unregister();
-                  }
-                  window.location.reload();
-                });
-              } else {
-                window.location.reload();
+                const registrations = await navigator.serviceWorker.getRegistrations();
+                for (let r of registrations) {
+                  await r.unregister();
+                }
               }
+              if ('caches' in window) {
+                const cacheNames = await caches.keys();
+                for (let name of cacheNames) {
+                  await caches.delete(name);
+                }
+              }
+            } catch (e) {
+              console.error("Cache clear failed", e);
             }
+            // Always force reload from server
+            window.location.href = window.location.origin + "?update=" + Date.now();
           }}
           onClose={() => setShowUpdateBanner(false)}
         />
