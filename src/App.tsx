@@ -41,6 +41,7 @@ function AppContent() {
 
   const {
     needRefresh: [needRefresh],
+    updateServiceWorker,
   } = useRegisterSW({
     onRegistered(r: any) {
       console.log('SW Registered: ' + r);
@@ -119,23 +120,33 @@ function AppContent() {
         <UpdateBanner
           onUpdate={async () => {
             try {
-              if ('serviceWorker' in navigator) {
-                const registrations = await navigator.serviceWorker.getRegistrations();
-                for (let r of registrations) {
-                  await r.unregister();
-                }
+              if (needRefresh && updateServiceWorker) {
+                await updateServiceWorker(true);
+                return;
               }
-              if ('caches' in window) {
-                const cacheNames = await caches.keys();
-                for (let name of cacheNames) {
-                  await caches.delete(name);
+
+              const clearTasks = async () => {
+                const tasks: Promise<any>[] = [];
+                if ('serviceWorker' in navigator) {
+                  const regs = await navigator.serviceWorker.getRegistrations();
+                  regs.forEach(r => tasks.push(r.unregister()));
                 }
-              }
+                if ('caches' in window) {
+                  const keys = await caches.keys();
+                  keys.forEach(k => tasks.push(caches.delete(k)));
+                }
+                await Promise.all(tasks);
+              };
+
+              await Promise.race([
+                clearTasks(),
+                new Promise(resolve => setTimeout(resolve, 1500))
+              ]);
+
             } catch (e) {
-              console.error("Cache clear failed", e);
+              console.error("Cache clear timeout/error:", e);
             }
-            // Always force reload from server
-            window.location.href = window.location.origin + "?update=" + Date.now();
+            window.location.replace(window.location.origin + "?update=" + Date.now());
           }}
           onClose={() => setShowUpdateBanner(false)}
         />
