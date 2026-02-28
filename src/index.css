@@ -67,3 +67,67 @@
 .animate-spin-slow {
   animation: spin 3s linear infinite;
 }
+
+/* Glassmorphism & Glossy Effects */
+.glass-panel {
+  @apply bg-slate-900/40 backdrop-blur-md border border-slate-700/50 shadow-lg;
+}
+
+.glass-pill {
+  @apply bg-slate-800/60 backdrop-blur-sm border border-slate-700/60 shadow-inner text-slate-200;
+}
+
+.glow-btn-active {
+  box-shadow: 0 0 15px 0px rgba(14, 165, 233, 0.4);
+  @apply bg-gradient-to-br from-mobile-accent to-blue-600 border border-blue-400 text-white;
+}
+
+.glow-btn-danger {
+  box-shadow: 0 0 15px 0px rgba(239, 68, 68, 0.4);
+  @apply bg-gradient-to-br from-red-500 to-rose-700 border border-red-400 text-white;
+}
+
+.glow-btn-success {
+  box-shadow: 0 0 15px 0px rgba(16, 185, 129, 0.4);
+  @apply bg-gradient-to-br from-emerald-500 to-green-700 border border-emerald-400 text-white;
+}
+
+/* Custom Stealth Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(15, 23, 42, 0.5);
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(51, 65, 85, 0.8);
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(14, 165, 233, 0.8);
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+  height: 4px;
+}
+
+/* Base background mesh / grid for depth */
+body::before {
+  content: "";
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+  background-size: 20px 20px;
+  background-position: center;
+  pointer-events: none;
+  z-index: -1;
+}

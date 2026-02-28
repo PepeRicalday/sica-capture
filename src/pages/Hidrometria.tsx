@@ -1,14 +1,30 @@
 import React, { useMemo, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../lib/db';
-import { Droplets, Trophy, Clock, AlertTriangle, Activity, TrendingUp, AlertCircle } from 'lucide-react';
+import { Activity, Trophy, Clock, AlertTriangle, TrendingUp, AlertCircle, WifiOff } from 'lucide-react';
 import { ResponsiveContainer, ComposedChart, Line, XAxis, YAxis, CartesianGrid, Tooltip } from 'recharts';
 import clsx from 'clsx';
 import { TomaHistoryModal } from '../components/TomaHistoryModal';
 import { formatCaudalLps } from '../lib/formatters';
+import { useAuth } from '../context/AuthContext';
 
 const Hidrometria: React.FC = () => {
+    const { user } = useAuth();
+    const [isOnline, setIsOnline] = useState(navigator.onLine);
     const [selectedToma, setSelectedToma] = useState<any | null>(null);
+    const [selectedZonaFiltro, setSelectedZonaFiltro] = useState<string>('Todas');
+    const isAdmin = user?.email === 'gerente@srlconchos.com' || user?.email === 'aforador@srlconchos.com';
+
+    React.useEffect(() => {
+        const handle = () => setIsOnline(navigator.onLine);
+        window.addEventListener('online', handle);
+        window.addEventListener('offline', handle);
+        return () => {
+            window.removeEventListener('online', handle);
+            window.removeEventListener('offline', handle);
+        };
+    }, []);
+
     // 1. Fetch points from offline DB
     const allPoints = useLiveQuery(() => db.puntos.toArray()) || [];
 
@@ -113,36 +129,58 @@ const Hidrometria: React.FC = () => {
 
     return (
         <div className="flex flex-col h-[100dvh] bg-mobile-dark">
-            <header className="px-4 py-3 bg-mobile-card border-b border-slate-800 shrink-0">
-                <h1 className="text-sm font-bold text-white tracking-wide uppercase flex items-center justify-between">
-                    <div>
-                        <Droplets className="inline -mt-1 mr-2 text-mobile-accent" size={16} />
-                        Resumen de Hidrometría
+            <header className="px-4 py-4 bg-slate-900 border-b border-mobile-accent/30 shrink-0 shadow-lg relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-32 h-32 bg-mobile-accent/5 blur-3xl rounded-full -mr-16 -mt-16"></div>
+                <h1 className="text-base font-black text-white tracking-widest uppercase flex items-center justify-between relative z-10">
+                    <div className="flex items-center gap-2">
+                        <Activity className="text-mobile-accent animate-pulse" size={20} />
+                        Centro de Control Hidrométrico
                     </div>
+                    {isOnline ? (
+                        <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/30">
+                            <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></div>
+                            <span className="text-[8px] text-emerald-400 font-black">ONLINE</span>
+                        </div>
+                    ) : (
+                        <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-slate-800 border border-slate-700">
+                            <WifiOff size={10} className="text-slate-400" />
+                            <span className="text-[8px] text-slate-400 font-black">OFFLINE</span>
+                        </div>
+                    )}
                 </h1>
-                <p className="text-[10px] text-mobile-accent/80 font-mono mt-0.5">Visión Offline de Tomas Abiertas</p>
+                <div className="flex justify-between items-center mt-1 relative z-10 font-mono">
+                    <p className="text-[10px] text-slate-400">Hidro-Sincronía Digital SRL </p>
+                    <p className="text-[9px] text-mobile-accent font-bold">V.1.2.1-PRO</p>
+                </div>
             </header>
 
-            <div className="flex-1 overflow-y-auto p-4 space-y-5">
-                {/* GLOBAL METRICS */}
+            <div className="flex-1 overflow-y-auto p-4 space-y-5 custom-scrollbar pb-20">
+                {/* EXEC METRICS: Glassmorphism Style */}
                 <div className="grid grid-cols-2 gap-3">
-                    <div className="bg-slate-800/80 rounded-xl p-3 border border-slate-700/50 flex flex-col items-center justify-center">
-                        <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-1">Caudal Global</span>
-                        <div className="text-2xl font-bold text-cyan-400">
-                            {totalGastoM3s.toFixed(2)} <span className="text-xs text-cyan-400/70 font-normal">m³/s</span>
+                    <div className="glass-panel rounded-2xl p-4 flex flex-col items-start justify-center relative overflow-hidden group border-mobile-accent/20">
+                        <div className="absolute -right-4 -top-4 w-16 h-16 bg-cyan-500/10 blur-2xl rounded-full"></div>
+                        <span className="text-[9px] text-slate-500 font-black uppercase tracking-widest mb-2">Gasto en Red Mayor</span>
+                        <div className="flex items-baseline gap-1">
+                            <span className="text-2xl font-black text-white tracking-tighter">{totalGastoM3s.toFixed(2)}</span>
+                            <span className="text-[10px] text-cyan-400 font-mono font-bold">m³/s</span>
                         </div>
+                        <div className="mt-2 h-1 w-12 bg-cyan-500/30 rounded-full"></div>
                     </div>
-                    <div className="bg-slate-800/80 rounded-xl p-3 border border-slate-700/50 flex flex-col items-center justify-center">
-                        <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-1">Vol. Entregado</span>
-                        <div className="text-2xl font-bold text-blue-400">
-                            {(totalVolumenMm3 / 1000000).toFixed(3)} <span className="text-xs text-blue-400/70 font-normal">Mm³</span>
+
+                    <div className="glass-panel rounded-2xl p-4 flex flex-col items-start justify-center relative overflow-hidden group border-blue-500/20">
+                        <div className="absolute -right-4 -top-4 w-16 h-16 bg-blue-500/10 blur-2xl rounded-full"></div>
+                        <span className="text-[9px] text-slate-500 font-black uppercase tracking-widest mb-2">Volumen Entregado</span>
+                        <div className="flex items-baseline gap-1">
+                            <span className="text-2xl font-black text-white tracking-tighter">{(totalVolumenMm3 / 1000000).toFixed(3)}</span>
+                            <span className="text-[10px] text-blue-400 font-mono font-bold">Mm³</span>
                         </div>
+                        <div className="mt-2 h-1 w-12 bg-blue-500/30 rounded-full"></div>
                     </div>
                 </div>
 
                 {/* WIDGET ESCALAS: Perfil Hidráulico */}
-                <div className="bg-mobile-card rounded-xl border border-slate-700/50 shadow-xl overflow-hidden">
-                    <div className="p-3 border-b border-slate-800/50">
+                <div className="glass-panel rounded-xl overflow-hidden relative">
+                    <div className="p-3 border-b border-slate-700/50 bg-slate-900/30">
                         <h2 className="text-xs font-bold text-cyan-400 uppercase tracking-wider flex items-center gap-2">
                             <TrendingUp size={14} className="text-cyan-500" />
                             Perfil Hidráulico Red Mayor
@@ -230,7 +268,7 @@ const Hidrometria: React.FC = () => {
                 </div>
 
                 {/* WIDGET 1: Distribución por Zona */}
-                <div className="bg-mobile-card rounded-xl p-3 border border-slate-700/50 shadow-lg">
+                <div className="glass-panel rounded-xl p-3 relative">
                     <h2 className="text-xs font-bold text-white uppercase tracking-wider mb-3 flex items-center gap-2">
                         <Activity size={14} className="text-emerald-400" />
                         Gasto Activo por Zona
@@ -261,7 +299,7 @@ const Hidrometria: React.FC = () => {
                 </div>
 
                 {/* NUEVO WIDGET: Tomas Abiertas en la Red (Por Zona) */}
-                <div className="bg-mobile-card rounded-xl p-3 border border-slate-700/50 shadow-lg">
+                <div className="glass-panel rounded-xl p-3 relative">
                     <div className="flex justify-between items-center mb-3">
                         <h2 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-2">
                             <span className="relative flex h-2 w-2">
@@ -270,45 +308,59 @@ const Hidrometria: React.FC = () => {
                             </span>
                             Tomas Abiertas en la Red
                         </h2>
+                        {isAdmin && Object.keys(tomasPorZona).length > 0 && (
+                            <select
+                                className="bg-slate-800 text-white text-[10px] sm:text-xs rounded border border-slate-600 px-2 py-1 outline-none"
+                                value={selectedZonaFiltro}
+                                onChange={(e) => setSelectedZonaFiltro(e.target.value)}
+                            >
+                                <option value="Todas">Todas las Zonas</option>
+                                {Object.keys(tomasPorZona).sort().map(z => (
+                                    <option key={z} value={z}>{z}</option>
+                                ))}
+                            </select>
+                        )}
                     </div>
                     <div className="space-y-4">
                         {Object.keys(tomasPorZona).length === 0 ? (
                             <p className="text-[10px] text-slate-500 italic">Ninguna toma registrada como abierta hoy.</p>
                         ) : (
-                            Object.entries(tomasPorZona).map(([zona, tomas]) => (
-                                <div key={zona} className="bg-slate-800/50 rounded-lg p-2 border border-slate-700/30">
-                                    <h3 className="text-[10px] font-bold text-cyan-400 uppercase tracking-wider mb-2 border-b border-cyan-900/50 pb-1">
-                                        {zona} <span className="text-slate-500 ml-1 font-normal">({tomas.length})</span>
-                                    </h3>
-                                    <div className="flex gap-2 overflow-x-auto pb-1 custom-scrollbar min-h-[44px]">
-                                        {tomas.map(p => (
-                                            <div
-                                                key={p.id}
-                                                onClick={() => setSelectedToma(p)}
-                                                className="flex-shrink-0 bg-slate-900 border border-slate-700 rounded p-1.5 min-w-[120px] max-w-[150px] cursor-pointer hover:bg-slate-800 transition-colors"
-                                            >
-                                                <div className="text-[10px] text-white font-bold truncate flex justify-between items-center">
-                                                    <span className="truncate pr-1">{p.name}</span>
+                            Object.entries(tomasPorZona)
+                                .filter(([zona]) => selectedZonaFiltro === 'Todas' || zona === selectedZonaFiltro)
+                                .map(([zona, tomas]) => (
+                                    <div key={zona} className="bg-slate-800/50 rounded-lg p-2 border border-slate-700/30">
+                                        <h3 className="text-[10px] font-bold text-cyan-400 uppercase tracking-wider mb-2 border-b border-cyan-900/50 pb-1">
+                                            {zona} <span className="text-slate-500 ml-1 font-normal">({tomas.length})</span>
+                                        </h3>
+                                        <div className="flex gap-2 overflow-x-auto pb-1 custom-scrollbar min-h-[44px]">
+                                            {tomas.map(p => (
+                                                <div
+                                                    key={p.id}
+                                                    onClick={() => setSelectedToma(p)}
+                                                    className="flex-shrink-0 bg-slate-900 border border-slate-700 rounded p-1.5 min-w-[120px] max-w-[150px] cursor-pointer hover:bg-slate-800 transition-colors"
+                                                >
+                                                    <div className="text-[10px] text-white font-bold truncate flex justify-between items-center">
+                                                        <span className="truncate pr-1">{p.name}</span>
+                                                    </div>
+                                                    <div className="mt-1 flex justify-between items-center">
+                                                        <span className="text-[9px] text-cyan-400 bg-cyan-900/30 px-1 rounded">
+                                                            {formatCaudalLps(p.caudal_promedio)}
+                                                        </span>
+                                                        <span className="text-[8px] text-slate-500">
+                                                            Mod: {p.modulo}
+                                                        </span>
+                                                    </div>
                                                 </div>
-                                                <div className="mt-1 flex justify-between items-center">
-                                                    <span className="text-[9px] text-cyan-400 bg-cyan-900/30 px-1 rounded">
-                                                        {formatCaudalLps(p.caudal_promedio)}
-                                                    </span>
-                                                    <span className="text-[8px] text-slate-500">
-                                                        Mod: {p.modulo}
-                                                    </span>
-                                                </div>
-                                            </div>
-                                        ))}
+                                            ))}
+                                        </div>
                                     </div>
-                                </div>
-                            ))
+                                ))
                         )}
                     </div>
                 </div>
 
                 {/* WIDGET 2: Top 5 Consumo */}
-                <div className="bg-mobile-card rounded-xl p-3 border border-slate-700/50 shadow-lg">
+                <div className="glass-panel rounded-xl p-3 relative">
                     <h2 className="text-xs font-bold text-white uppercase tracking-wider mb-3 flex items-center gap-2">
                         <Trophy size={14} className="text-amber-400" />
                         Top 5 Mayor Volumen Entregado
@@ -350,8 +402,8 @@ const Hidrometria: React.FC = () => {
 
                 {/* WIDGET 3: Tomas Olvidadas */}
                 <div className={clsx(
-                    "rounded-xl p-3 border shadow-lg transition-colors duration-300",
-                    olvidadas.length > 0 ? "bg-red-950/20 border-red-500/30" : "bg-mobile-card border-slate-700/50"
+                    "rounded-xl p-3 border shadow-lg transition-colors duration-300 relative",
+                    olvidadas.length > 0 ? "glass-panel border-red-500/50 bg-red-950/20" : "glass-panel"
                 )}>
                     <h2 className={clsx(
                         "text-xs font-bold uppercase tracking-wider mb-3 flex items-center gap-2",

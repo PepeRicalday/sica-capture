@@ -124,12 +124,29 @@ const Monitor = () => {
     return (
         <div className="flex flex-col h-[100dvh] bg-mobile-dark">
             {/* Header */}
-            <header className="bg-mobile-card px-4 py-3 flex justify-between items-center shadow-md">
-                <div className="flex flex-col">
-                    <h1 className="text-xl font-bold leading-tight">Monitor Operativo</h1>
-                    <span className="text-mobile-accent font-mono text-xs font-semibold tracking-wider">
-                        {dateStr} • {timeStr}
-                    </span>
+            <header className="px-4 py-4 bg-slate-900 border-b border-indigo-500/30 shrink-0 shadow-lg relative overflow-hidden">
+                <div className="absolute top-0 left-0 w-32 h-32 bg-indigo-500/5 blur-3xl rounded-full -ml-16 -mt-16"></div>
+                <div className="flex justify-between items-center relative z-10">
+                    <div className="flex flex-col">
+                        <h1 className="text-base font-black text-white tracking-widest uppercase flex items-center gap-2">
+                            <Scale className="text-indigo-400" size={18} />
+                            Balance Hidrodinámico
+                        </h1>
+                        <span className="text-indigo-400 font-mono text-[10px] font-bold tracking-wider">
+                            {dateStr} • {timeStr}
+                        </span>
+                    </div>
+                    {isOnline ? (
+                        <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30">
+                            <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></div>
+                            <span className="text-[8px] text-emerald-400 font-black tracking-tighter">RED ACTIVA</span>
+                        </div>
+                    ) : (
+                        <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-slate-800 border border-slate-700">
+                            <WifiOff size={10} className="text-slate-500" />
+                            <span className="text-[8px] text-slate-500 font-black tracking-tighter">LOCAL MODE</span>
+                        </div>
+                    )}
                 </div>
             </header>
 

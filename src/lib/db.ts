@@ -41,6 +41,7 @@ export interface SicaRecord {
     fecha_captura: string;
     hora_captura: string;
     sincronizado: 'true' | 'false'; // IndexedDB booleans workaround
+    error_sync?: string; // Nuevo: Para rastrear por qué falló la subida (Ej. RLS, Validación)
 }
 
 export interface AforoDobela {
@@ -60,6 +61,12 @@ export interface SicaAforoRecord extends SicaRecord {
     espejo_m: number;
     dobelas: AforoDobela[]; // Array con los datos de cada sección (v1, v2, v3...)
     gasto_total_m3s: number; // Resultado calculado
+    plantilla_m?: number;
+    talud_z?: number;
+    tirante_calculo_m?: number;
+    area_hidraulica_m2?: number;
+    velocidad_media_ms?: number;
+    froude?: number;
 }
 
 export class SicaCaptureDB extends Dexie {

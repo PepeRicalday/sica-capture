@@ -61,6 +61,7 @@ export const downloadCatalogs = async () => {
                 km,
                 coords_x,
                 coords_y,
+                capacidad_max_lps,
                 modulos ( codigo_corto, nombre ),
                 secciones ( nombre )
             `);
@@ -70,35 +71,46 @@ export const downloadCatalogs = async () => {
         const localTimeOffsetMs = now.getTimezoneOffset() * 60000;
         const localDate = new Date(now.getTime() - localTimeOffsetMs);
         const todayStr = localDate.toISOString().split('T')[0];
-        // Fetch operational reports directly for the current day to get pre-calculated volumes and state
-        const { data: reportesHoy } = await supabase
+
+        // Retrocedemos 5 días para asegurar que tomas que no "cruzaron" el cron job o quedaron abiertas sigan visibles
+        const fiveDaysAgo = new Date(localDate.getTime() - 5 * 24 * 60 * 60 * 1000);
+        const fiveDaysAgoStr = fiveDaysAgo.toISOString().split('T')[0];
+
+        // Fetch operational reports, recent ones first
+        const { data: reportesRecientes } = await supabase
             .from('reportes_operacion')
-            .select('punto_id, caudal_promedio, volumen_acumulado, hora_apertura, estado')
-            .eq('fecha', todayStr);
+            .select('punto_id, caudal_promedio, volumen_acumulado, hora_apertura, estado, fecha')
+            .gte('fecha', fiveDaysAgoStr)
+            .order('fecha', { ascending: false })
+            .order('hora_apertura', { ascending: false });
 
         const mapReportes = new Map<string, any>();
-        if (reportesHoy) {
-            reportesHoy.forEach((r: any) => {
-                const caudalM3s = Number(r.caudal_promedio || 0);
-                let volumenM3 = Number(r.volumen_acumulado || 0) * 1000000; // DB stores Mm³ → convert to m³
+        if (reportesRecientes) {
+            reportesRecientes.forEach((r: any) => {
+                // Al estar ordenado por fecha DESC, el primero que leemos es el estado operativo más reciente
+                if (!mapReportes.has(r.punto_id)) {
+                    const isToday = r.fecha === todayStr;
+                    const caudalM3s = Number(r.caudal_promedio || 0);
+                    let volumenM3 = isToday ? Number(r.volumen_acumulado || 0) * 1000000 : 0; // DB stores Mm³ → convert to m³
 
-                // Si el volumen del DB es 0 pero hay caudal y hora_apertura,
-                // calculamos dinámicamente: V = Q × t (m³/s × segundos)
-                // Esto sucede en registros 'continua' generados por el rollover de medianoche
-                if (volumenM3 === 0 && caudalM3s > 0 && r.hora_apertura) {
-                    const apertura = new Date(r.hora_apertura);
-                    const ahora = new Date();
-                    const segundosTranscurridos = Math.max(0, (ahora.getTime() - apertura.getTime()) / 1000);
-                    volumenM3 = caudalM3s * segundosTranscurridos; // m³
+                    // Si el volumen del DB es 0 (o viene de un día anterior arrastrando estado abierto),
+                    // calculamos dinámicamente: V = Q × t (m³/s × segundos)
+                    const isStateOpen = ['inicio', 'continua', 'reabierto', 'modificacion'].includes(r.estado || '');
+                    if ((volumenM3 === 0 || !isToday) && caudalM3s > 0 && r.hora_apertura && isStateOpen) {
+                        const apertura = new Date(r.hora_apertura);
+                        const ahora = new Date();
+                        const segundosTranscurridos = Math.max(0, (ahora.getTime() - apertura.getTime()) / 1000);
+                        volumenM3 = caudalM3s * segundosTranscurridos; // m³
+                    }
+
+                    mapReportes.set(r.punto_id, {
+                        punto_id: r.punto_id,
+                        estado: r.estado || 'cerrado',
+                        volumen_total_m3: volumenM3, // Already in m³ from calculation
+                        hora_apertura: r.hora_apertura,
+                        caudal_promedio_m3s: caudalM3s
+                    });
                 }
-
-                mapReportes.set(r.punto_id, {
-                    punto_id: r.punto_id,
-                    estado: r.estado || 'cerrado',
-                    volumen_total_m3: volumenM3, // Already in m³ from calculation
-                    hora_apertura: r.hora_apertura,
-                    caudal_promedio_m3s: caudalM3s
-                });
             });
         }
 
@@ -118,6 +130,7 @@ export const downloadCatalogs = async () => {
                     volumen_hoy_m3: parseFloat(reporte?.volumen_total_m3 || 0),
                     hora_apertura: reporte?.hora_apertura,
                     caudal_promedio: parseFloat(reporte?.caudal_promedio_m3s || 0),
+                    capacidad_max_lps: p.capacidad_max_lps ? Number(p.capacidad_max_lps) : undefined,
                     lat: p.coords_y ? Number(p.coords_y) : 0,
                     lng: p.coords_x ? Number(p.coords_x) : 0
                 };
@@ -164,11 +177,12 @@ export const syncPendingRecords = async () => {
         let syncSuccessIds: string[] = [];
 
         if (escalasPayload.length > 0) {
-            const { error } = await supabase.from('lecturas_escalas').insert(escalasPayload);
-            if (error) {
-                console.error('Error insertando escalas:', error.message);
+            const { error: err } = await supabase.from('lecturas_escalas').insert(escalasPayload);
+            if (err) {
+                console.error('Error insertando escalas:', err.message);
+                // Tag individual local records with error
+                await db.records.where('id').anyOf(escalasPending.map(p => p.id)).modify({ error_sync: err.message });
             } else {
-                // Agregar IDs a la lista de éxitos
                 syncSuccessIds.push(...escalasPending.map(p => p.id as string));
             }
         }
@@ -192,11 +206,11 @@ export const syncPendingRecords = async () => {
         }));
 
         if (tomasPayload.length > 0) {
-            const { error } = await supabase.from('mediciones').insert(tomasPayload);
-            if (error) {
-                console.error('Error insertando tomas:', error.message);
+            const { error: err } = await supabase.from('mediciones').insert(tomasPayload);
+            if (err) {
+                console.error('Error insertando tomas:', err.message);
+                await db.records.where('id').anyOf(tomasPending.map(p => p.id)).modify({ error_sync: err.message });
             } else {
-                // Agregar IDs a la lista de éxitos
                 syncSuccessIds.push(...tomasPending.map(p => p.id as string));
             }
         }
@@ -213,22 +227,28 @@ export const syncPendingRecords = async () => {
             nivel_escala_fin_m: p.tirante_final_m,
             espejo_agua_m: p.espejo_m,
             gasto_calculado_m3s: p.gasto_total_m3s,
-            dobelas_data: p.dobelas as any
+            dobelas_data: p.dobelas as any,
+            plantilla_m: p.plantilla_m,
+            talud_z: p.talud_z,
+            tirante_calculo_m: p.tirante_calculo_m,
+            area_hidraulica_m2: p.area_hidraulica_m2,
+            velocidad_media_ms: p.velocidad_media_ms,
+            froude: p.froude
         }));
 
         if (aforosPayload.length > 0) {
-            const { error } = await supabase.from('aforos').insert(aforosPayload);
-            if (error) {
-                console.error('Error insertando aforos:', error.message);
+            const { error: err } = await supabase.from('aforos').insert(aforosPayload);
+            if (err) {
+                console.error('Error insertando aforos:', err.message);
+                await db.records.where('id').anyOf(aforosPending.map(p => p.id)).modify({ error_sync: err.message });
             } else {
-                // Agregar IDs a la lista de éxitos
                 syncSuccessIds.push(...aforosPending.map(p => p.id));
             }
         }
 
-        // Si se subieron bien, *SOLO ESTOS* se marcan como sincronizados
+        // Si se subieron bien, *SOLO ESTOS* se marcan como sincronizados y se limpia el error
         if (syncSuccessIds.length > 0) {
-            await db.records.where('id').anyOf(syncSuccessIds).modify({ sincronizado: 'true' });
+            await db.records.where('id').anyOf(syncSuccessIds).modify({ sincronizado: 'true', error_sync: undefined });
             console.log(`Sync complete. Successfully synced ${syncSuccessIds.length}/${pending.length} records.`);
 
             // 🔥 CRITICAL: Refresh catalogs to get the new 'estado_hoy' computed by DB triggers

@@ -113,7 +113,7 @@ export const TomaHistoryModal: React.FC<TomaHistoryModalProps> = ({ isOpen, onCl
             <div className="bg-mobile-dark w-full max-h-[45dvh] sm:max-w-md mx-auto sm:rounded-2xl rounded-t-2xl shadow-2xl flex flex-col animate-in slide-in-from-bottom-full duration-300">
 
                 {/* Header */}
-                <div className="relative px-5 py-4 border-b border-slate-800 bg-mobile-card sm:rounded-t-2xl rounded-t-2xl flex flex-col gap-1">
+                <div className="relative px-5 py-4 border-b border-slate-700/50 glass-panel sm:rounded-t-2xl rounded-t-2xl flex flex-col gap-1 z-10 shadow-lg">
                     <button onClick={onClose} className="absolute top-4 right-4 p-2 bg-slate-800 text-slate-400 hover:text-white rounded-full">
                         <X size={18} />
                     </button>
@@ -129,24 +129,26 @@ export const TomaHistoryModal: React.FC<TomaHistoryModalProps> = ({ isOpen, onCl
                 <div className="flex-1 overflow-y-auto p-5 pb-24 custom-scrollbar">
 
                     {/* Totales Resumen */}
-                    <div className="grid grid-cols-2 gap-3 mb-6">
-                        <div className="bg-slate-800/80 rounded-xl p-3 border border-slate-700/50 flex flex-col">
-                            <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-1 flex items-center gap-1"><Clock size={12} className="text-amber-400" /> Hrs. Activas</span>
-                            <div className="text-2xl font-bold text-white">
+                    <div className="grid grid-cols-2 gap-3 mb-6 relative">
+                        <div className="glass-panel overflow-hidden relative rounded-xl p-3 flex flex-col group">
+                            <div className="absolute inset-0 bg-blue-500/10 blur-xl opacity-0 hover:opacity-100 transition-opacity"></div>
+                            <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-1 flex items-center gap-1 relative z-10"><Clock size={12} className="text-amber-400" /> Hrs. Activas</span>
+                            <div className="text-2xl font-bold text-white relative z-10">
                                 {Math.max(totales.horasContinuas, (Date.now() - new Date(punto.hora_apertura || Date.now()).getTime()) / 3600000).toFixed(0)} <span className="text-xs text-slate-500 font-normal">h</span>
                             </div>
                         </div>
-                        <div className="bg-slate-800/80 rounded-xl p-3 border border-slate-700/50 flex flex-col">
-                            <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-1 flex items-center gap-1"><Droplets size={12} className="text-blue-400" /> Vol. Acumulado</span>
-                            <div className="text-2xl font-bold text-blue-400">
+                        <div className="glass-panel overflow-hidden relative rounded-xl p-3 flex flex-col group">
+                            <div className="absolute inset-0 bg-cyan-500/10 blur-xl opacity-0 hover:opacity-100 transition-opacity"></div>
+                            <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-1 flex items-center gap-1 relative z-10"><Droplets size={12} className="text-blue-400" /> Vol. Acumulado</span>
+                            <div className="text-2xl font-bold text-blue-400 relative z-10">
                                 {volTotalMm3.toFixed(3)} <span className="text-xs text-blue-400/70 font-normal">Mm³</span>
                             </div>
                         </div>
                     </div>
 
                     {!isOnline ? (
-                        <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 flex flex-col items-center justify-center text-center">
-                            <WifiOff size={32} className="text-slate-600 mb-3" />
+                        <div className="glass-panel rounded-xl p-6 flex flex-col items-center justify-center text-center">
+                            <WifiOff size={32} className="text-slate-600 mb-3 drop-shadow-md" />
                             <h3 className="text-slate-300 font-bold mb-1">Sin Conexión</h3>
                             <p className="text-xs text-slate-500 max-w-[200px]">
                                 El historial de eventos anteriores requiere acceso a la nube.
@@ -192,9 +194,9 @@ export const TomaHistoryModal: React.FC<TomaHistoryModalProps> = ({ isOpen, onCl
                                                     isFirst && "animate-pulse ring-cyan-900/50"
                                                 )}></div>
 
-                                                <div className="bg-slate-800/40 rounded-lg p-2.5 border border-slate-700/30">
+                                                <div className="glass-panel rounded-lg p-2.5 border-t border-b-0 border-r-0 border-l border-white/5 shadow-md">
                                                     <div className="flex justify-between items-start mb-1">
-                                                        <span className={clsx("text-xs font-bold uppercase tracking-wide", textStatus)}>
+                                                        <span className={clsx("text-xs font-bold uppercase tracking-wide drop-shadow-sm", textStatus)}>
                                                             {ev.estado_evento}
                                                         </span>
                                                         <span className="text-[10px] text-slate-400 font-mono">
