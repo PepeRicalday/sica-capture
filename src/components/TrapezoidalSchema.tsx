@@ -41,8 +41,6 @@ export const TrapezoidalSchema: React.FC<TrapezoidalSchemaProps> = ({
     const waterLevelY = 90;
 
     // Ancho del espejo visual en el dibujo
-    const totalVisualEspejoWidth = (rightCrownX - (rightCrownX - rightBottomX) * 0.4) - (leftCrownX + (leftBottomX - leftCrownX) * 0.4);
-
     // Calculamos las X para cada vertical (dobela) de forma EQUIDISTANTE (Ancho uniforme)
     const dobelas = Array.from({ length: dobelasCount }).map((_, i) => {
         // En aforos, las dobelas deben distribuirse uniformemente en el espejo real.
