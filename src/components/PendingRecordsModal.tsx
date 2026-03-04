@@ -10,14 +10,15 @@ interface PendingRecordsModalProps {
 export const PendingRecordsModal = ({ onClose }: PendingRecordsModalProps) => {
     const [pendingRecords, setPendingRecords] = useState<SicaRecord[]>([]);
 
-    useEffect(() => {
-        loadPending();
-    }, []);
-
     const loadPending = async () => {
         const records = await db.records.where({ sincronizado: 'false' }).toArray();
         setPendingRecords(records);
     };
+
+    useEffect(() => {
+        loadPending();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
     const handleDelete = async (id: string) => {
         if (confirm('¿Estás seguro de eliminar este registro pendiente? (No se puede recuperar)')) {

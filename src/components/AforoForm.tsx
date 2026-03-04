@@ -42,6 +42,7 @@ export const AforoForm = ({ selectedPoint, isOnline, onSaveSuccess, editRecord }
     // EFECTO DE HIDRATACIÓN (Para Corregir Aforos Anteriores)
     useEffect(() => {
         if (editRecord) {
+            // eslint-disable-next-line react-hooks/set-state-in-effect
             setHoraInicial(editRecord.hora_inicial || '');
             setHoraFinal(editRecord.hora_final || '');
             setEscalaInicial(editRecord.tirante_inicial_m || 0);
@@ -134,17 +135,19 @@ export const AforoForm = ({ selectedPoint, isOnline, onSaveSuccess, editRecord }
         });
 
         // RE-CALCULO PARA PROGRESIVAS (Acumuladas) Y TOTALES ESTRICTOS
-        let cumulX = 0;
         let totalA = 0;
         let totalQ = 0;
-        const dobelasFinales = dobelasCalculadas.map((d) => {
+        let cumulX = 0;
+        const dobelasFinales: any[] = [];
+
+        for (const d of dobelasCalculadas) {
             const centerOffset = d.base_m / 2;
             const currentX = cumulX + centerOffset;
             cumulX += d.base_m;
             totalA += d.area;
             totalQ += d.gasto;
-            return { ...d, x: currentX };
-        });
+            dobelasFinales.push({ ...d, x: currentX });
+        }
 
         // Cálculo de Régimen (Froude)
         const t_prom = totalA > 0 && espejo ? (totalA / Number(espejo)) : (totalQ > 0 ? 0.5 : 0);

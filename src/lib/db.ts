@@ -22,6 +22,11 @@ export interface OfflinePoint {
     nivel_actual?: number;
     delta_12h?: number;
     escala_estado?: string;
+
+    // Configuración Radiales de la Escala
+    ancho_radiales?: number;
+    alto_radiales?: number;
+    pzas_radiales?: number;
 }
 
 // 2. Registro a Sincronizar (Mochila)
@@ -42,6 +47,12 @@ export interface SicaRecord {
     hora_captura: string;
     sincronizado: 'true' | 'false'; // IndexedDB booleans workaround
     error_sync?: string; // Nuevo: Para rastrear por qué falló la subida (Ej. RLS, Validación)
+
+    // Nuevas métricas para Reporte de Escalas (Represos)
+    nivel_abajo_m?: number;
+    apertura_radiales_m?: number;
+    gasto_calculado_m3s?: number;
+    radiales_json?: any[]; // Arreglo detallado de cada compuerta radial
 }
 
 export interface AforoDobela {

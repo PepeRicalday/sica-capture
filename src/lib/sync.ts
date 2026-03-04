@@ -1,5 +1,6 @@
 import { supabase } from './supabase';
 import { db, type SicaAforoRecord } from './db';
+import { getTodayString, getDaysAgoString, getTimezoneOffsetString } from './dateHelpers';
 
 // -- 1. DESCARGA DE CATÁLOGOS (DE SUR A NORTE) --
 // Llama a esto cuando el usuario inicie sesión para tener los catálogos en el teléfono
@@ -8,15 +9,12 @@ export const downloadCatalogs = async () => {
 
     try {
         console.log('Downloading catalogs...');
-        const todayForEscalas = new Date();
-        const localOffsetMsE = todayForEscalas.getTimezoneOffset() * 60000;
-        const localDateE = new Date(todayForEscalas.getTime() - localOffsetMsE);
-        const todayStrE = localDateE.toISOString().split('T')[0];
+        const todayStrE = getTodayString();
 
         // A. Puntos de Entrega (Escalas)
         const { data: baseEscalas } = await supabase
             .from('escalas')
-            .select('id, nombre, latitud, longitud, km, nivel_min_operativo, nivel_max_operativo')
+            .select('id, nombre, latitud, longitud, km, nivel_min_operativo, nivel_max_operativo, ancho, alto, pzas_radiales')
             .eq('activa', true);
 
         // Fetch daily summary for scales
@@ -45,7 +43,10 @@ export const downloadCatalogs = async () => {
                     nivel_max_operativo: parseFloat(p.nivel_max_operativo || 0),
                     nivel_actual: resumen ? parseFloat(resumen.nivel_actual || 0) : undefined,
                     delta_12h: resumen ? parseFloat(resumen.delta_12h || 0) : undefined,
-                    escala_estado: resumen?.estado || 'normal'
+                    escala_estado: resumen?.estado || 'normal',
+                    ancho_radiales: p.ancho ? parseFloat(p.ancho) : undefined,
+                    alto_radiales: p.alto ? parseFloat(p.alto) : undefined,
+                    pzas_radiales: p.pzas_radiales ? parseInt(p.pzas_radiales) : undefined
                 };
             }));
         }
@@ -67,14 +68,10 @@ export const downloadCatalogs = async () => {
             `);
 
         // C. Traer Estado Operativo de Hoy para Ayudas Visuales (Usando el offset local para consistencia)
-        const now = new Date();
-        const localTimeOffsetMs = now.getTimezoneOffset() * 60000;
-        const localDate = new Date(now.getTime() - localTimeOffsetMs);
-        const todayStr = localDate.toISOString().split('T')[0];
+        const todayStr = getTodayString();
 
         // Retrocedemos 5 días para asegurar que tomas que no "cruzaron" el cron job o quedaron abiertas sigan visibles
-        const fiveDaysAgo = new Date(localDate.getTime() - 5 * 24 * 60 * 60 * 1000);
-        const fiveDaysAgoStr = fiveDaysAgo.toISOString().split('T')[0];
+        const fiveDaysAgoStr = getDaysAgoString(5);
 
         // Fetch operational reports, recent ones first
         const { data: reportesRecientes } = await supabase
@@ -137,6 +134,21 @@ export const downloadCatalogs = async () => {
             }));
         }
 
+        // D. Puntos de Aforo (Aforos Principales)
+        const { data: aforosControl } = await supabase
+            .from('aforos_control')
+            .select('id, nombre_punto, latitud, longitud');
+
+        if (aforosControl) {
+            mappedPuntos.push(...aforosControl.map((p: any) => ({
+                id: p.id,
+                name: p.nombre_punto,
+                type: 'aforo',
+                lat: p.latitud ? Number(p.latitud) : 0,
+                lng: p.longitud ? Number(p.longitud) : 0
+            })));
+        }
+
         if (mappedPuntos.length > 0) {
             // A-06: Atomic transaction — prevents empty IndexedDB if crash occurs between clear and bulkPut
             await db.transaction('rw', db.puntos, async () => {
@@ -169,12 +181,16 @@ export const syncPendingRecords = async () => {
             escala_id: p.punto_id,
             fecha: p.fecha_captura,
             nivel_m: p.valor_q,
+            nivel_abajo_m: p.nivel_abajo_m,
+            apertura_radiales_m: p.apertura_radiales_m,
+            radiales_json: p.radiales_json,
+            gasto_calculado_m3s: p.gasto_calculado_m3s,
             hora_lectura: p.hora_captura,
             responsable: p.responsable_nombre || 'Operador Móvil', // Real UUID linked
             turno: parseInt(p.hora_captura.split(':')[0]) < 14 ? 'am' : 'pm'
         }));
 
-        let syncSuccessIds: string[] = [];
+        const syncSuccessIds: string[] = [];
 
         if (escalasPayload.length > 0) {
             const { error: err } = await supabase.from('lecturas_escalas').insert(escalasPayload);
@@ -187,11 +203,8 @@ export const syncPendingRecords = async () => {
             }
         }
 
-        // Obtener el offset local (Ej. -06:00 o -07:00 para Chihuahua)
-        const dateOffset = new Date().getTimezoneOffset();
-        const offsetHours = Math.floor(Math.abs(dateOffset) / 60).toString().padStart(2, '0');
-        const offsetMinutes = (Math.abs(dateOffset) % 60).toString().padStart(2, '0');
-        const offsetString = `${dateOffset <= 0 ? '+' : '-'}${offsetHours}:${offsetMinutes}`;
+        // Obtener el offset local (Ej. -06:00 o -07:00 para Chihuahua) — centralizado via Intl
+        const offsetString = getTimezoneOffsetString();
 
         // 1B. Tomas y Laterales (van a mediciones)
         const tomasPending = pending.filter(p => p.tipo === 'toma');

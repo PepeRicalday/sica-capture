@@ -6,22 +6,53 @@ import { ResponsiveContainer, ComposedChart, Line, XAxis, YAxis, CartesianGrid, 
 import clsx from 'clsx';
 import { TomaHistoryModal } from '../components/TomaHistoryModal';
 import { formatCaudalLps } from '../lib/formatters';
-import { useAuth } from '../context/AuthContext';
+
+// Custom Tooltip for Escalas Graph
+const EscalasTooltip = ({ active, payload }: any) => {
+    if (active && payload && payload.length) {
+        const data = payload[0].payload;
+        return (
+            <div className="bg-slate-900 border border-slate-700 p-2 rounded-lg shadow-xl text-xs">
+                <p className="text-white font-bold mb-1 border-b border-slate-700 pb-1">{data.nombre}</p>
+                <p className="text-slate-400">Km: <span className="text-white font-mono">{data.km}</span></p>
+                {data.nivel_actual !== undefined ? (
+                    <>
+                        <p className="text-cyan-400 font-bold mt-1">Nivel: {data.nivel_actual.toFixed(2)}m</p>
+                        <p className="text-slate-500">Min: {data.min?.toFixed(2)}m | Max: {data.max?.toFixed(2)}m</p>
+                        {data.delta !== 0 && data.delta !== undefined && (
+                            <p className={clsx("mt-1 flex items-center gap-1 font-bold", data.delta > 0 ? "text-emerald-400" : "text-amber-400")}>
+                                <TrendingUp size={12} className={data.delta < 0 ? "rotate-180" : ""} />
+                                {Math.abs(data.delta).toFixed(2)}m (12h)
+                            </p>
+                        )}
+                    </>
+                ) : (
+                    <p className="text-amber-500/70 italic mt-1">Sin lectura reciente</p>
+                )}
+            </div>
+        );
+    }
+    return null;
+};
 
 const Hidrometria: React.FC = () => {
-    const { user } = useAuth();
     const [isOnline, setIsOnline] = useState(navigator.onLine);
     const [selectedToma, setSelectedToma] = useState<any | null>(null);
     const [selectedZonaFiltro, setSelectedZonaFiltro] = useState<string>('Todas');
-    const isAdmin = user?.email === 'gerente@srlconchos.com' || user?.email === 'aforador@srlconchos.com';
+
+    const [nowMs, setNowMs] = useState<number>(() => Date.now());
 
     React.useEffect(() => {
         const handle = () => setIsOnline(navigator.onLine);
         window.addEventListener('online', handle);
         window.addEventListener('offline', handle);
+
+        const interval = setInterval(() => setNowMs(Date.now()), 60000); // refresh time every minute instead of on every render
+
         return () => {
             window.removeEventListener('online', handle);
             window.removeEventListener('offline', handle);
+            clearInterval(interval);
         };
     }, []);
 
@@ -60,7 +91,6 @@ const Hidrometria: React.FC = () => {
         const top5 = [...activas].sort((a, b) => (b.caudal_promedio || 0) - (a.caudal_promedio || 0)).slice(0, 5);
 
         // Widget 3: Tomas Olvidadas (> 12 hours)
-        const nowMs = Date.now();
         const olvidadas = activas.filter(p => {
             if (!p.hora_apertura) return false;
             const aperturaDate = new Date(p.hora_apertura).getTime();
@@ -97,36 +127,7 @@ const Hidrometria: React.FC = () => {
         const escalasAlertas = escalasPoints.filter(p => p.escala_estado === 'alto' || p.escala_estado === 'bajo');
 
         return { totalGastoM3s, seccionData, top5, olvidadas, totalVolumenMm3, tomasPorZona, escalasGraphData, escalasAlertas };
-    }, [allPoints]);
-
-    // Custom Tooltip for Escalas Graph
-    const EscalasTooltip = ({ active, payload }: any) => {
-        if (active && payload && payload.length) {
-            const data = payload[0].payload;
-            return (
-                <div className="bg-slate-900 border border-slate-700 p-2 rounded-lg shadow-xl text-xs">
-                    <p className="text-white font-bold mb-1 border-b border-slate-700 pb-1">{data.nombre}</p>
-                    <p className="text-slate-400">Km: <span className="text-white font-mono">{data.km}</span></p>
-                    {data.nivel_actual !== undefined ? (
-                        <>
-                            <p className="text-cyan-400 font-bold mt-1">Nivel: {data.nivel_actual.toFixed(2)}m</p>
-                            <p className="text-slate-500">Min: {data.min?.toFixed(2)}m | Max: {data.max?.toFixed(2)}m</p>
-                            {data.delta !== 0 && data.delta !== undefined && (
-                                <p className={clsx("mt-1 flex items-center gap-1 font-bold", data.delta > 0 ? "text-emerald-400" : "text-amber-400")}>
-                                    <TrendingUp size={12} className={data.delta < 0 ? "rotate-180" : ""} />
-                                    {Math.abs(data.delta).toFixed(2)}m (12h)
-                                </p>
-                            )}
-                        </>
-                    ) : (
-                        <p className="text-amber-500/70 italic mt-1">Sin lectura reciente</p>
-                    )}
-                </div>
-            );
-        }
-        return null;
-    };
-
+    }, [allPoints, nowMs]);
     return (
         <div className="flex flex-col h-[100dvh] bg-mobile-dark">
             <header className="px-4 py-4 bg-slate-900 border-b border-mobile-accent/30 shrink-0 shadow-lg relative overflow-hidden">
@@ -308,19 +309,44 @@ const Hidrometria: React.FC = () => {
                             </span>
                             Tomas Abiertas en la Red
                         </h2>
-                        {isAdmin && Object.keys(tomasPorZona).length > 0 && (
-                            <select
-                                className="bg-slate-800 text-white text-[10px] sm:text-xs rounded border border-slate-600 px-2 py-1 outline-none"
-                                value={selectedZonaFiltro}
-                                onChange={(e) => setSelectedZonaFiltro(e.target.value)}
-                            >
-                                <option value="Todas">Todas las Zonas</option>
-                                {Object.keys(tomasPorZona).sort().map(z => (
-                                    <option key={z} value={z}>{z}</option>
-                                ))}
-                            </select>
-                        )}
                     </div>
+
+                    {Object.keys(tomasPorZona).length > 0 && (
+                        <div className="flex overflow-x-auto gap-2 mb-3 pb-2 custom-scrollbar">
+                            <button
+                                onClick={() => setSelectedZonaFiltro('Todas')}
+                                className={clsx(
+                                    "px-3 py-1.5 rounded-full text-[10px] font-bold whitespace-nowrap transition-all duration-300",
+                                    selectedZonaFiltro === 'Todas'
+                                        ? "bg-cyan-500 text-[#0b1120] shadow-[0_0_10px_rgba(6,182,212,0.4)]"
+                                        : "bg-slate-800/80 text-slate-400 border border-slate-700 hover:bg-slate-700"
+                                )}
+                            >
+                                Todas General
+                            </button>
+                            {Object.keys(tomasPorZona).sort().map(z => (
+                                <button
+                                    key={z}
+                                    onClick={() => setSelectedZonaFiltro(z)}
+                                    className={clsx(
+                                        "px-3 py-1.5 rounded-full text-[10px] font-bold whitespace-nowrap transition-all duration-300 flex items-center gap-1.5",
+                                        selectedZonaFiltro === z
+                                            ? "bg-cyan-500 text-[#0b1120] shadow-[0_0_10px_rgba(6,182,212,0.4)]"
+                                            : "bg-slate-800/80 text-slate-400 border border-slate-700 hover:bg-slate-700"
+                                    )}
+                                >
+                                    {z}
+                                    <span className={clsx(
+                                        "px-1.5 py-0.5 rounded-full text-[8px]",
+                                        selectedZonaFiltro === z ? "bg-[#0b1120]/20 text-[#0b1120]" : "bg-slate-900 text-cyan-500"
+                                    )}>
+                                        {tomasPorZona[z].length}
+                                    </span>
+                                </button>
+                            ))}
+                        </div>
+                    )}
+
                     <div className="space-y-4">
                         {Object.keys(tomasPorZona).length === 0 ? (
                             <p className="text-[10px] text-slate-500 italic">Ninguna toma registrada como abierta hoy.</p>
@@ -329,8 +355,9 @@ const Hidrometria: React.FC = () => {
                                 .filter(([zona]) => selectedZonaFiltro === 'Todas' || zona === selectedZonaFiltro)
                                 .map(([zona, tomas]) => (
                                     <div key={zona} className="bg-slate-800/50 rounded-lg p-2 border border-slate-700/30">
-                                        <h3 className="text-[10px] font-bold text-cyan-400 uppercase tracking-wider mb-2 border-b border-cyan-900/50 pb-1">
-                                            {zona} <span className="text-slate-500 ml-1 font-normal">({tomas.length})</span>
+                                        <h3 className="text-[10px] font-bold text-cyan-400 uppercase tracking-wider mb-2 border-b border-cyan-900/50 pb-1 flex justify-between items-center">
+                                            <span>{zona}</span>
+                                            <span className="text-[8px] text-slate-400 font-mono">{tomas.length} TOMAS</span>
                                         </h3>
                                         <div className="flex gap-2 overflow-x-auto pb-1 custom-scrollbar min-h-[44px]">
                                             {tomas.map(p => (

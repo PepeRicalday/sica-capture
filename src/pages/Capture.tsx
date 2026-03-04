@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Save, Wifi, WifiOff, UploadCloud, ChevronDown, RefreshCw, History as HistoryIcon } from 'lucide-react';
 import { db, type SicaRecord, type SicaAforoRecord } from '../lib/db';
 import { syncPendingRecords, downloadCatalogs } from '../lib/sync';
+import { getTodayString } from '../lib/dateHelpers';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useAuth } from '../context/AuthContext';
 import { toast } from 'sonner';
@@ -9,6 +10,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { AforoForm } from '../components/AforoForm';
 import { PendingRecordsModal } from '../components/PendingRecordsModal';
 import { AforoHistoryModal } from '../components/AforoHistoryModal';
+import { RepresoSchema } from '../components/RepresoSchema';
 
 // Micro-Componente Aislado para Reloj: Evita el re-renderizado masivo de toda la App
 const LiveClock = () => {
@@ -39,7 +41,15 @@ const Capture = () => {
 
     // Método de Captura: Estilo "Cajero Automático" (Evita decimales rotos y números infinitos)
     const [rawValue, setRawValue] = useState<number>(0);
-    const val = activeTab === 'toma' ? rawValue.toString() : (rawValue / 100).toFixed(2); // Litros/seg para Tomas, Metros para Escalas
+    const [escalaField, setEscalaField] = useState<'arriba' | 'abajo' | 'apertura'>('arriba');
+    const [escalaData, setEscalaData] = useState<{ arriba: number, abajo: number, aperturas: number[] }>({ arriba: 0, abajo: 0, aperturas: [] });
+    const [activeGateIndex, setActiveGateIndex] = useState(0);
+
+    const val = activeTab === 'toma'
+        ? rawValue.toString()
+        : activeTab === 'escala'
+            ? (escalaField === 'apertura' ? ((escalaData.aperturas[activeGateIndex] || 0) / 100).toFixed(2) : (escalaData[escalaField] / 100).toFixed(2))
+            : '0.00'; // Listros/seg para Tomas, Metros para Escalas
 
     // Selectores Offline
     const [selectedPoint, setSelectedPoint] = useState<string>('');
@@ -64,15 +74,61 @@ const Capture = () => {
     const getCurrentTimeStr24 = () => new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
 
     const handleKeypad = (num: number) => {
-        setRawValue(prev => {
-            const next = prev * 10 + num;
-            // Cap to 9999.99 (999999 raw) to prevent absurd numbers
-            return next > 999999 ? prev : next;
-        });
+        if (activeTab === 'escala') {
+            if (escalaField === 'apertura') {
+                setEscalaData(prev => {
+                    const prevAps = [...prev.aperturas];
+                    const prevVal = prevAps[activeGateIndex] || 0;
+                    const next = prevVal * 10 + num;
+                    prevAps[activeGateIndex] = next > 999999 ? prevVal : next;
+                    return { ...prev, aperturas: prevAps };
+                });
+            } else {
+                setEscalaData(prev => {
+                    const prevVal = prev[escalaField];
+                    const next = prevVal * 10 + num;
+                    return { ...prev, [escalaField]: next > 999999 ? prevVal : next };
+                });
+            }
+        } else {
+            setRawValue(prev => {
+                const next = prev * 10 + num;
+                return next > 999999 ? prev : next;
+            });
+        }
     };
 
-    const handleClear = () => setRawValue(0);
-    const handleBackspace = () => setRawValue(prev => Math.floor(prev / 10));
+    const handleClear = () => {
+        if (activeTab === 'escala') {
+            if (escalaField === 'apertura') {
+                setEscalaData(prev => {
+                    const nextAps = [...prev.aperturas];
+                    nextAps[activeGateIndex] = 0;
+                    return { ...prev, aperturas: nextAps };
+                });
+            } else {
+                setEscalaData(prev => ({ ...prev, [escalaField]: 0 }));
+            }
+        } else {
+            setRawValue(0);
+        }
+    };
+
+    const handleBackspace = () => {
+        if (activeTab === 'escala') {
+            if (escalaField === 'apertura') {
+                setEscalaData(prev => {
+                    const nextAps = [...prev.aperturas];
+                    nextAps[activeGateIndex] = Math.floor((nextAps[activeGateIndex] || 0) / 10);
+                    return { ...prev, aperturas: nextAps };
+                });
+            } else {
+                setEscalaData(prev => ({ ...prev, [escalaField]: Math.floor(prev[escalaField] / 10) }));
+            }
+        } else {
+            setRawValue(prev => Math.floor(prev / 10));
+        }
+    };
 
     const handleSave = async () => {
         if (!selectedPoint) {
@@ -80,19 +136,19 @@ const Capture = () => {
             return;
         }
 
-        // Validación de hora futura
-        const now = new Date();
-        const y = now.getFullYear();
-        const m = String(now.getMonth() + 1).padStart(2, '0');
-        const d = String(now.getDate()).padStart(2, '0');
-        const captureDateStr = `${y}-${m}-${d}`; // Local Date
+        // Validación de hora futura (Chihuahua Timezone forzada)
+        const captureDateStr = getTodayString();
+        const nowChihuahua = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Chihuahua' }));
 
-        const captureTimeStr = manualTime ? `${manualTime}:00` : now.toTimeString().split(' ')[0];
+        const hr = String(nowChihuahua.getHours()).padStart(2, '0');
+        const min = String(nowChihuahua.getMinutes()).padStart(2, '0');
+        const sec = String(nowChihuahua.getSeconds()).padStart(2, '0');
+
+        const captureTimeStr = manualTime ? `${manualTime}:00` : `${hr}:${min}:${sec}`;
 
         if (manualTime) {
-            const currentNow = new Date();
             const inputDate = new Date(`${captureDateStr}T${captureTimeStr}`);
-            if (inputDate > currentNow) {
+            if (inputDate > nowChihuahua) {
                 toast.error('La hora seleccionada no puede ser en el futuro.');
                 return;
             }
@@ -110,8 +166,40 @@ const Capture = () => {
 
         // Agregar valores según tipo
         if (activeTab === 'escala') {
+            const hArriba = escalaData.arriba / 100;
+            const hAbajo = escalaData.abajo / 100;
+
+            const pt = puntos.find(p => p.id === selectedPoint);
+            let q = 0;
+            const realAperturasStr: any[] = [];
+            let maxAperturaStr = 0;
+
+            if (pt?.pzas_radiales && pt?.ancho_radiales && escalaData.aperturas?.length > 0) {
+                const Cd = 0.6;
+                // Calculo individual para cada compuerta y suma de sus gastos
+                for (let i = 0; i < pt.pzas_radiales; i++) {
+                    const ap = (escalaData.aperturas[i] || 0) / 100;
+                    realAperturasStr.push({ index: i, apertura_m: ap });
+                    if (ap > maxAperturaStr) maxAperturaStr = ap;
+
+                    if (ap > 0) {
+                        const area = pt.ancho_radiales * ap;
+                        q += Cd * area * Math.sqrt(2 * 9.81 * hArriba);
+                    }
+                }
+            } else {
+                // Garganta Larga
+                const cd = 1.84;
+                const n = 1.52;
+                q = hArriba > 0 ? cd * Math.pow(hArriba, n) : 0;
+            }
+
             payload.punto_id = selectedPoint;
-            payload.valor_q = parseFloat(val);
+            payload.valor_q = hArriba; // nivel principal (arriba)
+            payload.nivel_abajo_m = hAbajo;
+            payload.apertura_radiales_m = maxAperturaStr; // Guardamos la máxima como numérico legacy
+            payload.radiales_json = realAperturasStr; // JSON Guardamos para ver cada una al renderizar
+            payload.gasto_calculado_m3s = q;
         } else if (activeTab === 'toma') {
             const numVal = parseFloat(val);
             const refPt = puntos.find(p => p.id === selectedPoint);
@@ -181,6 +269,12 @@ const Capture = () => {
             setTimeout(() => setShowSuccessAnim(false), 1500);
 
             setRawValue(0);
+            setEscalaData({
+                arriba: 0,
+                abajo: 0,
+                aperturas: Array(puntos.find(p => p.id === selectedPoint)?.pzas_radiales || 0).fill(0)
+            });
+            setActiveGateIndex(0);
             setManualTime('');
         } catch (e) {
             toast.error('Error al guardar reporte.');
@@ -260,7 +354,17 @@ const Capture = () => {
                             onChange={(e) => {
                                 const newId = e.target.value;
                                 setSelectedPoint(newId);
-                                if (activeTab === 'toma') {
+                                if (activeTab === 'escala') {
+                                    const pt = puntos.find(p => p.id === newId);
+                                    setEscalaData({
+                                        arriba: 0,
+                                        abajo: 0,
+                                        aperturas: Array(pt?.pzas_radiales || 0).fill(0)
+                                    });
+                                    setEscalaField('arriba');
+                                    setActiveGateIndex(0);
+                                    setRawValue(0);
+                                } else if (activeTab === 'toma') {
                                     const pt = puntos.find(p => p.id === newId);
                                     const openStates = ['inicio', 'continua', 'modificacion', 'reabierto'];
                                     if (pt && openStates.includes(pt.estado_hoy || '') && pt.caudal_promedio) {
@@ -280,11 +384,9 @@ const Capture = () => {
                         >
                             <option value="" disabled>-- Elige una Opción --</option>
                             {activeTab === 'aforo' ? (
-                                <>
-                                    <option value="CANAL-0+580">🟢 CANAL K- 0+580 (ENTRADA)</option>
-                                    <option value="CANAL-106">🔵 CANAL K-106+000 (CONTROL EST.)</option>
-                                    <option value="CANAL-104">🔴 CANAL K-104+000 (SALIDA FINAL)</option>
-                                </>
+                                puntos
+                                    .filter(p => p.type === 'aforo')
+                                    .map(p => <option key={p.id} value={p.id}>🌊 {p.name}</option>)
                             ) : activeTab === 'escala' ? (
                                 puntos
                                     .filter(p => p.type === 'escala')
@@ -447,14 +549,89 @@ const Capture = () => {
                 {/* 3. Main Display Numérico (SOLO SI NO ES AFORO) */}
                 {activeTab !== 'aforo' && (
                     <div className="flex-1 flex flex-col justify-end mt-4">
-                        <div className="text-right text-slate-400 text-xs font-semibold mb-1 flex-shrink-0">
-                            {activeTab === 'escala' ? 'Lectura de Nivel (m)' : 'Captura de Gasto (L/s)'}
-                        </div>
-                        <div className="text-right text-5xl sm:text-6xl font-mono font-bold text-white mb-4 tracking-tighter truncate flex-shrink-0">
+                        {activeTab === 'escala' ? (
+                            <div className="flex bg-slate-800 rounded-lg p-1 mb-2">
+                                {(
+                                    [
+                                        { id: 'arriba', title: 'Nivel Arriba' },
+                                        { id: 'abajo', title: 'Nivel Abajo' },
+                                        { id: 'apertura', title: 'Apertura Radial' }
+                                    ] as const
+                                ).map(f => (
+                                    <button
+                                        key={f.id}
+                                        onClick={() => setEscalaField(f.id)}
+                                        className={`flex-1 py-2 px-1 rounded-md text-[10px] font-bold uppercase transition-all flex flex-col items-center ${escalaField === f.id
+                                            ? 'bg-mobile-accent text-mobile-dark shadow-lg scale-105'
+                                            : 'bg-transparent text-slate-400 hover:bg-slate-700/50'
+                                            }`}
+                                    >
+                                        <span>{f.title}</span>
+                                        <span className="text-sm font-mono mt-0.5">
+                                            {f.id === 'apertura'
+                                                ? ((escalaData.aperturas[activeGateIndex] || 0) / 100).toFixed(2)
+                                                : (escalaData[f.id as 'arriba' | 'abajo'] / 100).toFixed(2)}m
+                                        </span>
+                                    </button>
+                                ))}
+                            </div>
+                        ) : (
+                            <div className="text-right text-slate-400 text-xs font-semibold mb-1 flex-shrink-0">
+                                Captura de Gasto (L/s)
+                            </div>
+                        )}
+                        <div className="text-right text-5xl sm:text-6xl font-mono font-bold text-white mb-1 tracking-tighter truncate flex-shrink-0">
                             {val}
                         </div>
+                        {activeTab === 'escala' && (() => {
+                            const pt = puntos.find(p => p.id === selectedPoint);
+                            const hArriba = escalaData.arriba / 100;
+                            const realAps = (escalaData.aperturas || []).map(a => a / 100);
 
-                        {/* Guardar Button Movido Arriba del Numpad para Accesibilidad */}
+                            let q = 0;
+                            let hasRadialesOpen = false;
+
+                            if (pt?.pzas_radiales && pt?.ancho_radiales && realAps.length > 0) {
+                                const Cd = 0.6;
+                                for (let i = 0; i < pt.pzas_radiales; i++) {
+                                    const ap = realAps[i] || 0;
+                                    if (ap > 0) {
+                                        hasRadialesOpen = true;
+                                        q += Cd * (pt.ancho_radiales * ap) * Math.sqrt(2 * 9.81 * hArriba);
+                                    }
+                                }
+                            } else if (!pt?.pzas_radiales && hArriba > 0) {
+                                q = 1.84 * Math.pow(hArriba, 1.52);
+                            }
+
+                            return (
+                                <>
+                                    {pt?.pzas_radiales !== undefined && pt.pzas_radiales > 0 && escalaField === 'apertura' && (
+                                        <div className="-mx-2 z-20 relative">
+                                            <RepresoSchema
+                                                pzasRadiales={pt.pzas_radiales}
+                                                anchoRadial={pt.ancho_radiales || 0}
+                                                altoRadial={pt.alto_radiales || 2}
+                                                aperturas={realAps}
+                                                nivelArriba={hArriba}
+                                                activeGateIndex={activeGateIndex}
+                                                onGateSelect={(idx) => setActiveGateIndex(idx)}
+                                            />
+                                        </div>
+                                    )}
+
+                                    <div className="text-right text-mobile-accent font-mono font-bold text-lg mb-4 flex-shrink-0 bg-slate-900/50 rounded p-1">
+                                        <span className="text-slate-500 text-xs mr-2">
+                                            {pt?.pzas_radiales && hasRadialesOpen ? 'Gasto Sumado (Radiales):' : 'Gasto Calculado:'}
+                                        </span>
+                                        {q.toFixed(3)} m³/s
+                                    </div>
+                                </>
+                            );
+                        })()}
+                        {activeTab === 'toma' && <div className="mb-4"></div>}
+
+                        {/* Guardar Button Movido Arriba del Numpad para Accesibilidad (Alto Contraste UI) */}
                         <div className="mb-6 flex-shrink-0 relative">
                             {showSuccessAnim && (
                                 <div className="absolute inset-0 z-10 flex items-center justify-center glow-btn-success rounded-xl animate-in zoom-in spin-in-12 duration-300">
@@ -464,10 +641,10 @@ const Capture = () => {
                                 </div>
                             )}
                             <button
-                                className="glow-btn-active w-full text-lg sm:text-xl h-14 rounded-xl flex items-center justify-center gap-2 font-bold shadow-[0_4px_14px_0_rgba(14,165,233,0.39)] hover:shadow-[0_6px_20px_rgba(14,165,233,0.23)] active:scale-95 transition-all"
+                                className="w-full text-lg sm:text-xl h-14 rounded-xl flex items-center justify-center gap-2 font-black tracking-widest bg-mobile-warning text-slate-900 shadow-[0_4px_14px_0_rgba(245,158,11,0.39)] hover:shadow-[0_6px_20px_rgba(245,158,11,0.6)] active:scale-95 transition-all outline-none"
                                 onClick={handleSave}
                             >
-                                <Save size={20} className="drop-shadow-sm" /> GUARDAR CAPTURA
+                                <Save size={24} className="drop-shadow-sm text-slate-900" /> GUARDAR CAPTURA
                             </button>
                         </div>
 

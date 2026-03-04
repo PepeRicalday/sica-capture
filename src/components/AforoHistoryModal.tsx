@@ -14,10 +14,6 @@ export const AforoHistoryModal = ({ onClose, onEditRecord }: AforoHistoryModalPr
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedDetail, setSelectedDetail] = useState<SicaAforoRecord | null>(null);
 
-    useEffect(() => {
-        loadHistory();
-    }, []);
-
     const loadHistory = async () => {
         // Query all aforos, descending by date/time
         const records = await db.records
@@ -28,6 +24,11 @@ export const AforoHistoryModal = ({ onClose, onEditRecord }: AforoHistoryModalPr
 
         setHistory(records);
     };
+
+    useEffect(() => {
+        loadHistory();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
     const handleDelete = async (id: string) => {
         if (confirm('¿Eliminar permanentemente esta bitácora local?')) {
