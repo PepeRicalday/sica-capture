@@ -48,7 +48,7 @@ const createColoredIcon = (colorName: string) => new L.Icon({
 
 const Monitor = () => {
     const puntos = useLiveQuery(() => db.puntos.toArray()) || [];
-    const [currentTime, setCurrentTime] = useState(new Date());
+    const [currentTime, setCurrentTime] = useState<Date>(() => new Date());
     const [isOnline, setIsOnline] = useState(navigator.onLine);
     const [balanceCanal, setBalanceCanal] = useState({ entrada000: 0, salida104: 0 });
 

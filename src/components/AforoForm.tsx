@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
+import { useLiveQuery } from 'dexie-react-hooks';
 import { Save, Calculator, AlertTriangle, TrendingUp } from 'lucide-react';
 import { toast } from 'sonner';
 import { db, type SicaAforoRecord, type AforoDobela } from '../lib/db';
@@ -52,8 +53,18 @@ export const AforoForm = ({ selectedPoint, isOnline, onSaveSuccess, editRecord }
             setNumDobelasInput(editRecord.dobelas?.length || 1);
             setActiveDobelaIdx(0);
             toast.info('Cargando datos para corrección técnica.');
+        } else if (selectedPoint) {
+            // Pre-fill from catalog if characteristics exist
+            db.puntos.get(selectedPoint).then(pt => {
+                if (pt?.caracteristicas_hidraulicas) {
+                    const char = pt.caracteristicas_hidraulicas;
+                    if (char.plantilla !== undefined) setPlantilla(char.plantilla);
+                    if (char.talud !== undefined) setTalud(char.talud);
+                    toast.info(`Geometría cargada de ${pt.name}`);
+                }
+            });
         }
-    }, [editRecord]);
+    }, [editRecord, selectedPoint]);
 
     // Sugerir Distribución de Dobelas
     const handleSugerirDistribucion = () => {
@@ -135,19 +146,18 @@ export const AforoForm = ({ selectedPoint, isOnline, onSaveSuccess, editRecord }
         });
 
         // RE-CALCULO PARA PROGRESIVAS (Acumuladas) Y TOTALES ESTRICTOS
-        let totalA = 0;
-        let totalQ = 0;
-        let cumulX = 0;
-        const dobelasFinales: any[] = [];
+        const initialAcc = { totalA: 0, totalQ: 0, cumulX: 0, dobelasFinales: [] as any[] };
 
-        for (const d of dobelasCalculadas) {
+        const { totalA, totalQ, dobelasFinales } = dobelasCalculadas.reduce((acc, d) => {
             const centerOffset = d.base_m / 2;
-            const currentX = cumulX + centerOffset;
-            cumulX += d.base_m;
-            totalA += d.area;
-            totalQ += d.gasto;
-            dobelasFinales.push({ ...d, x: currentX });
-        }
+            const currentX = acc.cumulX + centerOffset;
+            return {
+                totalA: acc.totalA + d.area,
+                totalQ: acc.totalQ + d.gasto,
+                cumulX: acc.cumulX + d.base_m,
+                dobelasFinales: [...acc.dobelasFinales, { ...d, x: currentX }]
+            };
+        }, initialAcc);
 
         // Cálculo de Régimen (Froude)
         const t_prom = totalA > 0 && espejo ? (totalA / Number(espejo)) : (totalQ > 0 ? 0.5 : 0);
@@ -256,6 +266,33 @@ export const AforoForm = ({ selectedPoint, isOnline, onSaveSuccess, editRecord }
                 </div>
                 {editRecord && <span className="text-[9px] bg-amber-500 text-white px-2 py-0.5 rounded-full animate-pulse uppercase font-black">Modo Corrección</span>}
             </h2>
+
+            {/* Información del Punto Seleccionado */}
+            {selectedPoint && (
+                <div className="bg-slate-900/40 rounded-lg p-2 mb-3 border border-slate-700/50 flex gap-3 items-center">
+                    {(() => {
+                        const pt = useLiveQuery(() => db.puntos.get(selectedPoint), [selectedPoint]);
+                        if (!pt) return null;
+                        return (
+                            <>
+                                {pt.foto_url && (
+                                    <div className="w-16 h-16 rounded-lg overflow-hidden shrink-0 border border-slate-700">
+                                        <img src={pt.foto_url} alt={pt.name} className="w-full h-full object-cover" />
+                                    </div>
+                                )}
+                                <div className="flex-1">
+                                    <p className="text-[10px] text-mobile-accent font-black uppercase">{pt.name}</p>
+                                    {pt.caracteristicas_hidraulicas && (
+                                        <p className="text-[9px] text-slate-400 font-mono line-clamp-2">
+                                            {Object.entries(pt.caracteristicas_hidraulicas).map(([k, v]) => `${k}: ${v}`).join(' | ')}
+                                        </p>
+                                    )}
+                                </div>
+                            </>
+                        );
+                    })()}
+                </div>
+            )}
 
             {/* Metadatos Generales */}
             <div className="bg-slate-800 rounded-lg p-2.5 mb-3 space-y-2 relative border border-slate-700/50">

@@ -27,6 +27,10 @@ export interface OfflinePoint {
     ancho_radiales?: number;
     alto_radiales?: number;
     pzas_radiales?: number;
+
+    // Aforo Extended
+    foto_url?: string;
+    caracteristicas_hidraulicas?: any;
 }
 
 // 2. Registro a Sincronizar (Mochila)

@@ -137,7 +137,7 @@ export const downloadCatalogs = async () => {
         // D. Puntos de Aforo (Aforos Principales)
         const { data: aforosControl } = await supabase
             .from('aforos_control')
-            .select('id, nombre_punto, latitud, longitud');
+            .select('id, nombre_punto, latitud, longitud, foto_url, caracteristicas_hidraulicas');
 
         if (aforosControl) {
             mappedPuntos.push(...aforosControl.map((p: any) => ({
@@ -145,7 +145,9 @@ export const downloadCatalogs = async () => {
                 name: p.nombre_punto,
                 type: 'aforo',
                 lat: p.latitud ? Number(p.latitud) : 0,
-                lng: p.longitud ? Number(p.longitud) : 0
+                lng: p.longitud ? Number(p.longitud) : 0,
+                foto_url: p.foto_url,
+                caracteristicas_hidraulicas: p.caracteristicas_hidraulicas
             })));
         }
 
