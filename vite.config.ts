@@ -4,12 +4,10 @@ import { VitePWA } from 'vite-plugin-pwa'
 import basicSsl from '@vitejs/plugin-basic-ssl'
 import pkg from './package.json'
 
-const buildHash = Date.now().toString(36);
-
 export default defineConfig({
   define: {
     '__APP_VERSION__': JSON.stringify(pkg.version),
-    '__BUILD_HASH__': JSON.stringify(buildHash),
+    '__BUILD_HASH__': JSON.stringify(Date.now().toString(36)),
     '__BUILD_DATE__': JSON.stringify(new Date().toISOString())
   },
   server: {
@@ -20,8 +18,8 @@ export default defineConfig({
     react(),
     basicSsl(),
     VitePWA({
-      registerType: 'autoUpdate',
-      filename: 'sw-v120.js',
+      registerType: 'autoUpdate',   // SW se actualiza sin prompt NUNCA
+      filename: 'sw-sica.js',       // Nombre nuevo para forzar invalidación del SW viejo
       manifest: {
         name: 'SICA Captura | S.R.L. Unidad Conchos',
         short_name: 'SICA Captura',
@@ -36,10 +34,15 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,png,svg,woff2}'],
-        maximumFileSizeToCacheInBytes: 10 * 1024 * 1024 // 10 MiB limit to accommodate large logos
+        maximumFileSizeToCacheInBytes: 10 * 1024 * 1024,
+        // CRÍTICO: skipWaiting fuerza al nuevo SW a tomar el control inmediatamente
+        skipWaiting: true,
+        clientsClaim: true,
+        // Limpiar caches viejos automáticamente
+        cleanupOutdatedCaches: true
       },
       devOptions: {
-        enabled: false,
+        enabled: false,   // NUNCA activar en dev — causa loops infinitos
         type: 'module'
       }
     })

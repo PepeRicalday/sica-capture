@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { Save, Calculator, AlertTriangle, TrendingUp, Info } from 'lucide-react';
+import { Save, Calculator, AlertTriangle, TrendingUp } from 'lucide-react';
 import { toast } from 'sonner';
 import { db, type SicaAforoRecord, type AforoDobela } from '../lib/db';
 import { useAuth } from '../context/AuthContext';
@@ -36,7 +36,7 @@ export const AforoForm = ({ selectedPoint, isOnline, onSaveSuccess, editRecord }
     const [numDobelasInput, setNumDobelasInput] = useState<number | ''>(1);
     const [activeDobelaIdx, setActiveDobelaIdx] = useState<number>(0);
     const [channelProfile, setChannelProfile] = useState<any>(null);
-    const [isLoadingProfile, setIsLoadingProfile] = useState(false);
+    const [_isLoadingProfile, setIsLoadingProfile] = useState(false);
 
     // 2. Estado Complejo: Lista de Dobelas
     const [dobelas, setDobelas] = useState<AforoDobela[]>([

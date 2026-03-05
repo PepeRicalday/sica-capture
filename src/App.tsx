@@ -1,5 +1,5 @@
 
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import Layout from './components/Layout';
 import Capture from './pages/Capture';
@@ -11,9 +11,17 @@ import { downloadCatalogs, syncPendingRecords } from './lib/sync';
 import { supabase } from './lib/supabase';
 import { Toaster } from 'sonner';
 import { VersionGuard } from './components/VersionGuard';
-import { useRegisterSW } from 'virtual:pwa-register/react';
-import { UpdateBanner } from './components/UpdateBanner';
 
+/**
+ * PWA Update System v3.0 — Robusto y Sin Bloqueos
+ * 
+ * ARQUITECTURA:
+ * 1. Service Worker se registra en modo 'autoUpdate' (prompt desactivado).
+ * 2. El SW se actualiza automáticamente sin mostrar banners que bloqueen.
+ * 3. La app se recarga limpiamente solo cuando el SW detecta un cambio. 
+ * 4. NO se compara versión contra Supabase para evitar falsos positivos.
+ * 5. VersionGuard solo actúa si min_supported_version > local (caso extremo).
+ */
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { session, loading } = useAuth();
@@ -34,64 +42,27 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
 };
 
 function AppContent() {
-  const [showUpdateBanner, setShowUpdateBanner] = useState(true);
-  const [manualUpdateAvailable, setManualUpdateAvailable] = useState(false);
-
-  const CURRENT_VERSION = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '0.0.0';
-
-  const {
-    needRefresh: [needRefresh],
-    updateServiceWorker,
-  } = useRegisterSW({
-    onRegistered(r: any) {
-      console.log('SW Registered: ' + r);
-      if (r) {
-        r.update();
-        setInterval(() => { r.update(); }, 5 * 60 * 1000); // Check every 5 min (was 60s — too aggressive for mobile data)
-      }
-    },
-    onRegisterError(error: any) {
-      console.log('SW registration error', error);
-    },
-  });
-
   useEffect(() => {
-    // Check version against Supabase to force banner if SW fails to detect it
-    const checkActualVersion = async () => {
-      try {
-        const { data } = await supabase
-          .from('app_versions')
-          .select('version')
-          .eq('app_id', 'capture')
-          .single();
+    // --- PWA SERVICE WORKER: Registro silencioso ---
+    if ('serviceWorker' in navigator && !import.meta.env.DEV) {
+      navigator.serviceWorker.ready.then(registration => {
+        // Verificar actualizaciones cada 10 minutos (no agresivo)
+        setInterval(() => {
+          registration.update().catch(() => { /* silencioso */ });
+        }, 10 * 60 * 1000);
+      });
 
-        if (data && data.version) {
-          // Compare versions (e.g. 1.2.9 vs 1.2.8)
-          const localParts = CURRENT_VERSION.split('.').map(Number);
-          const serverParts = data.version.split('.').map(Number);
+      // Cuando un nuevo SW toma el control, recargar automáticamente
+      let refreshing = false;
+      navigator.serviceWorker.addEventListener('controllerchange', () => {
+        if (refreshing) return;
+        refreshing = true;
+        console.log('[SICA PWA] Nuevo Service Worker activo. Recargando...');
+        window.location.reload();
+      });
+    }
 
-          let serverIsNewer = false;
-          for (let i = 0; i < 3; i++) {
-            if (serverParts[i] > localParts[i]) {
-              serverIsNewer = true;
-              break;
-            }
-            if (serverParts[i] < localParts[i]) {
-              break;
-            }
-          }
-
-          if (serverIsNewer) {
-            console.log(`[Update] Server has ${data.version}, local is ${CURRENT_VERSION}. Forcing banner.`);
-            setManualUpdateAvailable(true);
-          }
-        }
-      } catch (e) {
-        console.error("Version check failed", e);
-      }
-    };
-    checkActualVersion();
-
+    // --- Sincronización de catálogos ---
     downloadCatalogs();
 
     // Sync pending records when device comes online
@@ -121,54 +92,17 @@ function AppContent() {
       document.removeEventListener('visibilitychange', handleVisibility);
       supabase.removeChannel(channel);
     };
-  }, [CURRENT_VERSION]);
+  }, []);
 
   return (
-    <>
-      <Routes>
-        <Route path="/login" element={<Login />} />
-        <Route path="/monitor" element={<ProtectedRoute><Monitor /></ProtectedRoute>} />
-        <Route path="/hidrometria" element={<ProtectedRoute><Hidrometria /></ProtectedRoute>} />
-        <Route path="/captura" element={<ProtectedRoute><Capture /></ProtectedRoute>} />
-        <Route path="/" element={<Navigate to="/monitor" replace />} />
-        <Route path="*" element={<Navigate to="/monitor" replace />} />
-      </Routes>
-      {showUpdateBanner && !import.meta.env.DEV && (needRefresh || manualUpdateAvailable) && (
-        <UpdateBanner
-          onUpdate={async () => {
-            try {
-              if (needRefresh && updateServiceWorker) {
-                await updateServiceWorker(true);
-                return;
-              }
-
-              const clearTasks = async () => {
-                const tasks: Promise<any>[] = [];
-                if ('serviceWorker' in navigator) {
-                  const regs = await navigator.serviceWorker.getRegistrations();
-                  regs.forEach(r => tasks.push(r.unregister()));
-                }
-                if ('caches' in window) {
-                  const keys = await caches.keys();
-                  keys.forEach(k => tasks.push(caches.delete(k)));
-                }
-                await Promise.all(tasks);
-              };
-
-              await Promise.race([
-                clearTasks(),
-                new Promise(resolve => setTimeout(resolve, 1500))
-              ]);
-
-            } catch (e) {
-              console.error("Cache clear timeout/error:", e);
-            }
-            window.location.replace(window.location.origin + "?update=" + Date.now());
-          }}
-          onClose={() => setShowUpdateBanner(false)}
-        />
-      )}
-    </>
+    <Routes>
+      <Route path="/login" element={<Login />} />
+      <Route path="/monitor" element={<ProtectedRoute><Monitor /></ProtectedRoute>} />
+      <Route path="/hidrometria" element={<ProtectedRoute><Hidrometria /></ProtectedRoute>} />
+      <Route path="/captura" element={<ProtectedRoute><Capture /></ProtectedRoute>} />
+      <Route path="/" element={<Navigate to="/monitor" replace />} />
+      <Route path="*" element={<Navigate to="/monitor" replace />} />
+    </Routes>
   );
 }
 
