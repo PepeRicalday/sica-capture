@@ -1,12 +1,13 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { Save, Calculator, AlertTriangle, TrendingUp } from 'lucide-react';
+import { Save, Calculator, AlertTriangle, TrendingUp, Info } from 'lucide-react';
 import { toast } from 'sonner';
 import { db, type SicaAforoRecord, type AforoDobela } from '../lib/db';
 import { useAuth } from '../context/AuthContext';
 import { syncPendingRecords } from '../lib/sync';
 import { v4 as uuidv4 } from 'uuid';
 import { TrapezoidalSchema } from './TrapezoidalSchema';
+import { supabase } from '../lib/supabase';
 
 interface AforoFormProps {
     selectedPoint: string;
@@ -34,6 +35,8 @@ export const AforoForm = ({ selectedPoint, isOnline, onSaveSuccess, editRecord }
     // Estado para Generar X Dobelas Automáticamente
     const [numDobelasInput, setNumDobelasInput] = useState<number | ''>(1);
     const [activeDobelaIdx, setActiveDobelaIdx] = useState<number>(0);
+    const [channelProfile, setChannelProfile] = useState<any>(null);
+    const [isLoadingProfile, setIsLoadingProfile] = useState(false);
 
     // 2. Estado Complejo: Lista de Dobelas
     const [dobelas, setDobelas] = useState<AforoDobela[]>([
@@ -55,12 +58,28 @@ export const AforoForm = ({ selectedPoint, isOnline, onSaveSuccess, editRecord }
             toast.info('Cargando datos para corrección técnica.');
         } else if (selectedPoint) {
             // Pre-fill from catalog if characteristics exist
-            db.puntos.get(selectedPoint).then(pt => {
-                if (pt?.caracteristicas_hidraulicas) {
-                    const char = pt.caracteristicas_hidraulicas;
-                    if (char.plantilla !== undefined) setPlantilla(char.plantilla);
-                    if (char.talud !== undefined) setTalud(char.talud);
-                    toast.info(`Geometría cargada de ${pt.name}`);
+            db.puntos.get(selectedPoint).then(async pt => {
+                if (pt) {
+                    // Try to fetch channel profile from Supabase using KM
+                    if (pt.km !== undefined) {
+                        setIsLoadingProfile(true);
+                        const { data, error } = await supabase.rpc('get_perfil_hidraulico', { p_km: pt.km });
+                        if (!error && data && data.length > 0) {
+                            const profile = data[0];
+                            setChannelProfile(profile);
+                            setPlantilla(profile.plantilla_m);
+                            setTalud(profile.talud_z);
+                            toast.success(`Datos de diseño cargados de Perfil Hidráulico (KM ${pt.km})`);
+                        }
+                        setIsLoadingProfile(false);
+                    }
+
+                    if (pt.caracteristicas_hidraulicas) {
+                        const char = pt.caracteristicas_hidraulicas;
+                        if (char.plantilla !== undefined && !channelProfile) setPlantilla(char.plantilla);
+                        if (char.talud !== undefined && !channelProfile) setTalud(char.talud);
+                        toast.info(`Geometría cargada de ${pt.name}`);
+                    }
                 }
             });
         }
@@ -335,9 +354,30 @@ export const AforoForm = ({ selectedPoint, isOnline, onSaveSuccess, editRecord }
 
             {/* SECCIÓN NUEVA: ASISTENTE DE GEOMETRÍA */}
             <div className="bg-slate-900/60 border border-slate-700/50 rounded-xl p-3 mb-3">
-                <h3 className="text-[9px] text-mobile-accent font-black uppercase mb-2 flex items-center gap-1.5 px-1">
-                    <TrendingUp size={12} /> Parámetros de Sección Trapezoidal
-                </h3>
+                <div className="flex justify-between items-center mb-2 px-1">
+                    <h3 className="text-[9px] text-mobile-accent font-black uppercase flex items-center gap-1.5">
+                        <TrendingUp size={12} /> Parámetros de Sección Trapezoidal
+                    </h3>
+                    {channelProfile && (
+                        <span className="text-[8px] bg-sky-500/20 text-sky-400 px-2 py-0.5 rounded-full font-black border border-sky-500/30 animate-pulse">
+                            DATOS DE DISEÑO (KM {channelProfile.km_inicio})
+                        </span>
+                    )}
+                </div>
+
+                {channelProfile && (
+                    <div className="mb-3 p-2 bg-sky-950/20 border border-sky-500/20 rounded-lg">
+                        <div className="grid grid-cols-2 gap-y-1">
+                            <span className="text-[8px] text-slate-500 font-bold uppercase">Capacidad Máx:</span>
+                            <span className="text-[9px] text-sky-300 font-mono text-right">{channelProfile.capacidad_diseno_m3s} m³/s</span>
+                            <span className="text-[8px] text-slate-500 font-bold uppercase">Velocidad Diseño:</span>
+                            <span className="text-[9px] text-sky-300 font-mono text-right">{channelProfile.velocidad_diseno_ms} m/s</span>
+                            <span className="text-[8px] text-slate-500 font-bold uppercase">Tirante Normal:</span>
+                            <span className="text-[9px] text-sky-300 font-mono text-right">{channelProfile.tirante_diseno_m} m</span>
+                        </div>
+                    </div>
+                )}
+
                 <div className="grid grid-cols-2 gap-3 mb-3">
                     <div>
                         <label className="text-[8px] text-slate-500 uppercase font-black ml-1">Plantilla (b)</label>
@@ -542,6 +582,11 @@ export const AforoForm = ({ selectedPoint, isOnline, onSaveSuccess, editRecord }
                         <div className="text-3xl font-black text-white leading-none tracking-tighter">
                             {datosCalculados.gastoTotal.toFixed(3)} <span className="text-[10px] text-slate-500 font-black">m³/s</span>
                         </div>
+                        {channelProfile && datosCalculados.gastoTotal > channelProfile.capacidad_diseno_m3s && (
+                            <span className="text-[7px] bg-red-600 text-white px-2 py-0.5 rounded mt-1 font-black animate-pulse uppercase border border-red-400 shadow-sm">
+                                ⚠️ EXCESO: DISEÑO {channelProfile.capacidad_diseno_m3s}m³/s
+                            </span>
+                        )}
                         {datosCalculados.areaTotal > 0 && (datosCalculados.gastoTotal / datosCalculados.areaTotal) < 0.05 && (
                             <span className="text-[7px] bg-red-500/20 text-red-500 px-1 rounded mt-1 font-bold animate-pulse">VELOCIDAD BAJA - POSIBLE ERROR INSTRUMENTAL</span>
                         )}
