@@ -277,6 +277,12 @@ export const AforoForm = ({ selectedPoint, isOnline, onSaveSuccess, editRecord }
         }
     };
 
+    // Hook movido al top-level del componente (NUNCA dentro de JSX condicional)
+    const selectedPtInfo = useLiveQuery(
+        () => selectedPoint ? db.puntos.get(selectedPoint) : undefined,
+        [selectedPoint]
+    );
+
     return (
         <div className="flex flex-col pb-12">
             <h2 className="text-lg font-bold mb-2 flex items-center justify-between px-1">
@@ -287,29 +293,21 @@ export const AforoForm = ({ selectedPoint, isOnline, onSaveSuccess, editRecord }
             </h2>
 
             {/* Información del Punto Seleccionado */}
-            {selectedPoint && (
+            {selectedPoint && selectedPtInfo && (
                 <div className="bg-slate-900/40 rounded-lg p-2 mb-3 border border-slate-700/50 flex gap-3 items-center">
-                    {(() => {
-                        const pt = useLiveQuery(() => db.puntos.get(selectedPoint), [selectedPoint]);
-                        if (!pt) return null;
-                        return (
-                            <>
-                                {pt.foto_url && (
-                                    <div className="w-16 h-16 rounded-lg overflow-hidden shrink-0 border border-slate-700">
-                                        <img src={pt.foto_url} alt={pt.name} className="w-full h-full object-cover" />
-                                    </div>
-                                )}
-                                <div className="flex-1">
-                                    <p className="text-[10px] text-mobile-accent font-black uppercase">{pt.name}</p>
-                                    {pt.caracteristicas_hidraulicas && (
-                                        <p className="text-[9px] text-slate-400 font-mono line-clamp-2">
-                                            {Object.entries(pt.caracteristicas_hidraulicas).map(([k, v]) => `${k}: ${v}`).join(' | ')}
-                                        </p>
-                                    )}
-                                </div>
-                            </>
-                        );
-                    })()}
+                    {selectedPtInfo.foto_url && (
+                        <div className="w-16 h-16 rounded-lg overflow-hidden shrink-0 border border-slate-700">
+                            <img src={selectedPtInfo.foto_url} alt={selectedPtInfo.name} className="w-full h-full object-cover" />
+                        </div>
+                    )}
+                    <div className="flex-1">
+                        <p className="text-[10px] text-mobile-accent font-black uppercase">{selectedPtInfo.name}</p>
+                        {selectedPtInfo.caracteristicas_hidraulicas && (
+                            <p className="text-[9px] text-slate-400 font-mono line-clamp-2">
+                                {Object.entries(selectedPtInfo.caracteristicas_hidraulicas).map(([k, v]) => `${k}: ${v}`).join(' | ')}
+                            </p>
+                        )}
+                    </div>
                 </div>
             )}
 
