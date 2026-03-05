@@ -386,6 +386,15 @@ const Capture = () => {
                             {activeTab === 'aforo' ? (
                                 puntos
                                     .filter(p => p.type === 'aforo')
+                                    .sort((a, b) => {
+                                        const parseKm = (name: string) => {
+                                            if (!name) return 999;
+                                            if (name.includes('DEL K-68')) return 68.110;
+                                            const match = name.match(/K-(\d+)\+(\d+)/);
+                                            return match ? parseInt(match[1], 10) + parseInt(match[2], 10) / 1000 : 999;
+                                        };
+                                        return parseKm(a.name || '') - parseKm(b.name || '');
+                                    })
                                     .map(p => <option key={p.id} value={p.id}>🌊 {p.name}</option>)
                             ) : activeTab === 'escala' ? (
                                 puntos

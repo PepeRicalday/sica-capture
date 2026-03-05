@@ -65,9 +65,26 @@ function AppContent() {
           .eq('app_id', 'capture')
           .single();
 
-        if (data && data.version !== CURRENT_VERSION) {
-          console.log(`[Update] Server has ${data.version}, local is ${CURRENT_VERSION}. Forcing banner.`);
-          setManualUpdateAvailable(true);
+        if (data && data.version) {
+          // Compare versions (e.g. 1.2.9 vs 1.2.8)
+          const localParts = CURRENT_VERSION.split('.').map(Number);
+          const serverParts = data.version.split('.').map(Number);
+
+          let serverIsNewer = false;
+          for (let i = 0; i < 3; i++) {
+            if (serverParts[i] > localParts[i]) {
+              serverIsNewer = true;
+              break;
+            }
+            if (serverParts[i] < localParts[i]) {
+              break;
+            }
+          }
+
+          if (serverIsNewer) {
+            console.log(`[Update] Server has ${data.version}, local is ${CURRENT_VERSION}. Forcing banner.`);
+            setManualUpdateAvailable(true);
+          }
         }
       } catch (e) {
         console.error("Version check failed", e);
@@ -116,7 +133,7 @@ function AppContent() {
         <Route path="/" element={<Navigate to="/monitor" replace />} />
         <Route path="*" element={<Navigate to="/monitor" replace />} />
       </Routes>
-      {(needRefresh || manualUpdateAvailable) && showUpdateBanner && (
+      {showUpdateBanner && !import.meta.env.DEV && (needRefresh || manualUpdateAvailable) && (
         <UpdateBanner
           onUpdate={async () => {
             try {
