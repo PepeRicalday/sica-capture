@@ -180,6 +180,7 @@ export const syncPendingRecords = async () => {
         // 1. Escalas (van a lecturas_escalas)
         const escalasPending = pending.filter(p => p.tipo === 'escala');
         const escalasPayload = escalasPending.map(p => ({
+            id: p.id,
             escala_id: p.punto_id,
             fecha: p.fecha_captura,
             nivel_m: p.valor_q,
@@ -195,7 +196,7 @@ export const syncPendingRecords = async () => {
         const syncSuccessIds: string[] = [];
 
         if (escalasPayload.length > 0) {
-            const { error: err } = await supabase.from('lecturas_escalas').insert(escalasPayload);
+            const { error: err } = await supabase.from('lecturas_escalas').upsert(escalasPayload, { onConflict: 'id' });
             if (err) {
                 console.error('Error insertando escalas:', err.message);
                 // Tag individual local records with error
@@ -221,7 +222,7 @@ export const syncPendingRecords = async () => {
         }));
 
         if (tomasPayload.length > 0) {
-            const { error: err } = await supabase.from('mediciones').insert(tomasPayload);
+            const { error: err } = await supabase.from('mediciones').upsert(tomasPayload, { onConflict: 'id' });
             if (err) {
                 console.error('Error insertando tomas:', err.message);
                 await db.records.where('id').anyOf(tomasPending.map(p => p.id)).modify({ error_sync: err.message });
@@ -252,7 +253,7 @@ export const syncPendingRecords = async () => {
         }));
 
         if (aforosPayload.length > 0) {
-            const { error: err } = await supabase.from('aforos').insert(aforosPayload);
+            const { error: err } = await supabase.from('aforos').upsert(aforosPayload, { onConflict: 'id' });
             if (err) {
                 console.error('Error insertando aforos:', err.message);
                 await db.records.where('id').anyOf(aforosPending.map(p => p.id)).modify({ error_sync: err.message });
