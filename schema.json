@@ -1,0 +1,75 @@
+{
+  "required": [
+    "id",
+    "escala_id",
+    "fecha",
+    "turno",
+    "nivel_m"
+  ],
+  "properties": {
+    "id": {
+      "description": "Note:\nThis is a Primary Key.<pk/>",
+      "format": "text",
+      "type": "string"
+    },
+    "escala_id": {
+      "description": "Note:\nThis is a Foreign Key to `escalas.id`.<fk table='escalas' column='id'/>",
+      "format": "text",
+      "type": "string"
+    },
+    "fecha": {
+      "format": "date",
+      "type": "string"
+    },
+    "turno": {
+      "enum": [
+        "am",
+        "pm"
+      ],
+      "format": "public.turno_lectura",
+      "type": "string"
+    },
+    "nivel_m": {
+      "format": "numeric",
+      "type": "number"
+    },
+    "hora_lectura": {
+      "format": "time without time zone",
+      "type": "string"
+    },
+    "responsable": {
+      "format": "text",
+      "type": "string"
+    },
+    "notas": {
+      "format": "text",
+      "type": "string"
+    },
+    "creado_en": {
+      "default": "now()",
+      "format": "timestamp with time zone",
+      "type": "string"
+    },
+    "ciclo_id": {
+      "description": "Note:\nThis is a Foreign Key to `ciclos_agricolas.id`.<fk table='ciclos_agricolas' column='id'/>",
+      "format": "text",
+      "type": "string"
+    },
+    "nivel_abajo_m": {
+      "format": "numeric",
+      "type": "number"
+    },
+    "apertura_radiales_m": {
+      "format": "numeric",
+      "type": "number"
+    },
+    "gasto_calculado_m3s": {
+      "format": "numeric",
+      "type": "number"
+    },
+    "radiales_json": {
+      "format": "jsonb"
+    }
+  },
+  "type": "object"
+}

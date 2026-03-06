@@ -39,3 +39,18 @@ export const formatVolumenMm3 = (m3: number | undefined | null, decimals = 3): s
         maximumFractionDigits: decimals,
     })} Mm³`;
 };
+
+/**
+ * Convierte un volumen en m³ a Millares de metros cúbicos (10³ m³).
+ * El usuario lo denomina como "mm3" para diferenciarlo de "Mm3".
+ * @param m3 - Volumen en metros cúbicos
+ * @returns String formateado, e.g. "15.120 mil m³"
+ */
+export const formatVolumenMillares = (m3: number | undefined | null, decimals = 3): string => {
+    if (!m3) return '0.000 dam³';
+    // Dividimos entre 1000 para obtener millares
+    return `${(m3 / 1000).toLocaleString(undefined, {
+        minimumFractionDigits: decimals,
+        maximumFractionDigits: decimals,
+    })} dam³`;
+};

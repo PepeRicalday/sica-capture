@@ -303,9 +303,14 @@ const Monitor = () => {
                                                         <span className="block font-mono text-emerald-400 font-bold text-sm">
                                                             Q: {(p.caudal_promedio! * 1000).toFixed(1)} LPS
                                                         </span>
-                                                        <span className="block font-mono text-white font-bold text-xs opacity-80">
-                                                            Vol: {((p.volumen_hoy_m3 || 0) / 1000000).toLocaleString(undefined, { minimumFractionDigits: 3, maximumFractionDigits: 3 })} Mm³
-                                                        </span>
+                                                        {['inicio', 'reabierto', 'continua', 'modificacion'].includes(p.estado_hoy || '') && (
+                                                            <span className="block font-mono text-white font-bold text-xs opacity-80">
+                                                                Vol: {p.type === 'aforo'
+                                                                    ? `${(p.volumen_hoy_m3 || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })} m³`
+                                                                    : `${((p.volumen_hoy_m3 || 0) / 1000).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 3 })} mm³`
+                                                                }
+                                                            </span>
+                                                        )}
                                                     </div>
                                                 </div>
                                             </Popup>
@@ -331,9 +336,15 @@ const Monitor = () => {
                                                     <span className={`text-xs font-bold block ${theme.twText}`}>{p.name}</span>
                                                     <span className="text-[10px] text-slate-500">MOD {p.modulo} | {p.seccion}</span>
                                                 </div>
-                                                <span className="text-xs font-mono text-white font-bold">
-                                                    {((p.volumen_hoy_m3 || 0) / 1000000).toLocaleString(undefined, { minimumFractionDigits: 3, maximumFractionDigits: 3 })} Mm³
-                                                </span>
+                                                <div className="flex flex-col items-end">
+                                                    <span className="text-white font-mono font-bold">
+                                                        {p.type === 'aforo'
+                                                            ? `${(p.volumen_hoy_m3 || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })} m³`
+                                                            : `${((p.volumen_hoy_m3 || 0) / 1000).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 3 })} mm³`
+                                                        }
+                                                    </span>
+                                                    <span className="text-[9px] text-slate-500 uppercase font-bold">Acumulado</span>
+                                                </div>
                                             </div>
                                         );
                                     }) : (

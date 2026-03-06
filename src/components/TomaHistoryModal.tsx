@@ -105,7 +105,7 @@ export const TomaHistoryModal: React.FC<TomaHistoryModalProps> = ({ isOpen, onCl
 
     if (!isOpen || !punto) return null;
 
-    const volTotalMm3 = (totales.volumenAcumuladoMm3 || punto.volumen_hoy_m3 || 0) / 1000000;
+    const volAcumuladoM3 = totales.volumenAcumuladoMm3 || punto.volumen_hoy_m3 || 0;
 
     return (
         <div className="fixed inset-0 z-50 flex flex-col justify-end bg-black/60 backdrop-blur-sm sm:justify-center sm:p-4">
@@ -141,7 +141,10 @@ export const TomaHistoryModal: React.FC<TomaHistoryModalProps> = ({ isOpen, onCl
                             <div className="absolute inset-0 bg-cyan-500/10 blur-xl opacity-0 hover:opacity-100 transition-opacity"></div>
                             <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-1 flex items-center gap-1 relative z-10"><Droplets size={12} className="text-blue-400" /> Vol. Acumulado</span>
                             <div className="text-2xl font-bold text-blue-400 relative z-10">
-                                {volTotalMm3.toFixed(3)} <span className="text-xs text-blue-400/70 font-normal">Mm³</span>
+                                {punto.type === 'aforo'
+                                    ? volAcumuladoM3.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 3 })
+                                    : (volAcumuladoM3 / 1000).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 3 })
+                                } <span className="text-xs text-blue-400/70 font-normal">{punto.type === 'aforo' ? 'm³' : 'mm³'}</span>
                             </div>
                         </div>
                     </div>

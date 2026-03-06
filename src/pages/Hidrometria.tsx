@@ -418,7 +418,10 @@ const Hidrometria: React.FC = () => {
                                             {formatCaudalLps(p.caudal_promedio)}
                                         </span>
                                         <span className="text-[9px] text-blue-400">
-                                            {(p.volumen_hoy_m3 || 0).toLocaleString(undefined, { maximumFractionDigits: 0 })} m³
+                                            {p.type === 'aforo'
+                                                ? `${(p.volumen_hoy_m3 || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })} m³`
+                                                : `${((p.volumen_hoy_m3 || 0) / 1000).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 3 })} mm³`
+                                            }
                                         </span>
                                     </div>
                                 </div>
