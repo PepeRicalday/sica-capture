@@ -169,6 +169,24 @@ const Capture = () => {
             const hArriba = escalaData.arriba / 100;
             const hAbajo = escalaData.abajo / 100;
 
+            // ---- REGLAS FÍSICAS Y LÓGICAS PARA ESCALAS ----
+            if (hArriba > 4.50) {
+                toast.error('Bloqueo: El nivel supera el bordo físico del canal (4.50m). Imposible guardar.');
+                return;
+            }
+            if (hArriba <= 0.00) {
+                toast.error('Bloqueo: El nivel no puede ser 0 absoluto en operación.');
+                return;
+            }
+            if (hAbajo > hArriba) {
+                toast.error('Gravedad: Nivel abajo no puede ser mayor que Nivel arriba.');
+                return;
+            }
+            if (hArriba < 2.80 || hArriba > 3.40) {
+                const confirmed = window.confirm(`El nivel de ${hArriba}m está fuera del rango óptimo (2.80m - 3.40m).\n¿Desea guardar como una anomalía operativa?`);
+                if (!confirmed) return;
+            }
+
             const pt = puntos.find(p => p.id === selectedPoint);
             let q = 0;
             const realAperturasStr: any[] = [];
@@ -176,9 +194,16 @@ const Capture = () => {
 
             if (pt?.pzas_radiales && pt?.ancho_radiales && escalaData.aperturas?.length > 0) {
                 const Cd = 0.6;
-                // Calculo individual para cada compuerta y suma de sus gastos
+                const maxAltoCompuerta = pt.alto_radiales || 4.0; // Fallback si no hay alto
+
                 for (let i = 0; i < pt.pzas_radiales; i++) {
                     const ap = (escalaData.aperturas[i] || 0) / 100;
+
+                    if (ap > maxAltoCompuerta) {
+                        toast.error(`Bloqueo: La apertura de la radial ${i + 1} (${ap}m) excede su tamaño físico (${maxAltoCompuerta}m).`);
+                        return;
+                    }
+
                     realAperturasStr.push({ index: i, apertura_m: ap });
                     if (ap > maxAperturaStr) maxAperturaStr = ap;
 
@@ -226,11 +251,11 @@ const Capture = () => {
                 }
 
                 if (isActionClosing && numVal !== 0) {
-                    toast.error('Para cerrar o suspender la toma, el gasto capturado debe ser 0.');
+                    toast.error('Bloqueo: Para cerrar o suspender la toma, el gasto capturado debe ser 0 L/s.');
                     return;
                 }
                 if (!isActionClosing && numVal === 0) {
-                    toast.error('Para iniciar, modificar o continuar la toma, el gasto capturado debe ser mayor a 0.');
+                    toast.error('Bloqueo: Para iniciar, modificar o continuar la toma, debe introducir un gasto mayor a 0 L/s.');
                     return;
                 }
             }
