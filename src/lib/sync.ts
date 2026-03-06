@@ -18,14 +18,22 @@ export const downloadCatalogs = async () => {
             .eq('activa', true);
 
         // Fetch daily summary for scales
+        // Change: We now want to make sure we get the latest valid data, even if it was from yesterday
+        // The DB maintenance job will soon create 'today' records at 00:00, but offline devices need to 
+        // fallback to the most recent one if they haven't synced today yet.
         const { data: resumenEscalas } = await supabase
             .from('resumen_escalas_diario')
-            .select('escala_id, nivel_actual, delta_12h, estado')
-            .eq('fecha', todayStrE);
+            .select('escala_id, nivel_actual, delta_12h, estado, fecha')
+            .order('fecha', { ascending: false });
 
         const dictResumenEscalas = new Map<string, any>();
         if (resumenEscalas) {
-            resumenEscalas.forEach((r: any) => dictResumenEscalas.set(r.escala_id, r));
+            // First one is the most recent due to order desc
+            resumenEscalas.forEach((r: any) => {
+                if (!dictResumenEscalas.has(r.escala_id)) {
+                    dictResumenEscalas.set(r.escala_id, r);
+                }
+            });
         }
 
         const mappedPuntos: any[] = [];
@@ -92,9 +100,14 @@ export const downloadCatalogs = async () => {
 
                     // Si el volumen del DB es 0 (o viene de un día anterior arrastrando estado abierto),
                     // calculamos dinámicamente: V = Q × t (m³/s × segundos)
+                    // The backend job creates a new row at '00:00:00'. We should calculate volume from then.
                     const isStateOpen = ['inicio', 'continua', 'reabierto', 'modificacion'].includes(r.estado || '');
                     if ((volumenM3 === 0 || !isToday) && caudalM3s > 0 && r.hora_apertura && isStateOpen) {
-                        const apertura = new Date(r.hora_apertura);
+                        let apertura = new Date(r.hora_apertura);
+                        // If it's a continuity record from previous days, use midnight of today
+                        if (!isToday) {
+                            apertura = new Date(`${todayStr}T00:00:00`);
+                        }
                         const ahora = new Date();
                         const segundosTranscurridos = Math.max(0, (ahora.getTime() - apertura.getTime()) / 1000);
                         volumenM3 = caudalM3s * segundosTranscurridos; // m³
