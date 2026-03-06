@@ -386,14 +386,15 @@ const Capture = () => {
                                 setSelectedPoint(newId);
                                 if (activeTab === 'escala') {
                                     const pt = puntos.find(p => p.id === newId);
+                                    const lastLevelCm = pt?.nivel_actual ? Math.round(pt.nivel_actual * 100) : 0;
                                     setEscalaData({
-                                        arriba: 0,
+                                        arriba: lastLevelCm,
                                         abajo: 0,
                                         aperturas: Array(pt?.pzas_radiales || 0).fill(0)
                                     });
                                     setEscalaField('arriba');
                                     setActiveGateIndex(0);
-                                    setRawValue(0);
+                                    setRawValue(lastLevelCm);
                                 } else if (activeTab === 'toma') {
                                     const pt = puntos.find(p => p.id === newId);
                                     const openStates = ['inicio', 'continua', 'modificacion', 'reabierto'];

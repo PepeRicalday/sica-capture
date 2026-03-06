@@ -9,8 +9,6 @@ export const downloadCatalogs = async () => {
 
     try {
         console.log('Downloading catalogs...');
-        const todayStrE = getTodayString();
-
         // A. Puntos de Entrega (Escalas)
         const { data: baseEscalas } = await supabase
             .from('escalas')
