@@ -151,7 +151,7 @@ const Hidrometria: React.FC = () => {
                 </h1>
                 <div className="flex justify-between items-center mt-1 relative z-10 font-mono">
                     <p className="text-[10px] text-slate-400">Hidro-Sincronía Digital SRL </p>
-                    <p className="text-[9px] text-mobile-accent font-bold">V.1.2.1-PRO</p>
+                    <p className="text-[9px] text-mobile-accent font-bold">V.1.3.4-PRO</p>
                 </div>
             </header>
 
