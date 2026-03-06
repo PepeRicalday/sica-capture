@@ -1,5 +1,9 @@
 import { useState, useEffect } from 'react';
-import { Save, Wifi, WifiOff, UploadCloud, ChevronDown, RefreshCw, History as HistoryIcon } from 'lucide-react';
+import {
+    Save, Wifi, WifiOff, UploadCloud, ChevronDown, RefreshCw,
+    History as HistoryIcon, AlertTriangle, Clock, Search, Activity,
+    History, MapPin, Gauge, Droplets, ArrowRight, User, ChevronUp, CheckCircle2, Calendar, Lock, AlertCircle
+} from 'lucide-react';
 import { db, type SicaRecord, type SicaAforoRecord } from '../lib/db';
 import { syncPendingRecords, downloadCatalogs } from '../lib/sync';
 import { getTodayString } from '../lib/dateHelpers';
@@ -157,9 +161,11 @@ const Capture = () => {
         const payload: SicaRecord = {
             id: uuidv4(),
             tipo: activeTab,
+            punto_id: selectedPoint,
             fecha_captura: captureDateStr,
             hora_captura: captureTimeStr,
             sincronizado: 'false', // ALWAYS start as false so syncPendingRecords picks it up
+            confirmada: true, // New field: Field reading is always confirmed
             responsable_id: profile?.id,
             responsable_nombre: profile?.nombre || 'Operador Móvil'
         };
@@ -503,6 +509,13 @@ const Capture = () => {
                                 Cerrada
                             </span>
                         )}
+                    </div>
+                )}
+
+                {activeTab === 'escala' && selectedPoint && puntos.find(p => p.id === selectedPoint)?.escala_confirmada === false && (
+                    <div className="mb-2 bg-amber-500/10 text-amber-500 p-2 rounded-lg border border-amber-500/30 flex items-center gap-2 animate-pulse flex-shrink-0">
+                        <AlertTriangle size={16} className="flex-shrink-0" />
+                        <span className="text-[10px] font-black uppercase tracking-wider">Confirmación de escala requerida - Ratificar nivel en campo</span>
                     </div>
                 )}
 

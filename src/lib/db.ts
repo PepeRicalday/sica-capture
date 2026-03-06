@@ -22,6 +22,7 @@ export interface OfflinePoint {
     nivel_actual?: number;
     delta_12h?: number;
     escala_estado?: string;
+    escala_confirmada?: boolean;
 
     // Configuración Radiales de la Escala
     ancho_radiales?: number;
@@ -43,18 +44,25 @@ export interface SicaRecord {
     responsable_nombre?: string;
 
     // Payload Dinámico dependiendo del tipo
-    punto_id?: string; // UUID
-    valor_q?: number; // Para escalas/tomas
-    estado_operativo?: 'inicio' | 'suspension' | 'reabierto' | 'cierre' | 'continua' | 'modificacion'; // Para Tomas
+    valor_q?: number; // Para tomas (L/s)
+    nivel_m?: number; // Para escalas
+    nivel_abajo_m?: number;
+    apertura_radiales_m?: number;
+    radiales_json?: any;
+    confirmada?: boolean;
+    estado_operativo?: 'inicio' | 'suspension' | 'reabierto' | 'cierre' | 'continua' | 'modificacion';
 
-    fecha_captura: string;
+    // Metadatos operacionales
+    punto_id: string; // ID del punto (PE-xxx, ESC-xxx)
+    fecha_captura: string; // ISO string o date string
     hora_captura: string;
     sincronizado: 'true' | 'false'; // IndexedDB booleans workaround
     error_sync?: string; // Nuevo: Para rastrear por qué falló la subida (Ej. RLS, Validación)
 
     // Nuevas métricas para Reporte de Escalas (Represos)
-    nivel_abajo_m?: number;
-    apertura_radiales_m?: number;
+    // These were moved up into the dynamic payload section
+    // nivel_abajo_m?: number;
+    // apertura_radiales_m?: number;
     gasto_calculado_m3s?: number;
     radiales_json?: any[]; // Arreglo detallado de cada compuerta radial
 }

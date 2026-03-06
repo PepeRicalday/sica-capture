@@ -15,10 +15,21 @@ export const downloadCatalogs = async () => {
             .select('id, nombre, latitud, longitud, km, nivel_min_operativo, nivel_max_operativo, ancho, alto, pzas_radiales')
             .eq('activa', true);
 
+        // Fetch latest readings to check for confirmation
+        const { data: lastReadings } = await supabase
+            .from('lecturas_escalas')
+            .select('escala_id, confirmada')
+            .order('fecha', { ascending: false })
+            .order('hora_lectura', { ascending: false });
+
+        const confirmMap = new Map<string, boolean>();
+        (lastReadings || []).forEach(lr => {
+            if (!confirmMap.has(lr.escala_id)) {
+                confirmMap.set(lr.escala_id, lr.confirmada !== false);
+            }
+        });
+
         // Fetch daily summary for scales
-        // Change: We now want to make sure we get the latest valid data, even if it was from yesterday
-        // The DB maintenance job will soon create 'today' records at 00:00, but offline devices need to 
-        // fallback to the most recent one if they haven't synced today yet.
         const { data: resumenEscalas } = await supabase
             .from('resumen_escalas_diario')
             .select('escala_id, nivel_actual, delta_12h, estado, fecha')
@@ -26,7 +37,6 @@ export const downloadCatalogs = async () => {
 
         const dictResumenEscalas = new Map<string, any>();
         if (resumenEscalas) {
-            // First one is the most recent due to order desc
             resumenEscalas.forEach((r: any) => {
                 if (!dictResumenEscalas.has(r.escala_id)) {
                     dictResumenEscalas.set(r.escala_id, r);
@@ -50,6 +60,7 @@ export const downloadCatalogs = async () => {
                     nivel_actual: resumen ? parseFloat(resumen.nivel_actual || 0) : undefined,
                     delta_12h: resumen ? parseFloat(resumen.delta_12h || 0) : undefined,
                     escala_estado: resumen?.estado || 'normal',
+                    escala_confirmada: confirmMap.get(p.id) !== false,
                     ancho_radiales: p.ancho ? parseFloat(p.ancho) : undefined,
                     alto_radiales: p.alto ? parseFloat(p.alto) : undefined,
                     pzas_radiales: p.pzas_radiales ? parseInt(p.pzas_radiales) : undefined
