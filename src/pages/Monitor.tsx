@@ -4,7 +4,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
-import { Droplet, Activity, WifiOff, Scale, Calculator } from 'lucide-react';
+import { Droplet, Activity, WifiOff, Scale, Calculator, AlertCircle } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
 const MapBounds = ({ bounds }: { bounds: [number, number][] }) => {
@@ -96,6 +96,11 @@ const Monitor = () => {
 
     // 1. Filtrar solo tomas (ignorar escalas para el cálculo de volumen)
     const tomas = puntos.filter(p => p.type !== 'escala');
+    const escalas = puntos.filter(p => p.type === 'escala');
+
+    // Buscar la escala principal (Ej. K-23, o la de mayor nivel) para la referencia
+    // Si hay varias, tomamos la de K-0 o K-23 como representativa de la central
+    const escalaPrincipal = escalas.find(e => e.km === 23.3) || escalas[0];
 
     // 2. Calcular volumen total por módulo
     const volPorModulo = tomas.reduce((acc, current) => {
@@ -185,6 +190,51 @@ const Monitor = () => {
                         </div>
                     </div>
                 </div>
+
+                {/* 0.5 Widget de Límites Operativos (Nivel Físico) */}
+                {escalaPrincipal && (
+                    <div className="px-4 pb-4 flex-shrink-0">
+                        <div className="bg-slate-800/80 rounded-xl p-3 shadow-inner border border-slate-700 relative overflow-hidden">
+                            <div className="flex justify-between items-center mb-2">
+                                <span className="text-xs text-slate-400 font-bold uppercase tracking-wider flex items-center gap-1.5">
+                                    <Activity size={12} className="text-cyan-400" />
+                                    Nivel Físico {escalaPrincipal.name}
+                                </span>
+                                <span className="text-base font-mono text-white font-bold">
+                                    {escalaPrincipal.nivel_actual?.toFixed(2) || '0.00'} <span className="text-[10px] text-slate-500">m</span>
+                                </span>
+                            </div>
+
+                            {/* Barra de progreso de rangos */}
+                            <div className="relative h-2 w-full bg-slate-900 rounded-full overflow-hidden mt-3">
+                                {/* Zona Óptima: 2.80 a 3.40 */}
+                                <div className="absolute top-0 bottom-0 left-[62%] right-[24%] bg-emerald-500/30 border-x border-emerald-500/50"></div>
+
+                                {/* Puntero Actual (Basado en 0 a 4.5m) */}
+                                {escalaPrincipal.nivel_actual && (
+                                    <div
+                                        className="absolute top-0 bottom-0 w-1.5 bg-cyan-400 rounded-full shadow-[0_0_8px_rgba(34,211,238,0.8)] z-10 transition-all duration-1000"
+                                        style={{ left: `${Math.min(100, (escalaPrincipal.nivel_actual / 4.50) * 100)}%` }}
+                                    ></div>
+                                )}
+                            </div>
+                            <div className="flex justify-between items-center mt-1 text-[8px] font-bold font-mono text-slate-500">
+                                <span>0.0m</span>
+                                <span className="text-emerald-500/80">MIN 2.8m</span>
+                                <span className="text-red-400/80">MAX 3.4m</span>
+                                <span>{(escalaPrincipal.nivel_max_operativo && escalaPrincipal.nivel_max_operativo > 3.4) ? escalaPrincipal.nivel_max_operativo : 4.5}m</span>
+                            </div>
+
+                            {/* Alerta visible si está fuera del rango de la regla estricta (2.8m - 3.4m) */}
+                            {escalaPrincipal.nivel_actual && (escalaPrincipal.nivel_actual < 2.80 || escalaPrincipal.nivel_actual > 3.40) && (
+                                <div className="mt-2 bg-amber-500/10 border border-amber-500/20 rounded p-1.5 flex items-center gap-1.5">
+                                    <AlertCircle size={10} className="text-amber-500 shrink-0" />
+                                    <span className="text-[9px] text-amber-400 font-bold uppercase">Precaución: Nivel fuera del rango óptimo (2.80m - 3.40m)</span>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                )}
 
                 {/* 1. Panel de Volumen por Módulo */}
                 <div className="p-4 flex-shrink-0">
