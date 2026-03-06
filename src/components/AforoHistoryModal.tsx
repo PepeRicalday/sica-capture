@@ -3,6 +3,7 @@ import { X, Search, ArrowRight, Edit3, Trash2, History, TrendingUp } from 'lucid
 import { db, type SicaAforoRecord } from '../lib/db';
 import { TrapezoidalSchema } from './TrapezoidalSchema';
 import { toast } from 'sonner';
+import { useAuth } from '../context/AuthContext';
 
 interface AforoHistoryModalProps {
     onClose: () => void;
@@ -10,6 +11,8 @@ interface AforoHistoryModalProps {
 }
 
 export const AforoHistoryModal = ({ onClose, onEditRecord }: AforoHistoryModalProps) => {
+    const { profile } = useAuth();
+    const isGerente = profile?.rol === 'SRL';
     const [history, setHistory] = useState<SicaAforoRecord[]>([]);
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedDetail, setSelectedDetail] = useState<SicaAforoRecord | null>(null);
@@ -115,18 +118,22 @@ export const AforoHistoryModal = ({ onClose, onEditRecord }: AforoHistoryModalPr
                                     <div className="flex justify-between items-center mb-4">
                                         <h3 className="text-lg font-black text-white tracking-tight uppercase">{selectedDetail.punto_id}</h3>
                                         <div className="flex gap-2">
-                                            <button
-                                                onClick={() => onEditRecord(selectedDetail)}
-                                                className="bg-mobile-accent text-white p-2 rounded-xl hover:bg-opacity-80 shadow-lg shadow-mobile-accent/20 transition-all font-bold flex items-center gap-2 text-xs"
-                                            >
-                                                <Edit3 size={16} /> CORREGIR AFORO
-                                            </button>
-                                            <button
-                                                onClick={() => handleDelete(selectedDetail.id)}
-                                                className="bg-red-500/10 text-red-400 p-2 rounded-xl border border-red-500/20 hover:bg-red-500/20"
-                                            >
-                                                <Trash2 size={16} />
-                                            </button>
+                                            {isGerente && (
+                                                <>
+                                                    <button
+                                                        onClick={() => onEditRecord(selectedDetail)}
+                                                        className="bg-mobile-accent text-white p-2 rounded-xl hover:bg-opacity-80 shadow-lg shadow-mobile-accent/20 transition-all font-bold flex items-center gap-2 text-xs"
+                                                    >
+                                                        <Edit3 size={16} /> CORREGIR AFORO
+                                                    </button>
+                                                    <button
+                                                        onClick={() => handleDelete(selectedDetail.id)}
+                                                        className="bg-red-500/10 text-red-400 p-2 rounded-xl border border-red-500/20 hover:bg-red-500/20"
+                                                    >
+                                                        <Trash2 size={16} />
+                                                    </button>
+                                                </>
+                                            )}
                                         </div>
                                     </div>
 
@@ -195,12 +202,14 @@ export const AforoHistoryModal = ({ onClose, onEditRecord }: AforoHistoryModalPr
                                         <p className="text-xl font-black text-white">{((selectedDetail.tirante_inicial_m + selectedDetail.tirante_final_m) / 2).toFixed(2)} <span className="text-[10px]">m</span></p>
                                     </div>
                                 </div>
-                                <button
-                                    onClick={() => onEditRecord(selectedDetail)}
-                                    className="w-full mt-8 bg-mobile-accent py-4 rounded-2xl font-black text-white shadow-xl shadow-mobile-accent/30 active:scale-95 transition-all"
-                                >
-                                    EDITAR Y RE-CAPTURAR
-                                </button>
+                                {isGerente && (
+                                    <button
+                                        onClick={() => onEditRecord(selectedDetail)}
+                                        className="w-full mt-8 bg-mobile-accent py-4 rounded-2xl font-black text-white shadow-xl shadow-mobile-accent/30 active:scale-95 transition-all"
+                                    >
+                                        EDITAR Y RE-CAPTURAR
+                                    </button>
+                                )}
                             </div>
                         </div>
                     )}

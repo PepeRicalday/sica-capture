@@ -48,7 +48,6 @@ export interface SicaRecord {
     nivel_m?: number; // Para escalas
     nivel_abajo_m?: number;
     apertura_radiales_m?: number;
-    radiales_json?: any;
     confirmada?: boolean;
     estado_operativo?: 'inicio' | 'suspension' | 'reabierto' | 'cierre' | 'continua' | 'modificacion';
 
@@ -60,9 +59,6 @@ export interface SicaRecord {
     error_sync?: string; // Nuevo: Para rastrear por qué falló la subida (Ej. RLS, Validación)
 
     // Nuevas métricas para Reporte de Escalas (Represos)
-    // These were moved up into the dynamic payload section
-    // nivel_abajo_m?: number;
-    // apertura_radiales_m?: number;
     gasto_calculado_m3s?: number;
     radiales_json?: any[]; // Arreglo detallado de cada compuerta radial
 }

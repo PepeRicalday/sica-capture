@@ -1,17 +1,22 @@
+
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
-import { X, Clock, Droplets, Activity, WifiOff, History } from 'lucide-react';
-import type { OfflinePoint } from '../lib/db';
+import { X, Clock, Droplets, Activity, WifiOff, History, Edit3 } from 'lucide-react';
+import type { OfflinePoint, SicaRecord } from '../lib/db';
 import clsx from 'clsx';
 import { formatCaudalLps } from '../lib/formatters';
+import { useAuth } from '../context/AuthContext';
 
 interface TomaHistoryModalProps {
     isOpen: boolean;
     onClose: () => void;
     punto: OfflinePoint | null;
+    onEditRecord?: (record: any) => void;
 }
 
-export const TomaHistoryModal: React.FC<TomaHistoryModalProps> = ({ isOpen, onClose, punto }) => {
+export const TomaHistoryModal: React.FC<TomaHistoryModalProps> = ({ isOpen, onClose, punto, onEditRecord }) => {
+    const { profile } = useAuth();
+    const isGerente = profile?.rol === 'SRL';
     const [loading, setLoading] = useState(false);
     const [historial, setHistorial] = useState<any[]>([]);
     const [totales, setTotales] = useState({ volumenAcumuladoMm3: 0, horasContinuas: 0 });
@@ -37,29 +42,26 @@ export const TomaHistoryModal: React.FC<TomaHistoryModalProps> = ({ isOpen, onCl
             setLoading(true);
             try {
                 // 1. Fetch exact modifications (mediciones) for this point looking backwards.
-                // To keep it simple, we fetch the last 20 events. The 'reabierto' or 'inicio' limits the active cycle.
                 const { data: eventos, error: errorEventos } = await supabase
                     .from('mediciones')
-                    .select('fecha_hora, valor_q, estado_evento')
+                    .select('id, fecha_hora, valor_q, estado_evento, usuario_id')
                     .eq('punto_id', punto.id)
                     .order('fecha_hora', { ascending: false })
                     .limit(20);
 
                 if (errorEventos) throw errorEventos;
 
-                // Stop at the first 'cierre'. That marks the end of the *previous* irrigation event.
                 const currentCycleEvents = [];
                 for (const ev of (eventos || [])) {
                     currentCycleEvents.push(ev);
-                    if (ev.estado_evento === 'cierre' || ev.estado_evento === 'suspension') { // Though suspension is a pause, let's include the moment it paused. But 'cierre' explicitly ends it. We'll include it to show when it started.
-                        if (ev.estado_evento === 'cierre') break; // stop accumulating backwards
+                    if (ev.estado_evento === 'cierre' || ev.estado_evento === 'suspension') {
+                        if (ev.estado_evento === 'cierre') break;
                     }
                 }
 
                 setHistorial(currentCycleEvents.reverse());
 
-                // 2. Fetch daily aggregate from reportes_operacion for the last 10 days to sum total volume
-                // This assumes `reportes_operacion` has a record per day per point.
+                // 2. Fetch daily aggregate
                 const { data: reportes, error: errorReportes } = await supabase
                     .from('reportes_operacion')
                     .select('fecha, volumen_acumulado, estado')
@@ -69,19 +71,14 @@ export const TomaHistoryModal: React.FC<TomaHistoryModalProps> = ({ isOpen, onCl
 
                 if (errorReportes) throw errorReportes;
 
-                // Calcule aggregated volume by going back until we find a day it was 'cerrado'
                 let sumVolMm3 = 0;
                 let daysCount = 0;
                 for (const rep of (reportes || [])) {
                     if (rep.estado === 'cerrado' && daysCount > 0) break;
-                    sumVolMm3 += Number(rep.volumen_acumulado || 0) * 1000000; // if it's stored in MM3, though normally 'volumen_acumulado' here is probably Mm3. Let's assume standard DB schema uses Mm3 directly.
+                    sumVolMm3 += Number(rep.volumen_acumulado || 0) * 1000000;
                     daysCount++;
                 }
 
-                // If from DB the unit was already Mm3 then: `sumVolMm3 = sumVolMm3 / 1000000` is wrong.
-                // Wait, SICA uses `vol / 1000000` in the UI. Meaning the DB object we map is M3. Let's use `volumen_acumulado * 1000000` to convert to m3 internally for UI compatibility (since the UI divides by 1000000) or just store Mm3 directly.
-
-                // Calculate total continuous hours based on `hora_apertura` vs `Date.now()`
                 let hoursOpen = 0;
                 if (punto.hora_apertura) {
                     const diffMs = Date.now() - new Date(punto.hora_apertura).getTime();
@@ -107,12 +104,30 @@ export const TomaHistoryModal: React.FC<TomaHistoryModalProps> = ({ isOpen, onCl
 
     const volAcumuladoM3 = totales.volumenAcumuladoMm3 || punto.volumen_hoy_m3 || 0;
 
+    const handleEdit = (ev: any) => {
+        if (!onEditRecord) return;
+
+        // Convert Supabase event to SicaRecord format for Capture.tsx
+        const date = new Date(ev.fecha_hora);
+        const record: Partial<SicaRecord> = {
+            id: ev.id,
+            tipo: 'toma',
+            punto_id: punto.id,
+            fecha_captura: date.toISOString().split('T')[0],
+            hora_captura: date.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+            valor_q: ev.valor_q,
+            estado_operativo: ev.estado_evento,
+            sincronizado: 'true' // It was already in Supabase
+        };
+
+        onEditRecord(record);
+        onClose();
+    };
+
     return (
         <div className="fixed inset-0 z-50 flex flex-col justify-end bg-black/60 backdrop-blur-sm sm:justify-center sm:p-4">
-            {/* Modal Container */}
-            <div className="bg-mobile-dark w-full max-h-[45dvh] sm:max-w-md mx-auto sm:rounded-2xl rounded-t-2xl shadow-2xl flex flex-col animate-in slide-in-from-bottom-full duration-300">
+            <div className="bg-mobile-dark w-full max-h-[70dvh] sm:max-w-md mx-auto sm:rounded-2xl rounded-t-2xl shadow-2xl flex flex-col animate-in slide-in-from-bottom-full duration-300">
 
-                {/* Header */}
                 <div className="relative px-5 py-4 border-b border-slate-700/50 glass-panel sm:rounded-t-2xl rounded-t-2xl flex flex-col gap-1 z-10 shadow-lg">
                     <button onClick={onClose} className="absolute top-4 right-4 p-2 bg-slate-800 text-slate-400 hover:text-white rounded-full">
                         <X size={18} />
@@ -125,20 +140,18 @@ export const TomaHistoryModal: React.FC<TomaHistoryModalProps> = ({ isOpen, onCl
                     <span className="text-xs text-slate-400">Mod: {punto.modulo} | {punto.seccion}</span>
                 </div>
 
-                {/* Content */}
-                <div className="flex-1 overflow-y-auto p-5 pb-24 custom-scrollbar">
+                <div className="flex-1 overflow-y-auto p-5 pb-10 custom-scrollbar">
 
-                    {/* Totales Resumen */}
                     <div className="grid grid-cols-2 gap-3 mb-6 relative">
                         <div className="glass-panel overflow-hidden relative rounded-xl p-3 flex flex-col group">
-                            <div className="absolute inset-0 bg-blue-500/10 blur-xl opacity-0 hover:opacity-100 transition-opacity"></div>
+                            <div className="absolute inset-0 bg-blue-500/10 blur-xl opacity-0 transition-opacity"></div>
                             <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-1 flex items-center gap-1 relative z-10"><Clock size={12} className="text-amber-400" /> Hrs. Activas</span>
                             <div className="text-2xl font-bold text-white relative z-10">
                                 {Math.max(totales.horasContinuas, (Date.now() - new Date(punto.hora_apertura || Date.now()).getTime()) / 3600000).toFixed(0)} <span className="text-xs text-slate-500 font-normal">h</span>
                             </div>
                         </div>
                         <div className="glass-panel overflow-hidden relative rounded-xl p-3 flex flex-col group">
-                            <div className="absolute inset-0 bg-cyan-500/10 blur-xl opacity-0 hover:opacity-100 transition-opacity"></div>
+                            <div className="absolute inset-0 bg-cyan-500/10 blur-xl opacity-0 transition-opacity"></div>
                             <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-1 flex items-center gap-1 relative z-10"><Droplets size={12} className="text-blue-400" /> Vol. Acumulado</span>
                             <div className="text-2xl font-bold text-blue-400 relative z-10">
                                 {punto.type === 'aforo'
@@ -156,14 +169,6 @@ export const TomaHistoryModal: React.FC<TomaHistoryModalProps> = ({ isOpen, onCl
                             <p className="text-xs text-slate-500 max-w-[200px]">
                                 El historial de eventos anteriores requiere acceso a la nube.
                             </p>
-
-                            <div className="mt-4 w-full bg-slate-800 rounded-lg p-3 text-left">
-                                <span className="text-[10px] text-mobile-accent uppercase font-bold block mb-1">Caché Local Hoy</span>
-                                <div className="flex justify-between items-center text-sm">
-                                    <span className="text-slate-300">Gasto Promedio:</span>
-                                    <span className="font-mono text-cyan-400 font-bold">{punto.caudal_promedio?.toFixed(2)} m³/s</span>
-                                </div>
-                            </div>
                         </div>
                     ) : loading ? (
                         <div className="flex justify-center py-10">
@@ -179,7 +184,7 @@ export const TomaHistoryModal: React.FC<TomaHistoryModalProps> = ({ isOpen, onCl
                                 <div className="space-y-4">
                                     {historial.map((ev, i) => {
                                         const date = new Date(ev.fecha_hora);
-                                        const isFirst = i === 0;
+                                        const isFirst = i === historial.length - 1;
 
                                         let dotColor = "bg-slate-500";
                                         let textStatus = "text-slate-300";
@@ -197,7 +202,7 @@ export const TomaHistoryModal: React.FC<TomaHistoryModalProps> = ({ isOpen, onCl
                                                     isFirst && "animate-pulse ring-cyan-900/50"
                                                 )}></div>
 
-                                                <div className="glass-panel rounded-lg p-2.5 border-t border-b-0 border-r-0 border-l border-white/5 shadow-md">
+                                                <div className="glass-panel rounded-lg p-2.5 border-t border-b-0 border-r-0 border-l border-white/5 shadow-md group">
                                                     <div className="flex justify-between items-start mb-1">
                                                         <span className={clsx("text-xs font-bold uppercase tracking-wide drop-shadow-sm", textStatus)}>
                                                             {ev.estado_evento}
@@ -206,9 +211,19 @@ export const TomaHistoryModal: React.FC<TomaHistoryModalProps> = ({ isOpen, onCl
                                                             {date.toLocaleDateString('es-MX', { day: '2-digit', month: 'short' })} {date.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })}
                                                         </span>
                                                     </div>
-                                                    <div className="flex items-center gap-2">
-                                                        <Activity size={12} className="text-slate-500" />
-                                                        <span className="text-sm font-bold text-white">{formatCaudalLps(Number(ev.valor_q))}</span>
+                                                    <div className="flex items-center justify-between">
+                                                        <div className="flex items-center gap-2">
+                                                            <Activity size={12} className="text-slate-500" />
+                                                            <span className="text-sm font-bold text-white">{formatCaudalLps(Number(ev.valor_q))}</span>
+                                                        </div>
+                                                        {isGerente && (
+                                                            <button
+                                                                onClick={() => handleEdit(ev)}
+                                                                className="text-mobile-accent p-1 hover:bg-mobile-accent/10 rounded-md transition-colors flex items-center gap-1 text-[10px] font-bold uppercase"
+                                                            >
+                                                                <Edit3 size={14} /> Corregir
+                                                            </button>
+                                                        )}
                                                     </div>
                                                 </div>
                                             </div>

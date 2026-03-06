@@ -1,8 +1,7 @@
 import { useState, useEffect } from 'react';
 import {
     Save, Wifi, WifiOff, UploadCloud, ChevronDown, RefreshCw,
-    History as HistoryIcon, AlertTriangle, Clock, Search, Activity,
-    History, MapPin, Gauge, Droplets, ArrowRight, User, ChevronUp, CheckCircle2, Calendar, Lock, AlertCircle
+    AlertTriangle, History as HistoryIcon
 } from 'lucide-react';
 import { db, type SicaRecord, type SicaAforoRecord } from '../lib/db';
 import { syncPendingRecords, downloadCatalogs } from '../lib/sync';
@@ -14,6 +13,8 @@ import { v4 as uuidv4 } from 'uuid';
 import { AforoForm } from '../components/AforoForm';
 import { PendingRecordsModal } from '../components/PendingRecordsModal';
 import { AforoHistoryModal } from '../components/AforoHistoryModal';
+import { EscalaHistoryModal } from '../components/EscalaHistoryModal';
+import { TomaHistoryModal } from '../components/TomaHistoryModal';
 import { RepresoSchema } from '../components/RepresoSchema';
 
 // Micro-Componente Aislado para Reloj: Evita el re-renderizado masivo de toda la App
@@ -41,7 +42,10 @@ const Capture = () => {
     const [showSuccessAnim, setShowSuccessAnim] = useState(false);
     const [showPendingModal, setShowPendingModal] = useState(false);
     const [showHistoryModal, setShowHistoryModal] = useState(false);
+    const [showEscalaHistoryModal, setShowEscalaHistoryModal] = useState(false);
+    const [showTomaHistoryModal, setShowTomaHistoryModal] = useState(false);
     const [editingAforo, setEditingAforo] = useState<SicaAforoRecord | undefined>(undefined);
+    const [editingRecord, setEditingRecord] = useState<SicaRecord | undefined>(undefined);
 
     // Método de Captura: Estilo "Cajero Automático" (Evita decimales rotos y números infinitos)
     const [rawValue, setRawValue] = useState<number>(0);
@@ -140,145 +144,151 @@ const Capture = () => {
             return;
         }
 
-        // Validación de hora futura (Chihuahua Timezone forzada)
-        const captureDateStr = getTodayString();
-        const nowChihuahua = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Chihuahua' }));
+        try {
 
-        const hr = String(nowChihuahua.getHours()).padStart(2, '0');
-        const min = String(nowChihuahua.getMinutes()).padStart(2, '0');
-        const sec = String(nowChihuahua.getSeconds()).padStart(2, '0');
+            // Validación de hora futura (Chihuahua Timezone forzada)
+            const captureDateStr = getTodayString();
+            const nowChihuahua = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Chihuahua' }));
 
-        const captureTimeStr = manualTime ? `${manualTime}:00` : `${hr}:${min}:${sec}`;
+            const hr = String(nowChihuahua.getHours()).padStart(2, '0');
+            const min = String(nowChihuahua.getMinutes()).padStart(2, '0');
+            const sec = String(nowChihuahua.getSeconds()).padStart(2, '0');
 
-        if (manualTime) {
-            const inputDate = new Date(`${captureDateStr}T${captureTimeStr}`);
-            if (inputDate > nowChihuahua) {
-                toast.error('La hora seleccionada no puede ser en el futuro.');
-                return;
-            }
-        }
+            const captureTimeStr = manualTime ? `${manualTime}:00` : `${hr}:${min}:${sec}`;
 
-        const payload: SicaRecord = {
-            id: uuidv4(),
-            tipo: activeTab,
-            punto_id: selectedPoint,
-            fecha_captura: captureDateStr,
-            hora_captura: captureTimeStr,
-            sincronizado: 'false', // ALWAYS start as false so syncPendingRecords picks it up
-            confirmada: true, // New field: Field reading is always confirmed
-            responsable_id: profile?.id,
-            responsable_nombre: profile?.nombre || 'Operador Móvil'
-        };
-
-        // Agregar valores según tipo
-        if (activeTab === 'escala') {
-            const hArriba = escalaData.arriba / 100;
-            const hAbajo = escalaData.abajo / 100;
-
-            // ---- REGLAS FÍSICAS Y LÓGICAS PARA ESCALAS ----
-            if (hArriba > 4.50) {
-                toast.error('Bloqueo: El nivel supera el bordo físico del canal (4.50m). Imposible guardar.');
-                return;
-            }
-            if (hArriba <= 0.00) {
-                toast.error('Bloqueo: El nivel no puede ser 0 absoluto en operación.');
-                return;
-            }
-            if (hAbajo > hArriba) {
-                toast.error('Gravedad: Nivel abajo no puede ser mayor que Nivel arriba.');
-                return;
-            }
-            if (hArriba < 2.80 || hArriba > 3.40) {
-                const confirmed = window.confirm(`El nivel de ${hArriba}m está fuera del rango óptimo (2.80m - 3.40m).\n¿Desea guardar como una anomalía operativa?`);
-                if (!confirmed) return;
+            if (manualTime) {
+                const inputDate = new Date(`${captureDateStr}T${captureTimeStr}`);
+                if (inputDate > nowChihuahua) {
+                    toast.error('La hora seleccionada no puede ser en el futuro.');
+                    return;
+                }
             }
 
-            const pt = puntos.find(p => p.id === selectedPoint);
-            let q = 0;
-            const realAperturasStr: any[] = [];
-            let maxAperturaStr = 0;
+            const payload: SicaRecord = {
+                id: editingRecord?.id || uuidv4(),
+                tipo: activeTab,
+                punto_id: selectedPoint,
+                fecha_captura: editingRecord?.fecha_captura || captureDateStr,
+                hora_captura: captureTimeStr,
+                sincronizado: 'false', // ALWAYS start as false so syncPendingRecords picks it up
+                confirmada: true, // New field: Field reading is always confirmed
+                responsable_id: profile?.id,
+                responsable_nombre: profile?.nombre || 'Operador Móvil'
+            };
 
-            if (pt?.pzas_radiales && pt?.ancho_radiales && escalaData.aperturas?.length > 0) {
-                const Cd = 0.6;
-                const maxAltoCompuerta = pt.alto_radiales || 4.0; // Fallback si no hay alto
+            // Agregar valores según tipo
+            if (activeTab === 'escala') {
+                const hArriba = escalaData.arriba / 100;
+                const hAbajo = escalaData.abajo / 100;
 
-                for (let i = 0; i < pt.pzas_radiales; i++) {
-                    const ap = (escalaData.aperturas[i] || 0) / 100;
+                // ---- REGLAS FÍSICAS Y LÓGICAS PARA ESCALAS ----
+                if (hArriba > 4.50) {
+                    toast.error('Bloqueo: El nivel supera el bordo físico del canal (4.50m). Imposible guardar.');
+                    return;
+                }
+                if (hArriba <= 0.00) {
+                    toast.error('Bloqueo: El nivel no puede ser 0 absoluto en operación.');
+                    return;
+                }
+                if (hAbajo > hArriba) {
+                    toast.error('Gravedad: Nivel abajo no puede ser mayor que Nivel arriba.');
+                    return;
+                }
+                if (hArriba < 2.80 || hArriba > 3.40) {
+                    const confirmed = window.confirm(`El nivel de ${hArriba}m está fuera del rango óptimo (2.80m - 3.40m).\n¿Desea guardar como una anomalía operativa?`);
+                    if (!confirmed) return;
+                }
 
-                    if (ap > maxAltoCompuerta) {
-                        toast.error(`Bloqueo: La apertura de la radial ${i + 1} (${ap}m) excede su tamaño físico (${maxAltoCompuerta}m).`);
+                const pt = puntos.find(p => p.id === selectedPoint);
+                let q = 0;
+                const realAperturasStr: any[] = [];
+                let maxAperturaStr = 0;
+
+                if (pt?.pzas_radiales && pt?.ancho_radiales && escalaData.aperturas?.length > 0) {
+                    const Cd = 0.6;
+                    const maxAltoCompuerta = pt.alto_radiales || 4.0; // Fallback si no hay alto
+
+                    for (let i = 0; i < pt.pzas_radiales; i++) {
+                        const ap = (escalaData.aperturas[i] || 0) / 100;
+
+                        if (ap > maxAltoCompuerta) {
+                            toast.error(`Bloqueo: La apertura de la radial ${i + 1} (${ap}m) excede su tamaño físico (${maxAltoCompuerta}m).`);
+                            return;
+                        }
+
+                        realAperturasStr.push({ index: i, apertura_m: ap });
+                        if (ap > maxAperturaStr) maxAperturaStr = ap;
+
+                        if (ap > 0) {
+                            const area = pt.ancho_radiales * ap;
+                            q += Cd * area * Math.sqrt(2 * 9.81 * hArriba);
+                        }
+                    }
+                } else {
+                    // Garganta Larga
+                    const cd = 1.84;
+                    const n = 1.52;
+                    q = hArriba > 0 ? cd * Math.pow(hArriba, n) : 0;
+                }
+
+                payload.punto_id = selectedPoint;
+                payload.valor_q = hArriba; // nivel principal (arriba)
+                payload.nivel_abajo_m = hAbajo;
+                payload.apertura_radiales_m = maxAperturaStr; // Guardamos la máxima como numérico legacy
+                payload.radiales_json = realAperturasStr; // JSON Guardamos para ver cada una al renderizar
+                payload.gasto_calculado_m3s = q;
+            } else if (activeTab === 'toma') {
+                const numVal = parseFloat(val);
+                const refPt = puntos.find(p => p.id === selectedPoint);
+
+                if (isNaN(numVal) || (numVal <= 0 && ['inicio', 'reabierto', 'continua', 'modificacion'].includes(estadoToma))) {
+                    toast.error('Lógica Falla: El gasto no puede ser 0 L/s para una toma activa. Si no hay flujo, reporta cierre.');
+                    return;
+                }
+
+                if (refPt?.type !== 'canal' && refPt?.capacidad_max_lps && numVal > refPt.capacidad_max_lps) {
+                    toast.error(`Excede capacidad máxima de diseño (${refPt.capacidad_max_lps} L/s)`);
+                    return;
+                }
+
+                if (refPt) {
+                    const ptStatus = refPt.estado_hoy || 'cerrado';
+                    const isPtOpen = ['inicio', 'reabierto', 'continua', 'modificacion'].includes(ptStatus);
+                    const isActionClosing = ['suspension', 'cierre'].includes(estadoToma);
+                    const isActionOpening = ['inicio', 'reabierto'].includes(estadoToma);
+                    const isActionOpenState = ['modificacion', 'continua', 'suspension', 'cierre'].includes(estadoToma);
+
+                    if (isPtOpen && isActionOpening) {
+                        toast.error('La toma ya está abierta. Solo puedes modificarla, continuarla o cerrarla.');
+                        return;
+                    }
+                    if (!isPtOpen && isActionOpenState) {
+                        toast.error('La toma está cerrada. Debes iniciarla o reabrirla.');
                         return;
                     }
 
-                    realAperturasStr.push({ index: i, apertura_m: ap });
-                    if (ap > maxAperturaStr) maxAperturaStr = ap;
-
-                    if (ap > 0) {
-                        const area = pt.ancho_radiales * ap;
-                        q += Cd * area * Math.sqrt(2 * 9.81 * hArriba);
+                    if (isActionClosing && numVal !== 0) {
+                        toast.error('Bloqueo: Para cerrar o suspender la toma, el gasto capturado debe ser 0 L/s.');
+                        return;
+                    }
+                    if (!isActionClosing && numVal === 0) {
+                        toast.error('Bloqueo: Para iniciar, modificar o continuar la toma, debe introducir un gasto mayor a 0 L/s.');
+                        return;
                     }
                 }
+
+                payload.punto_id = selectedPoint;
+                // Solo divide entre 1000 si NO es canal (el canal captura directo en m3/s)
+                payload.valor_q = refPt?.type === 'canal' ? numVal : numVal / 1000;
+                payload.estado_operativo = estadoToma;
+            }
+
+            if (editingRecord) {
+                await db.records.put(payload);
+                toast.success('Corrección guardada con éxito');
             } else {
-                // Garganta Larga
-                const cd = 1.84;
-                const n = 1.52;
-                q = hArriba > 0 ? cd * Math.pow(hArriba, n) : 0;
+                await db.records.add(payload);
             }
-
-            payload.punto_id = selectedPoint;
-            payload.valor_q = hArriba; // nivel principal (arriba)
-            payload.nivel_abajo_m = hAbajo;
-            payload.apertura_radiales_m = maxAperturaStr; // Guardamos la máxima como numérico legacy
-            payload.radiales_json = realAperturasStr; // JSON Guardamos para ver cada una al renderizar
-            payload.gasto_calculado_m3s = q;
-        } else if (activeTab === 'toma') {
-            const numVal = parseFloat(val);
-            const refPt = puntos.find(p => p.id === selectedPoint);
-
-            if (isNaN(numVal) || (numVal <= 0 && ['inicio', 'reabierto', 'continua', 'modificacion'].includes(estadoToma))) {
-                toast.error('Lógica Falla: El gasto no puede ser 0 L/s para una toma activa. Si no hay flujo, reporta cierre.');
-                return;
-            }
-
-            if (refPt?.type !== 'canal' && refPt?.capacidad_max_lps && numVal > refPt.capacidad_max_lps) {
-                toast.error(`Excede capacidad máxima de diseño (${refPt.capacidad_max_lps} L/s)`);
-                return;
-            }
-
-            if (refPt) {
-                const ptStatus = refPt.estado_hoy || 'cerrado';
-                const isPtOpen = ['inicio', 'reabierto', 'continua', 'modificacion'].includes(ptStatus);
-                const isActionClosing = ['suspension', 'cierre'].includes(estadoToma);
-                const isActionOpening = ['inicio', 'reabierto'].includes(estadoToma);
-                const isActionOpenState = ['modificacion', 'continua', 'suspension', 'cierre'].includes(estadoToma);
-
-                if (isPtOpen && isActionOpening) {
-                    toast.error('La toma ya está abierta. Solo puedes modificarla, continuarla o cerrarla.');
-                    return;
-                }
-                if (!isPtOpen && isActionOpenState) {
-                    toast.error('La toma está cerrada. Debes iniciarla o reabrirla.');
-                    return;
-                }
-
-                if (isActionClosing && numVal !== 0) {
-                    toast.error('Bloqueo: Para cerrar o suspender la toma, el gasto capturado debe ser 0 L/s.');
-                    return;
-                }
-                if (!isActionClosing && numVal === 0) {
-                    toast.error('Bloqueo: Para iniciar, modificar o continuar la toma, debe introducir un gasto mayor a 0 L/s.');
-                    return;
-                }
-            }
-
-            payload.punto_id = selectedPoint;
-            // Solo divide entre 1000 si NO es canal (el canal captura directo en m3/s)
-            payload.valor_q = refPt?.type === 'canal' ? numVal : numVal / 1000;
-            payload.estado_operativo = estadoToma;
-        }
-
-        try {
-            await db.records.add(payload);
 
             // Actualización Optimista del UI (Cambia el punto a Verde Localmente de inmediato)
             if (activeTab === 'toma' && selectedPoint) {
@@ -290,13 +300,13 @@ const Capture = () => {
                 }
             }
 
+
             if (!isOnline) {
                 toast.warning('💾 Guardado Offline (En Mochila)');
             } else {
-                // Sincronización Proactiva: Intentar subir de inmediato
                 toast.promise(syncPendingRecords(), {
                     loading: '🚀 Sincronizando con Red Mayor...',
-                    success: '✅ Sincronizado en Tiempo Real',
+                    success: '✅ Registro actualizado en Tiempo Real',
                     error: '💾 Resguardado Localmente (Pendiente de Sync)'
                 });
             }
@@ -312,6 +322,7 @@ const Capture = () => {
             });
             setActiveGateIndex(0);
             setManualTime('');
+            setEditingRecord(undefined);
         } catch (e) {
             toast.error('Error al guardar reporte.');
             console.error(e);
@@ -463,7 +474,13 @@ const Capture = () => {
 
                 {/* 2.1 Mini-Widget: Hora Manual de Escala (Solo Escalas) */}
                 {activeTab === 'escala' && (
-                    <div className="mb-2 flex-shrink-0 flex justify-end items-center">
+                    <div className="mb-2 flex-shrink-0 flex justify-between items-center">
+                        <button
+                            onClick={() => setShowEscalaHistoryModal(true)}
+                            className="text-[9px] bg-slate-800 text-slate-400 px-3 py-1.5 rounded-lg border border-slate-700 flex items-center gap-1.5 font-bold"
+                        >
+                            <HistoryIcon size={14} /> VER HISTORIAL
+                        </button>
                         <div className="flex items-center gap-2 glass-pill px-2 py-1 rounded-lg">
                             <label className="text-slate-500 text-[10px] font-bold uppercase tracking-wider">Hora Reporte:</label>
                             <input
@@ -525,8 +542,17 @@ const Capture = () => {
                 {activeTab === 'toma' && (
                     <div className="mb-4 flex-shrink-0">
                         <div className="flex justify-between items-end mb-1">
-                            <label className="block text-slate-400 text-xs uppercase tracking-wider font-semibold">
+                            <label className="block text-slate-400 text-xs uppercase tracking-wider font-semibold flex items-center gap-2">
                                 Acción Operativa
+                                <button
+                                    onClick={() => {
+                                        if (selectedPoint) setShowTomaHistoryModal(true);
+                                        else toast.error('Selecciona una toma primero');
+                                    }}
+                                    className="bg-slate-800 text-[9px] px-2 py-0.5 rounded border border-slate-700 text-slate-400"
+                                >
+                                    Bitácora
+                                </button>
                             </label>
                             <div className="flex items-center gap-2">
                                 <label className="text-slate-500 text-[10px] font-bold uppercase tracking-wider">Hora:</label>
@@ -694,11 +720,24 @@ const Capture = () => {
                                 </div>
                             )}
                             <button
-                                className="w-full text-lg sm:text-xl h-14 rounded-xl flex items-center justify-center gap-2 font-black tracking-widest bg-mobile-warning text-slate-900 shadow-[0_4px_14px_0_rgba(245,158,11,0.39)] hover:shadow-[0_6px_20px_rgba(245,158,11,0.6)] active:scale-95 transition-all outline-none"
+                                className={`w-full text-lg sm:text-xl h-14 rounded-xl flex items-center justify-center gap-2 font-black tracking-widest transition-all outline-none ${editingRecord ? 'bg-mobile-accent text-white shadow-[0_4px_14px_0_rgba(6,182,212,0.39)]' : 'bg-mobile-warning text-slate-900 shadow-[0_4px_14px_0_rgba(245,158,11,0.39)] hover:shadow-[0_6px_20px_rgba(245,158,11,0.6)]'}`}
                                 onClick={handleSave}
                             >
-                                <Save size={24} className="drop-shadow-sm text-slate-900" /> GUARDAR CAPTURA
+                                <Save size={24} className="drop-shadow-sm" /> {editingRecord ? 'APLICAR CORRECCIÓN' : 'GUARDAR CAPTURA'}
                             </button>
+                            {editingRecord && (
+                                <button
+                                    onClick={() => {
+                                        setEditingRecord(undefined);
+                                        setRawValue(0);
+                                        setEscalaData({ arriba: 0, abajo: 0, aperturas: [] });
+                                        toast.info('Edición cancelada');
+                                    }}
+                                    className="w-full mt-2 text-[10px] text-red-400 font-bold uppercase underline"
+                                >
+                                    Cancelar Corrección
+                                </button>
+                            )}
                         </div>
 
                         {/* Numpad */}
@@ -733,6 +772,44 @@ const Capture = () => {
                         setSelectedPoint(record.punto_id);
                         setShowHistoryModal(false);
                         toast.success(`Modo edición activo para ${record.punto_id}`);
+                    }}
+                />
+            )}
+
+            {showEscalaHistoryModal && (
+                <EscalaHistoryModal
+                    onClose={() => setShowEscalaHistoryModal(false)}
+                    onEditRecord={(record: SicaRecord) => {
+                        setEditingRecord(record);
+                        setSelectedPoint(record.punto_id);
+                        setEscalaData({
+                            arriba: Math.round((record.valor_q || 0) * 100),
+                            abajo: Math.round((record.nivel_abajo_m || 0) * 100),
+                            aperturas: (record.radiales_json || []).map((r: any) => Math.round(r.apertura_m * 100))
+                        });
+                        setManualTime(record.hora_captura.substring(0, 5));
+                        setShowEscalaHistoryModal(false);
+                        toast.success('Corrigiendo nivel...');
+                    }}
+                />
+            )}
+
+            {showTomaHistoryModal && (
+                <TomaHistoryModal
+                    isOpen={showTomaHistoryModal}
+                    onClose={() => setShowTomaHistoryModal(false)}
+                    punto={puntos.find(p => p.id === selectedPoint) || null}
+                    onEditRecord={(record: SicaRecord) => {
+                        setEditingRecord(record);
+                        setEstadoToma(record.estado_operativo as any);
+                        const pt = puntos.find(p => p.id === selectedPoint);
+                        if (pt?.type === 'canal') {
+                            setRawValue(Math.round(record.valor_q || 0));
+                        } else {
+                            setRawValue(Math.round((record.valor_q || 0) * 1000));
+                        }
+                        setManualTime(record.hora_captura.substring(0, 5));
+                        toast.success('Corrigiendo gasto...');
                     }}
                 />
             )}
