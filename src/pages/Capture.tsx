@@ -229,6 +229,11 @@ const Capture = () => {
             const numVal = parseFloat(val);
             const refPt = puntos.find(p => p.id === selectedPoint);
 
+            if (isNaN(numVal) || (numVal <= 0 && ['inicio', 'reabierto', 'continua', 'modificacion'].includes(estadoToma))) {
+                toast.error('Lógica Falla: El gasto no puede ser 0 L/s para una toma activa. Si no hay flujo, reporta cierre.');
+                return;
+            }
+
             if (refPt?.type !== 'canal' && refPt?.capacidad_max_lps && numVal > refPt.capacidad_max_lps) {
                 toast.error(`Excede capacidad máxima de diseño (${refPt.capacidad_max_lps} L/s)`);
                 return;
