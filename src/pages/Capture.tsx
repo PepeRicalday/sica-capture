@@ -403,7 +403,7 @@ const Capture = () => {
                                     .map(p => <option key={p.id} value={p.id}>{p.name} (km {p.km?.toFixed(3)})</option>)
                             ) : (
                                 puntos
-                                    .filter(p => p.type !== 'escala')
+                                    .filter(p => p.type !== 'escala' && p.type !== 'aforo')
                                     .sort((a, b) => (a.km || 0) - (b.km || 0))
                                     .map(p => {
                                         const modSec = [p.modulo && `Mod: ${p.modulo}`, p.seccion && `Sec: ${p.seccion}`].filter(Boolean).join(' | ');
