@@ -248,10 +248,15 @@ const Monitor = () => {
                                             <Popup className="custom-popup">
                                                 <div className="text-xs text-slate-300">
                                                     <strong className={`block uppercase border-b border-slate-700 pb-1 mb-1 ${theme.twText}`}>{p.name}</strong>
-                                                    <span className="block text-slate-400">MOD {p.modulo} | {p.seccion}</span>
-                                                    <span className="block mt-1 font-mono text-white font-bold text-sm">
-                                                        Vol: {((p.volumen_hoy_m3 || 0) / 1000000).toLocaleString(undefined, { minimumFractionDigits: 3, maximumFractionDigits: 3 })} Mm³
-                                                    </span>
+                                                    <span className="block text-slate-400">MOD {p.modulo} | Km: {p.km?.toFixed(3)}</span>
+                                                    <div className="mt-1 flex flex-col gap-0.5">
+                                                        <span className="block font-mono text-emerald-400 font-bold text-sm">
+                                                            Q: {(p.caudal_promedio! * 1000).toFixed(1)} LPS
+                                                        </span>
+                                                        <span className="block font-mono text-white font-bold text-xs opacity-80">
+                                                            Vol: {((p.volumen_hoy_m3 || 0) / 1000000).toLocaleString(undefined, { minimumFractionDigits: 3, maximumFractionDigits: 3 })} Mm³
+                                                        </span>
+                                                    </div>
                                                 </div>
                                             </Popup>
                                         </Marker>
