@@ -237,6 +237,18 @@ const Capture = () => {
                 payload.apertura_radiales_m = maxAperturaStr; // Guardamos la máxima como numérico legacy
                 payload.radiales_json = realAperturasStr; // JSON Guardamos para ver cada una al renderizar
                 payload.gasto_calculado_m3s = q;
+
+                // ---- VALIDACIÓN DE CAPACIDAD CONTRA PERFIL DE DISEÑO (Offline-First) ----
+                const ptKm = pt?.km;
+                if (ptKm !== undefined) {
+                    const profiles = await db.perfil_hidraulico.toArray();
+                    const section = profiles.find(p => ptKm >= p.km_inicio && ptKm <= p.km_fin);
+
+                    if (section && q > section.capacidad_diseno_m3s && section.capacidad_diseno_m3s > 0) {
+                        toast.error(`Violación Hidráulica: Q=${q.toFixed(2)} m³/s EXCEDE capacidad de diseño (${section.capacidad_diseno_m3s.toFixed(2)} m³/s) en el KM ${ptKm}.`);
+                        return;
+                    }
+                }
             } else if (activeTab === 'toma') {
                 const numVal = parseFloat(val);
                 const refPt = puntos.find(p => p.id === selectedPoint);

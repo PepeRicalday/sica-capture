@@ -173,11 +173,22 @@ export const downloadCatalogs = async () => {
             })));
         }
 
+        // E. Perfil Hidráulico del Canal (Rule: Un solo dato, una sola verdad)
+        const { data: perfiles } = await supabase
+            .from('perfil_hidraulico_canal')
+            .select('*')
+            .order('km_inicio', { ascending: true });
+
         if (mappedPuntos.length > 0) {
             // A-06: Atomic transaction — prevents empty IndexedDB if crash occurs between clear and bulkPut
-            await db.transaction('rw', db.puntos, async () => {
+            await db.transaction('rw', [db.puntos, db.perfil_hidraulico], async () => {
                 await db.puntos.clear();
                 await db.puntos.bulkPut(mappedPuntos);
+
+                if (perfiles && perfiles.length > 0) {
+                    await db.perfil_hidraulico.clear();
+                    await db.perfil_hidraulico.bulkPut(perfiles);
+                }
             });
         }
 

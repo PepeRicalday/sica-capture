@@ -88,18 +88,39 @@ export interface SicaAforoRecord extends SicaRecord {
     froude?: number;
 }
 
+export interface PerfilHidraulico {
+    id: string;
+    km_inicio: number;
+    km_fin: number;
+    nombre_tramo: string;
+    capacidad_diseno_m3s: number;
+    plantilla_m: number;
+    talud_z: number;
+    tirante_diseno_m: number;
+    pendiente_s0: number;
+    ancho_corona_m: number;
+    bordo_libre_m: number;
+    velocidad_diseno_ms: number;
+    inicio_lat?: number;
+    inicio_lng?: number;
+    fin_lat?: number;
+    fin_lng?: number;
+}
+
 export class SicaCaptureDB extends Dexie {
     records!: Table<SicaRecord>;
     puntos!: Table<OfflinePoint>;
+    perfil_hidraulico!: Table<PerfilHidraulico>;
 
     constructor() {
         super('sica_capture_db_v2');
-        // v2: Catálogos, v3: Tomas, v5: Aforos Canal Principal, v6: Offline UUIDs, v7: Hidrometria metrics
-        this.version(7).stores({
-            records: 'id, sincronizado, tipo, punto_id', // Primary key is now a UUID string
-            puntos: 'id, type', // Catálogo offline de ubicaciones
+        // v2: Catálogos, v3: Tomas, v5: Aforos Canal Principal, v6: Offline UUIDs, v7: Hidrometria metrics, v8: Canal Profiles
+        this.version(8).stores({
+            records: 'id, sincronizado, tipo, punto_id',
+            puntos: 'id, type',
+            perfil_hidraulico: 'id, km_inicio, km_fin'
         }).upgrade(() => {
-            // Migrate old records to have UUIDs if any
+            // Migration logic if needed
         });
     }
 }
