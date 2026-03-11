@@ -11,6 +11,7 @@ import { downloadCatalogs, syncPendingRecords } from './lib/sync';
 import { supabase } from './lib/supabase';
 import { Toaster } from 'sonner';
 import { VersionGuard } from './components/VersionGuard';
+import { HydricStatusProvider } from './context/HydricStatusContext';
 
 /**
  * PWA Update System v3.0 — Robusto y Sin Bloqueos
@@ -111,8 +112,10 @@ function App() {
     <BrowserRouter>
       <AuthProvider>
         <VersionGuard>
-          <Toaster position="top-center" theme="dark" toastOptions={{ style: { background: '#1e293b', border: '1px solid #334155', color: '#f8fafc' } }} />
-          <AppContent />
+          <HydricStatusProvider>
+            <Toaster position="top-center" theme="dark" toastOptions={{ style: { background: '#1e293b', border: '1px solid #334155', color: '#f8fafc' } }} />
+            <AppContent />
+          </HydricStatusProvider>
         </VersionGuard>
       </AuthProvider>
     </BrowserRouter>

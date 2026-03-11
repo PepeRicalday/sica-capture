@@ -57,6 +57,7 @@ export interface SicaRecord {
     hora_captura: string;
     sincronizado: 'true' | 'false'; // IndexedDB booleans workaround
     error_sync?: string; // Nuevo: Para rastrear por qué falló la subida (Ej. RLS, Validación)
+    notas?: string; // Nuevo: Observaciones o metadata (como GPS para confirmaciones de arribo)
 
     // Nuevas métricas para Reporte de Escalas (Represos)
     gasto_calculado_m3s?: number;

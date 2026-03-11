@@ -16,6 +16,8 @@ import { AforoHistoryModal } from '../components/AforoHistoryModal';
 import { EscalaHistoryModal } from '../components/EscalaHistoryModal';
 import { TomaHistoryModal } from '../components/TomaHistoryModal';
 import { RepresoSchema } from '../components/RepresoSchema';
+import { useHydricStatus } from '../context/HydricStatusContext';
+import StatusBanner from '../components/StatusBanner';
 
 // Micro-Componente Aislado para Reloj: Evita el re-renderizado masivo de toda la App
 const LiveClock = () => {
@@ -58,6 +60,9 @@ const Capture = () => {
         : activeTab === 'escala'
             ? (escalaField === 'apertura' ? ((escalaData.aperturas[activeGateIndex] || 0) / 100).toFixed(2) : (escalaData[escalaField] / 100).toFixed(2))
             : '0.00'; // Listros/seg para Tomas, Metros para Escalas
+
+    // Hydric Status
+    const { activeEvent } = useHydricStatus();
 
     // Selectores Offline
     const [selectedPoint, setSelectedPoint] = useState<string>('');
@@ -383,6 +388,8 @@ const Capture = () => {
                 </div>
             </header>
 
+            <StatusBanner />
+
             <div className="flex-1 flex flex-col p-3 pb-8">
 
                 {/* 1. Selector de Tipo (Rediseñado Gerencial: Alto Contraste Solar) */}
@@ -548,7 +555,52 @@ const Capture = () => {
                     </div>
                 )}
 
-
+                {/* BOTÓN MÁGICO DE ARRIBO (SINCRONÍA RÁPIDA CON CONCHOS DIGITAL) */}
+                {activeTab === 'escala' && selectedPoint && activeEvent?.evento_tipo === 'LLENADO' && (
+                    <div className="mb-4">
+                        <button
+                            onClick={async () => {
+                                if (navigator.geolocation) {
+                                    toast.loading("Obteniendo GPS para acta de arribo...");
+                                    navigator.geolocation.getCurrentPosition(async (pos) => {
+                                        toast.dismiss();
+                                        // Crear registro 0 instantáneo de confirmación
+                                        const now = new Date();
+                                        try {
+                                            const payload: SicaRecord = {
+                                                id: uuidv4(),
+                                                tipo: 'escala',
+                                                punto_id: selectedPoint,
+                                                fecha_captura: getTodayString(),
+                                                hora_captura: now.toLocaleTimeString('en-US', { hour12: false }),
+                                                sincronizado: 'false',
+                                                confirmada: true,
+                                                responsable_id: profile?.id,
+                                                responsable_nombre: profile?.nombre || 'Operador',
+                                                valor_q: 0.05, // Lectura mínima inicial
+                                                nivel_abajo_m: 0,
+                                                apertura_radiales_m: 0,
+                                                notas: `📌 ARRIBO VISUAL CONFIRMADO. Lat: ${pos.coords.latitude.toFixed(5)}, Lng: ${pos.coords.longitude.toFixed(5)}`
+                                            };
+                                            await db.records.add(payload);
+                                            toast.success("✅ Arribo notificado a Gerencia exitosamente");
+                                            if (navigator.onLine) syncPendingRecords();
+                                        } catch (e) {
+                                            toast.error("Error al registrar el arribo");
+                                        }
+                                    }, () => toast.error("Por favor activa el GPS de tu equipo"));
+                                } else {
+                                    toast.error("Tu dispositivo no soporta GPS");
+                                }
+                            }}
+                            className="w-full bg-blue-600 active:bg-blue-700 text-white shadow-[0_4px_20px_rgba(37,99,235,0.4)] p-4 rounded-xl flex items-center justify-center gap-3 font-black uppercase tracking-widest border border-blue-400/50 transition-all transform active:scale-95"
+                        >
+                            <span className="text-2xl drop-shadow-md">🌊</span> 
+                            <span>¡Confirmar LLEGADA del Agua!</span>
+                        </button>
+                        <p className="text-[9px] text-blue-400 mt-2 text-center italic tracking-wider">Esto enviará tu GPS a Conchos Digital en tiempo real.</p>
+                    </div>
+                )}
 
                 {/* 2.5 Selector de Estado (Solo Tomas) */}
                 {activeTab === 'toma' && (
