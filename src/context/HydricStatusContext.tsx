@@ -7,8 +7,10 @@ export type HydraulicEvent = 'LLENADO' | 'ESTABILIZACION' | 'CONTINGENCIA_LLUVIA
 export interface SICAEventLog {
     id: string;
     evento_tipo: HydraulicEvent;
-    activo: boolean;
-    hora_apertura: string | null;
+    esta_activo: boolean;
+    fecha_inicio: string;
+    notas: string;
+    hora_apertura_real: string | null;
     gasto_solicitado_m3s: number | null;
     valvulas_activas: string[] | null;
 }
@@ -37,7 +39,7 @@ export const HydricStatusProvider: React.FC<{ children: React.ReactNode }> = ({ 
                 const { data, error } = await supabase
                     .from('sica_eventos_log')
                     .select('*')
-                    .eq('activo', true)
+                    .eq('esta_activo', true)
                     .order('created_at', { ascending: false })
                     .limit(1)
                     .maybeSingle();
@@ -85,7 +87,7 @@ export const HydricStatusProvider: React.FC<{ children: React.ReactNode }> = ({ 
                     console.log('📡 Cambio detectado en Protocolos Centrales. Actualizando HUD...');
                     
                     // Alertas Push/Hápticas en tiempo real (SICA Chronos)
-                    if (payload.new && (payload.new as SICAEventLog).activo === true) {
+                    if (payload.new && (payload.new as SICAEventLog).esta_activo === true) {
                         const newEvent = payload.new as SICAEventLog;
                         if (newEvent.evento_tipo === 'ANOMALIA_BAJA') {
                             if (navigator.vibrate) navigator.vibrate([1000, 500, 1000, 500, 1000]); // Patrón de emergencia
