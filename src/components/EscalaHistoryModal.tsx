@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { X, Search, ArrowRight, Edit3, Trash2, History, Scale } from 'lucide-react';
 import { db, type SicaRecord } from '../lib/db';
 import { toast } from 'sonner';
@@ -17,7 +17,7 @@ export const EscalaHistoryModal = ({ onClose, onEditRecord }: EscalaHistoryModal
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedDetail, setSelectedDetail] = useState<SicaRecord | null>(null);
 
-    const loadHistory = async () => {
+    const loadHistory = useCallback(async () => {
         const records = await db.records
             .where('tipo')
             .equals('escala')
@@ -25,11 +25,11 @@ export const EscalaHistoryModal = ({ onClose, onEditRecord }: EscalaHistoryModal
             .toArray();
 
         setHistory(records);
-    };
+    }, []);
 
     useEffect(() => {
         loadHistory();
-    }, []);
+    }, [loadHistory]);
 
     const handleDelete = async (id: string) => {
         if (!isGerente) return;
