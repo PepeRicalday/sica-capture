@@ -62,7 +62,7 @@ const Capture = () => {
             : '0.00'; // Listros/seg para Tomas, Metros para Escalas
 
     // Hydric Status
-    const { activeEvent } = useHydricStatus();
+    const { activeEvent, maxKmAlcanzado } = useHydricStatus();
 
     // Selectores Offline
     const [selectedPoint, setSelectedPoint] = useState<string>('');
@@ -284,6 +284,14 @@ const Capture = () => {
                         return;
                     }
 
+                    // --- BLOQUEOS FÍSICOS (HIDRO-SINCRONÍA) ---
+                    if (activeEvent?.evento_tipo === 'LLENADO' && isActionOpening && refPt.km !== undefined) {
+                        if (refPt.km > maxKmAlcanzado) {
+                            toast.error(`BLOQUEO HIDRÁULICO: El agua (KM ${maxKmAlcanzado.toFixed(1)}) aún no pasa por esta toma (KM ${refPt.km.toFixed(1)}). Imposible abrir.`);
+                            return;
+                        }
+                    }
+
                     if (isActionClosing && numVal !== 0) {
                         toast.error('Bloqueo: Para cerrar o suspender la toma, el gasto capturado debe ser 0 L/s.');
                         return;
@@ -476,9 +484,14 @@ const Capture = () => {
                                         const modSec = [p.modulo && `Mod: ${p.modulo}`, p.seccion && `Sec: ${p.seccion}`].filter(Boolean).join(' | ');
                                         const suffix = modSec ? ` [${modSec}]` : '';
                                         const icon = ['inicio', 'reabierto', 'continua', 'modificacion'].includes(p.estado_hoy || '') ? '🟢' : '🔴';
+                                        
+                                        // Bloqueo visual por Hidro-Sincronía
+                                        const isBlocked = activeEvent?.evento_tipo === 'LLENADO' && (p.km || 0) > maxKmAlcanzado;
+                                        const lockIcon = isBlocked ? '🔒 VACIÓ - ' : '';
+
                                         return (
                                             <option key={p.id} value={p.id}>
-                                                {icon} km {p.km?.toFixed(3)} - {p.name}{suffix}
+                                                {lockIcon}{icon} km {p.km?.toFixed(3)} - {p.name}{suffix}
                                             </option>
                                         );
                                     })
