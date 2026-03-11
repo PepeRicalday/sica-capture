@@ -192,6 +192,7 @@ export const downloadCatalogs = async () => {
             });
         }
 
+        localStorage.setItem('sica_last_sync', Date.now().toString());
         console.log('Catalogs updated successfully.');
     } catch (error) {
         console.error('Failed to download catalogs:', error);

@@ -187,6 +187,8 @@ const Capture = () => {
                 const hAbajo = escalaData.abajo / 100;
 
                 // ---- REGLAS FÍSICAS Y LÓGICAS PARA ESCALAS ----
+                const pt = puntos.find(p => p.id === selectedPoint);
+
                 if (hArriba > 4.50) {
                     toast.error('Bloqueo: El nivel supera el bordo físico del canal (4.50m). Imposible guardar.');
                     return;
@@ -199,12 +201,16 @@ const Capture = () => {
                     toast.error('Gravedad: Nivel abajo no puede ser mayor que Nivel arriba.');
                     return;
                 }
-                if (hArriba < 2.80 || hArriba > 3.40) {
-                    const confirmed = window.confirm(`El nivel de ${hArriba}m está fuera del rango óptimo (2.80m - 3.40m).\n¿Desea guardar como una anomalía operativa?`);
+                
+                // MEJ-7: Validación dinámica de rango operativo por escala
+                const minOp = pt?.nivel_min_operativo || 2.80;
+                const maxOp = pt?.nivel_max_operativo || 3.40;
+                
+                if (hArriba < minOp || hArriba > maxOp) {
+                    const confirmed = window.confirm(`El nivel de ${hArriba}m está fuera del rango óptimo definido para esta escala (${minOp}m - ${maxOp}m).\n¿Desea guardar como una alerta operativa?`);
                     if (!confirmed) return;
                 }
 
-                const pt = puntos.find(p => p.id === selectedPoint);
                 let q = 0;
                 const realAperturasStr: any[] = [];
                 let maxAperturaStr = 0;
@@ -402,18 +408,24 @@ const Capture = () => {
 
                 {/* 1. Selector de Tipo (Rediseñado Gerencial: Alto Contraste Solar) */}
                 <div className="flex bg-slate-900/90 rounded-xl p-1 mb-4 flex-shrink-0 text-[10px] sm:text-xs shadow-inner ring-1 ring-slate-800">
-                    {(['escala', 'toma', 'aforo'] as const).map(tab => (
-                        <button
-                            key={tab}
-                            onClick={() => { setActiveTab(tab); setSelectedPoint(''); }}
-                            className={`flex-1 py-3 px-1 rounded-lg font-black uppercase tracking-wider transition-all duration-300 ${activeTab === tab
-                                ? 'bg-mobile-accent text-slate-900 shadow-lg shadow-mobile-accent/30 scale-[1.02]'
-                                : 'text-slate-500 hover:text-slate-300'
-                                }`}
-                        >
-                            {tab === 'escala' ? 'Niveles' : tab === 'toma' ? 'Distribución' : 'Aforos'}
-                        </button>
-                    ))}
+                    {(['escala', 'toma', 'aforo'] as const).map(tab => {
+                        // MEJ-4: Ocultar o deshabilitar tabs no relevantes
+                        const isRelevant = !(activeEvent?.evento_tipo === 'LLENADO' && tab === 'aforo');
+                        if (!isRelevant) return null;
+
+                        return (
+                            <button
+                                key={tab}
+                                onClick={() => { setActiveTab(tab); setSelectedPoint(''); }}
+                                className={`flex-1 py-3 px-1 rounded-lg font-black uppercase tracking-wider transition-all duration-300 ${activeTab === tab
+                                    ? 'bg-mobile-accent text-slate-900 shadow-lg shadow-mobile-accent/30 scale-[1.02]'
+                                    : 'text-slate-500 hover:text-slate-300'
+                                    }`}
+                            >
+                                {tab === 'escala' ? 'Niveles' : tab === 'toma' ? 'Distribución' : 'Aforos'}
+                            </button>
+                        );
+                    })}
                 </div>
 
                 {/* 2. Selector de Punto */}

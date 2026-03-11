@@ -1,14 +1,24 @@
-import type { ReactNode } from 'react';
+import { type ReactNode, useState, useEffect } from 'react';
 import { MapPin, LogOut, Activity, Droplets } from 'lucide-react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
 const APP_VERSION = __APP_VERSION__;
-const BUILD_HASH = __BUILD_HASH__;
 
 const Layout = ({ children }: { children: ReactNode }) => {
     const { signOut } = useAuth();
     const navigate = useNavigate();
+    const [lastSync, setLastSync] = useState<number | null>(null);
+
+    useEffect(() => {
+        const checkSync = () => {
+            const ls = localStorage.getItem('sica_last_sync');
+            if (ls) setLastSync(parseInt(ls));
+        };
+        checkSync();
+        const interval = setInterval(checkSync, 10000);
+        return () => clearInterval(interval);
+    }, []);
 
     const handleLogout = async () => {
         await signOut();
@@ -66,11 +76,18 @@ const Layout = ({ children }: { children: ReactNode }) => {
                         <span className="text-[9px] mt-0.5">Salir</span>
                     </button>
                 </div>
-                {/* Version Badge */}
-                <div className="flex justify-center pb-1 -mt-1">
+                {/* Version Badge & Sync Latency (MEJ-1) */}
+                <div className="flex justify-between items-center px-4 pb-1 -mt-1">
                     <span className="text-[8px] text-slate-600 font-mono tracking-wider">
-                        SICA v{APP_VERSION} • {BUILD_HASH}
+                        SICA v{APP_VERSION} 
                     </span>
+                    {lastSync && (
+                        <span className={`text-[8px] font-mono tracking-wider px-1.5 py-0.5 rounded-sm ${
+                            ((Date.now() - lastSync) / 60000) > 30 ? 'bg-amber-500/10 text-amber-500' : 'text-slate-500'
+                        }`}>
+                            Sync: {Math.floor((Date.now() - lastSync) / 60000)}m
+                        </span>
+                    )}
                 </div>
             </nav>
         </div>
