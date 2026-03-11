@@ -590,7 +590,7 @@ const Capture = () => {
                                                 confirmada: true,
                                                 responsable_id: profile?.id,
                                                 responsable_nombre: profile?.nombre || 'Operador',
-                                                valor_q: 0.05, // Lectura mínima inicial
+                                                valor_q: undefined, // Evita contaminar el resumen de escalas
                                                 nivel_abajo_m: 0,
                                                 apertura_radiales_m: 0,
                                                 notas: `📌 ARRIBO VISUAL CONFIRMADO. Lat: ${pos.coords.latitude.toFixed(5)}, Lng: ${pos.coords.longitude.toFixed(5)}`

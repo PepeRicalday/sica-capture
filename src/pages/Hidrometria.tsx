@@ -6,6 +6,7 @@ import { ResponsiveContainer, ComposedChart, Line, XAxis, YAxis, CartesianGrid, 
 import clsx from 'clsx';
 import { TomaHistoryModal } from '../components/TomaHistoryModal';
 import { formatCaudalLps } from '../lib/formatters';
+import StatusBanner from '../components/StatusBanner';
 
 // Custom Tooltip for Escalas Graph
 const EscalasTooltip = ({ active, payload }: any) => {
@@ -156,6 +157,7 @@ const Hidrometria: React.FC = () => {
             </header>
 
             <div className="flex-1 overflow-y-auto p-4 space-y-5 custom-scrollbar pb-20">
+                <StatusBanner />
                 {/* EXEC METRICS: Glassmorphism Style */}
                 <div className="grid grid-cols-2 gap-3">
                     <div className="glass-panel rounded-2xl p-4 flex flex-col items-start justify-center relative overflow-hidden group border-mobile-accent/20">

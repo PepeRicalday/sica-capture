@@ -6,6 +6,7 @@ import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 import { Droplet, Activity, WifiOff, Scale, Calculator, AlertCircle } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import StatusBanner from '../components/StatusBanner';
 
 const MapBounds = ({ bounds }: { bounds: [number, number][] }) => {
     const map = useMap();
@@ -156,6 +157,7 @@ const Monitor = () => {
             </header>
 
             <div className="flex-1 flex flex-col overflow-y-auto">
+                <StatusBanner />
                 {/* 0. Widget de Balance del Canal */}
                 <div className="p-4 flex-shrink-0 bg-slate-900/50 border-b border-slate-700/50">
                     <div className="flex items-center gap-2 mb-3">
