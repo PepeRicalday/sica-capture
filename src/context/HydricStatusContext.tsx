@@ -40,7 +40,7 @@ export const HydricStatusProvider: React.FC<{ children: React.ReactNode }> = ({ 
                     .from('sica_eventos_log')
                     .select('*')
                     .eq('esta_activo', true)
-                    .order('created_at', { ascending: false })
+                    .order('fecha_inicio', { ascending: false })
                     .limit(1)
                     .maybeSingle();
 

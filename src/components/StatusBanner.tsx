@@ -18,13 +18,16 @@ const StatusBanner: React.FC = () => {
 
     switch(activeEvent.evento_tipo) {
         case 'LLENADO':
+            const isProgrammed = !activeEvent.hora_apertura_real;
             bannerProps = {
-                bgStart: 'rgba(59, 130, 246, 0.2)', // blue-500
-                bgEnd: 'rgba(29, 78, 216, 0.1)',    // blue-700
-                borderColor: 'rgba(59, 130, 246, 0.5)',
-                icon: <Waves size={16} className="text-blue-400" />,
-                title: 'PROTOCOLO DE LLENADO ACTIVO',
-                desc: 'Onda en tránsito. Prioridad: Reportar arribo en escalas.'
+                bgStart: isProgrammed ? 'rgba(245, 158, 11, 0.2)' : 'rgba(59, 130, 246, 0.2)',
+                bgEnd: isProgrammed ? 'rgba(180, 83, 9, 0.1)' : 'rgba(29, 78, 216, 0.1)',
+                borderColor: isProgrammed ? 'rgba(245, 158, 11, 0.5)' : 'rgba(59, 130, 246, 0.5)',
+                icon: <Waves size={16} className={isProgrammed ? "text-amber-400" : "text-blue-400"} />,
+                title: isProgrammed ? 'PROTOCOLO PROGRAMADO' : 'PROTOCOLO DE LLENADO ACTIVO',
+                desc: isProgrammed 
+                    ? `Esperando apertura de presa. Gasto programado: ${activeEvent.gasto_solicitado_m3s || '--'} m³/s`
+                    : `Onda en tránsito (${activeEvent.gasto_solicitado_m3s} m³/s). Reportar arribos.`
             };
             break;
         case 'ESTABILIZACION':

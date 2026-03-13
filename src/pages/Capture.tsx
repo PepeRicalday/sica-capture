@@ -584,6 +584,7 @@ const Capture = () => {
                 {activeTab === 'escala' && selectedPoint && activeEvent?.evento_tipo === 'LLENADO' && (
                     <div className="mb-4">
                         <button
+                            disabled={!activeEvent.hora_apertura_real}
                             onClick={async () => {
                                 if (navigator.geolocation) {
                                     toast.loading("Obteniendo GPS para acta de arribo...");
@@ -618,12 +619,20 @@ const Capture = () => {
                                     toast.error("Tu dispositivo no soporta GPS");
                                 }
                             }}
-                            className="w-full bg-blue-600 active:bg-blue-700 text-white shadow-[0_4px_20px_rgba(37,99,235,0.4)] p-4 rounded-xl flex items-center justify-center gap-3 font-black uppercase tracking-widest border border-blue-400/50 transition-all transform active:scale-95"
+                            className={`w-full p-4 rounded-xl flex items-center justify-center gap-3 font-black uppercase tracking-widest border transition-all transform active:scale-95 ${
+                                activeEvent.hora_apertura_real 
+                                ? "bg-blue-600 active:bg-blue-700 text-white shadow-[0_4px_20px_rgba(37,99,235,0.4)] border-blue-400/50" 
+                                : "bg-slate-800 text-slate-500 border-slate-700 cursor-not-allowed opacity-70"
+                            }`}
                         >
-                            <span className="text-2xl drop-shadow-md">🌊</span> 
-                            <span>¡Confirmar LLEGADA del Agua!</span>
+                            <span className="text-2xl drop-shadow-md">{activeEvent.hora_apertura_real ? "🌊" : "🔒"}</span> 
+                            <span>{activeEvent.hora_apertura_real ? "¡Confirmar LLEGADA del Agua!" : "Esperando Apertura de Presa"}</span>
                         </button>
-                        <p className="text-[9px] text-blue-400 mt-2 text-center italic tracking-wider">Esto enviará tu GPS a Conchos Digital en tiempo real.</p>
+                        <p className="text-[9px] text-blue-400 mt-2 text-center italic tracking-wider">
+                            {activeEvent.hora_apertura_real 
+                            ? "Esto enviará tu GPS a Conchos Digital en tiempo real." 
+                            : "La Gerencia de la SRL aún no confirma la apertura física de la obra de toma."}
+                        </p>
                     </div>
                 )}
 
