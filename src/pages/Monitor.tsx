@@ -7,6 +7,7 @@ import L from 'leaflet';
 import { Droplet, Activity, WifiOff, Scale, Calculator, AlertCircle } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import StatusBanner from '../components/StatusBanner';
+import { useHydricStatus } from '../context/HydricStatusContext';
 
 const MapBounds = ({ bounds }: { bounds: [number, number][] }) => {
     const map = useMap();
@@ -48,6 +49,7 @@ const createColoredIcon = (colorName: string) => new L.Icon({
 });
 
 const Monitor = () => {
+    const { activeEvent } = useHydricStatus();
     const puntos = useLiveQuery(() => db.puntos.toArray()) || [];
     const [currentTime, setCurrentTime] = useState<Date>(() => new Date());
     const [isOnline, setIsOnline] = useState(navigator.onLine);
@@ -228,10 +230,14 @@ const Monitor = () => {
                             </div>
 
                             {/* Alerta visible si está fuera del rango de la regla estricta (2.8m - 3.4m) */}
-                            {escalaPrincipal.nivel_actual && (escalaPrincipal.nivel_actual < 2.80 || escalaPrincipal.nivel_actual > 3.40) && (
+                            {/* Durante LLENADO, no alertamos por nivel bajo (es esperado) */}
+                            {escalaPrincipal.nivel_actual && 
+                             (escalaPrincipal.nivel_actual > 3.40 || (activeEvent?.evento_tipo !== 'LLENADO' && escalaPrincipal.nivel_actual < 2.80)) && (
                                 <div className="mt-2 bg-amber-500/10 border border-amber-500/20 rounded p-1.5 flex items-center gap-1.5">
                                     <AlertCircle size={10} className="text-amber-500 shrink-0" />
-                                    <span className="text-[9px] text-amber-400 font-bold uppercase">Precaución: Nivel fuera del rango óptimo (2.80m - 3.40m)</span>
+                                    <span className="text-[9px] text-amber-400 font-bold uppercase">
+                                        {escalaPrincipal.nivel_actual > 3.40 ? 'Precaución: Nivel por ARRIBA del NAMO' : 'Precaución: Nivel por DEBAJO de Operativo'}
+                                    </span>
                                 </div>
                             )}
                         </div>

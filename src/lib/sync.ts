@@ -223,8 +223,9 @@ export const syncPendingRecords = async () => {
             radiales_json: p.radiales_json,
             gasto_calculado_m3s: p.gasto_calculado_m3s,
             hora_lectura: p.hora_captura,
-            responsable: p.responsable_nombre || 'Operador Móvil', // Real UUID linked
-            turno: parseInt(p.hora_captura.split(':')[0]) < 14 ? 'am' : 'pm'
+            responsable: p.responsable_nombre || 'Operador Móvil',
+            turno: parseInt(p.hora_captura.split(':')[0]) < 14 ? 'am' : 'pm',
+            notas: p.notas // Incluir notas (GPS, Arribos, etc.)
         }));
 
         const syncSuccessIds: string[] = [];
@@ -252,7 +253,8 @@ export const syncPendingRecords = async () => {
             fecha_hora: `${p.fecha_captura}T${p.hora_captura}${offsetString}`,
             tipo_ubicacion: 'canal',
             estado_evento: p.estado_operativo || null,
-            usuario_id: p.responsable_id || null
+            usuario_id: p.responsable_id || null,
+            notas: p.notas
         }));
 
         if (tomasPayload.length > 0) {

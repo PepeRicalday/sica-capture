@@ -18,6 +18,21 @@ import { TomaHistoryModal } from '../components/TomaHistoryModal';
 import { RepresoSchema } from '../components/RepresoSchema';
 import { useHydricStatus } from '../context/HydricStatusContext';
 import StatusBanner from '../components/StatusBanner';
+import { ManagerAuthModal } from '../components/ManagerAuthModal';
+
+// Función Haversine para cálculo de distancia en metros
+const getDistanceMeters = (lat1: number, lon1: number, lat2: number, lon2: number) => {
+    const R = 6371e3; // Metros
+    const φ1 = lat1 * Math.PI / 180;
+    const φ2 = lat2 * Math.PI / 180;
+    const Δφ = (lat2 - lat1) * Math.PI / 180;
+    const Δλ = (lon2 - lon1) * Math.PI / 180;
+    const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+        Math.cos(φ1) * Math.cos(φ2) *
+        Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
+};
 
 // Micro-Componente Aislado para Reloj: Evita el re-renderizado masivo de toda la App
 const LiveClock = () => {
@@ -49,6 +64,11 @@ const Capture = () => {
     const [editingAforo, setEditingAforo] = useState<SicaAforoRecord | undefined>(undefined);
     const [editingRecord, setEditingRecord] = useState<SicaRecord | undefined>(undefined);
 
+    // Modal de Autorización Gerencial
+    const [showAuthModal, setShowAuthModal] = useState(false);
+    const [authReason, setAuthReason] = useState('');
+    const [pendingPayload, setPendingPayload] = useState<SicaRecord | null>(null);
+
     // Método de Captura: Estilo "Cajero Automático" (Evita decimales rotos y números infinitos)
     const [rawValue, setRawValue] = useState<number>(0);
     const [escalaField, setEscalaField] = useState<'arriba' | 'abajo' | 'apertura'>('arriba');
@@ -71,6 +91,20 @@ const Capture = () => {
     // Red y Sincronía
     const [isOnline, setIsOnline] = useState(navigator.onLine);
     const pendingCount = useLiveQuery(() => db.records.where({ sincronizado: 'false' }).count(), []) || 0;
+
+    // MEJ-10: Verificar si ya existe una confirmación de arribo local para el punto seleccionado
+    const localArriboPending = useLiveQuery(
+        async () => {
+            if (!selectedPoint) return false;
+            const records = await db.records
+                .where('punto_id')
+                .equals(selectedPoint)
+                .filter(r => r.notas?.includes('ARRIBO VISUAL CONFIRMADO') || false)
+                .toArray();
+            return records.length > 0;
+        },
+        [selectedPoint]
+    );
 
     useEffect(() => {
         const handleOnline = () => setIsOnline(true);
@@ -143,11 +177,13 @@ const Capture = () => {
         }
     };
 
-    const handleSave = async () => {
+    const handleSave = async (isAuthorized = false) => {
         if (!selectedPoint) {
             toast.error('Por favor selecciona un punto o presa antes de guardar.');
             return;
         }
+
+        const isGerente = profile?.rol === 'SRL';
 
         try {
 
@@ -193,8 +229,17 @@ const Capture = () => {
                     toast.error('Bloqueo: El nivel supera el bordo físico del canal (4.50m). Imposible guardar.');
                     return;
                 }
-                if (hArriba <= 0.00) {
-                    toast.error('Bloqueo: El nivel no puede ser 0 absoluto en operación.');
+                
+                // Permitir 0 o niveles muy bajos durante el llenado
+                const isLlenado = activeEvent?.evento_tipo === 'LLENADO';
+                
+                if (hArriba < 0) {
+                    toast.error('Bloqueo: El nivel no puede ser negativo.');
+                    return;
+                }
+
+                if (hArriba === 0 && !isLlenado && !isAuthorized && !isGerente) {
+                    toast.error('Bloqueo: El nivel no puede ser 0 absoluto en operación normal.');
                     return;
                 }
                 if (hAbajo > hArriba) {
@@ -206,8 +251,17 @@ const Capture = () => {
                 const minOp = pt?.nivel_min_operativo || 2.80;
                 const maxOp = pt?.nivel_max_operativo || 3.40;
                 
-                if (hArriba < minOp || hArriba > maxOp) {
+                // Si es Gerente, SRL o está en LLENADO, no molestamos con el rango óptimo si es menor (porque está llenando)
+                const skipRangeCheck = isAuthorized || isGerente || (isLlenado && hArriba < minOp);
+
+                if (!skipRangeCheck && (hArriba < minOp || hArriba > maxOp)) {
                     const confirmed = window.confirm(`El nivel de ${hArriba}m está fuera del rango óptimo definido para esta escala (${minOp}m - ${maxOp}m).\n¿Desea guardar como una alerta operativa?`);
+                    if (!confirmed) return;
+                }
+                
+                // Si hArriba es 0 y es normal, avisar
+                if (hArriba === 0 && !isLlenado && (isGerente || isAuthorized)) {
+                    const confirmed = window.confirm("¿Seguro que desea guardar nivel 0.00m? (Afectará cálculos de volumen)");
                     if (!confirmed) return;
                 }
 
@@ -312,6 +366,34 @@ const Capture = () => {
                 // Solo divide entre 1000 si NO es canal (el canal captura directo en m3/s)
                 payload.valor_q = refPt?.type === 'canal' ? numVal : numVal / 1000;
                 payload.estado_operativo = estadoToma;
+            }
+
+            // ---- VALIDACIÓN GEOGRÁFICA (GEOFENCING) ----
+            // Si el punto tiene coordenadas, validar que el usuario esté cerca (ej. < 1km)
+            const pt = puntos.find(p => p.id === selectedPoint);
+            const shouldCheckLocation = !isGerente && !isAuthorized && pt?.lat && pt?.lng;
+
+            if (shouldCheckLocation && pt?.lat && pt?.lng) {
+                try {
+                    const pos: any = await new Promise((resolve, reject) => {
+                        navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 5000 });
+                    });
+                    
+                    const dist = getDistanceMeters(pos.coords.latitude, pos.coords.longitude, pt.lat, pt.lng);
+                    
+                    if (dist > 1000) { // 1km de radio permitido
+                        setAuthReason(`USUARIO FUERA DE UBICACIÓN: Estás a ${(dist / 1000).toFixed(1)}km del punto ${pt.name}. Se requiere autorización del Gerente.`);
+                        setPendingPayload(payload);
+                        setShowAuthModal(true);
+                        return;
+                    }
+                } catch (err) {
+                    toast.warning("No se pudo verificar ubicación GPS. Se requiere autorización gerencial por seguridad.");
+                    setAuthReason(`ERROR GPS: Imposible verificar distancia a ${pt.name}.`);
+                    setPendingPayload(payload);
+                    setShowAuthModal(true);
+                    return;
+                }
             }
 
             if (editingRecord) {
@@ -581,7 +663,12 @@ const Capture = () => {
                 )}
 
                 {/* BOTÓN MÁGICO DE ARRIBO (SINCRONÍA RÁPIDA CON CONCHOS DIGITAL) */}
-                {activeTab === 'escala' && selectedPoint && activeEvent?.evento_tipo === 'LLENADO' && (
+                {/* REGLA: Solo mostrar si el punto NO ha sido confirmado aún (ni local ni remotamente) */}
+                {activeTab === 'escala' && 
+                 selectedPoint && 
+                 activeEvent?.evento_tipo === 'LLENADO' && 
+                 puntos.find(p => p.id === selectedPoint)?.escala_confirmada === false &&
+                 !localArriboPending && (
                     <div className="mb-4">
                         <button
                             disabled={!activeEvent.hora_apertura_real}
@@ -603,7 +690,7 @@ const Capture = () => {
                                                 confirmada: true,
                                                 responsable_id: profile?.id,
                                                 responsable_nombre: profile?.nombre || 'Operador',
-                                                valor_q: undefined, // Evita contaminar el resumen de escalas
+                                                valor_q: 0.01, // Trace level (1cm) to satisfy DB constraints and show water presence
                                                 nivel_abajo_m: 0,
                                                 apertura_radiales_m: 0,
                                                 notas: `📌 ARRIBO VISUAL CONFIRMADO. Lat: ${pos.coords.latitude.toFixed(5)}, Lng: ${pos.coords.longitude.toFixed(5)}`
@@ -819,7 +906,7 @@ const Capture = () => {
                             )}
                             <button
                                 className={`w-full text-lg sm:text-xl h-14 rounded-xl flex items-center justify-center gap-2 font-black tracking-widest transition-all outline-none ${editingRecord ? 'bg-mobile-accent text-white shadow-[0_4px_14px_0_rgba(6,182,212,0.39)]' : 'bg-mobile-warning text-slate-900 shadow-[0_4px_14px_0_rgba(245,158,11,0.39)] hover:shadow-[0_6px_20px_rgba(245,158,11,0.6)]'}`}
-                                onClick={handleSave}
+                                onClick={() => handleSave()}
                             >
                                 <Save size={24} className="drop-shadow-sm" /> {editingRecord ? 'APLICAR CORRECCIÓN' : 'GUARDAR CAPTURA'}
                             </button>
@@ -908,6 +995,24 @@ const Capture = () => {
                         }
                         setManualTime(record.hora_captura.substring(0, 5));
                         toast.success('Corrigiendo gasto...');
+                    }}
+                />
+            )}
+
+            {showAuthModal && (
+                <ManagerAuthModal
+                    reason={authReason}
+                    onClose={() => {
+                        setShowAuthModal(false);
+                        setPendingPayload(null);
+                    }}
+                    onSuccess={() => {
+                        setShowAuthModal(false);
+                        if (pendingPayload) {
+                            // Enviar con bandera isAuthorized=true
+                            handleSave(true);
+                            setPendingPayload(null);
+                        }
                     }}
                 />
             )}
