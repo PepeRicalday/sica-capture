@@ -10,7 +10,7 @@
  */
 import { useEffect, useState, type ReactNode } from 'react';
 import { supabase } from '../lib/supabase';
-import { ShieldAlert, X } from 'lucide-react';
+import { ShieldAlert, X, Droplets } from 'lucide-react';
 
 const CURRENT_VERSION = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '0.0.0';
 
@@ -60,8 +60,9 @@ export const VersionGuard = ({ children }: { children: ReactNode }) => {
     }, []);
 
     const handleDismiss = () => {
-        setShowBanner(false);
-        sessionStorage.setItem('sica_version_dismissed', CURRENT_VERSION);
+        // En modo forzado, ya no permitimos descartar
+        // setShowBanner(false);
+        // sessionStorage.setItem('sica_version_dismissed', CURRENT_VERSION);
     };
 
     const handleUpdate = async () => {
@@ -86,21 +87,28 @@ export const VersionGuard = ({ children }: { children: ReactNode }) => {
     return (
         <>
             {showBanner && (
-                <div className="bg-red-600 text-white text-xs py-2 px-4 flex items-center justify-between font-bold uppercase tracking-wider sticky top-0 z-[9999] shadow-lg">
-                    <div className="flex items-center gap-2">
-                        <ShieldAlert size={14} />
-                        <span>Versión {CURRENT_VERSION} → Se requiere {serverVersion}</span>
-                    </div>
-                    <div className="flex items-center gap-2">
+                <div className="fixed inset-0 bg-slate-950/98 backdrop-blur-xl z-[99999] flex items-center justify-center p-6 text-center">
+                    <div className="max-w-sm w-full bg-slate-900 border border-orange-500/30 rounded-3xl p-8 shadow-2xl animate-in fade-in zoom-in duration-500">
+                        <div className="w-20 h-20 bg-orange-500/10 rounded-full flex items-center justify-center mx-auto mb-8">
+                            <ShieldAlert size={40} className="text-orange-500 animate-bounce" />
+                        </div>
+                        
+                        <h2 className="text-2xl font-black text-white mb-4 tracking-tighter">NUEVA VERSIÓN REQUERIDA</h2>
+                        <p className="text-base text-slate-400 mb-10 leading-relaxed">
+                            Para reportar aforos, debes actualizar SICA Capture a la <b>v{serverVersion}</b>.
+                        </p>
+
                         <button
                             onClick={handleUpdate}
-                            className="bg-white text-red-600 px-3 py-1 rounded-full hover:bg-slate-100 transition-colors text-[10px]"
+                            className="w-full bg-orange-600 hover:bg-orange-500 text-white font-black py-5 rounded-2xl transition-all shadow-xl active:scale-95 flex items-center justify-center gap-4 text-lg"
                         >
-                            Actualizar
+                            <Droplets size={22} />
+                            ACTUALIZAR AHORA
                         </button>
-                        <button onClick={handleDismiss} className="p-1 hover:bg-red-700 rounded">
-                            <X size={14} />
-                        </button>
+                        
+                        <div className="mt-8 text-[11px] text-slate-600 uppercase tracking-[0.2em] font-bold">
+                            SICA CAPTURE • MÓDULO RIEGO
+                        </div>
                     </div>
                 </div>
             )}

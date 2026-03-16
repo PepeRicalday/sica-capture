@@ -5,7 +5,7 @@
 <head>
   <meta charset="UTF-8" />
   <link rel="icon" type="image/png" href="/icon.png" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="SICA Captura">
@@ -16,7 +16,17 @@
   <meta http-equiv="Expires" content="0" />
 
   <link rel="apple-touch-icon" href="/icon-512.png">
-  <title>SICA Captura | S.R.L. Unidad Conchos</title>
+  <title>SICA Capture v2.0.2 | UNIFICACIÓN</title>
+  <script>
+    // CACHE BOUNCE v2.0.2
+    (function () {
+      const REQ_V = '202';
+      const urlParams = new URLSearchParams(window.location.search);
+      if (urlParams.get('v') !== REQ_V) {
+        window.location.replace(window.location.origin + window.location.pathname + '?v=' + REQ_V + '&t=' + Date.now());
+      }
+    })();
+  </script>
 
   <script>
     // CACHE NUKE TRINITY - SICA 2026

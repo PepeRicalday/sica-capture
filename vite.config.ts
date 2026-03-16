@@ -7,7 +7,7 @@ import pkg from './package.json'
 export default defineConfig({
   define: {
     '__APP_VERSION__': JSON.stringify(pkg.version),
-    '__BUILD_HASH__': JSON.stringify(Date.now().toString(36)),
+    '__BUILD_HASH__': JSON.stringify('hash-v202-unification'),
     '__BUILD_DATE__': JSON.stringify(new Date().toISOString())
   },
   server: {
@@ -19,7 +19,7 @@ export default defineConfig({
     basicSsl(),
     VitePWA({
       registerType: 'autoUpdate',   // SW se actualiza sin prompt NUNCA
-      filename: 'sw-sica.js',       // Nombre nuevo para forzar invalidación del SW viejo
+      filename: 'sw-sica-v2.js',       // Nombre nuevo para forzar invalidación del SW viejo
       manifest: {
         name: 'SICA Captura | S.R.L. Unidad Conchos',
         short_name: 'SICA Captura',

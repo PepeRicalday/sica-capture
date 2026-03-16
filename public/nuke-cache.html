@@ -47,16 +47,36 @@
             redirigido en un momento.</p>
     </div>
     <script>
-        // Double check SW removal just in case
+        console.log("SICA CAPTURE: Nuclear Reset...");
+        
+        // 1. Clear All
+        localStorage.clear();
+        sessionStorage.clear();
+        
+        // 2. Clear SW
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.getRegistrations().then(function (regs) {
                 for (let reg of regs) reg.unregister();
             });
         }
-        // Redirect back to home after 1.5 seconds to ensure headers were processed
+
+        // 3. Clear Caches
+        if ('caches' in window) {
+            caches.keys().then(function(names) {
+                for (let name of names) caches.delete(name);
+            });
+        }
+
+        // 4. Clear IDB
+        if (window.indexedDB) {
+            indexedDB.databases().then(dbs => {
+                dbs.forEach(db => { if(db.name) indexedDB.deleteDatabase(db.name); });
+            });
+        }
+
         setTimeout(function () {
-            window.location.href = "/?v=" + Date.now();
-        }, 1500);
+            window.location.replace(window.location.origin + "/?nuke=" + Date.now() + "&v=202");
+        }, 2000);
     </script>
 </body>
 
