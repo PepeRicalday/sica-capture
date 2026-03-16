@@ -173,7 +173,20 @@ export const downloadCatalogs = async () => {
             })));
         }
 
-        // E. Perfil Hidráulico del Canal (Rule: Un solo dato, una sola verdad)
+        // F. Presas
+        const { data: presas } = await supabase
+            .from('presas')
+            .select('id, nombre, nombre_corto');
+
+        if (presas) {
+            mappedPuntos.push(...presas.map((p: any) => ({
+                id: p.id,
+                name: p.nombre_corto || p.nombre,
+                type: 'presa'
+            })));
+        }
+
+        // G. Perfil Hidráulico del Canal (Rule: Un solo dato, una sola verdad)
         const { data: perfiles } = await supabase
             .from('perfil_hidraulico_canal')
             .select('*')
@@ -295,6 +308,26 @@ export const syncPendingRecords = async () => {
                 await db.records.where('id').anyOf(aforosPending.map(p => p.id)).modify({ error_sync: err.message });
             } else {
                 syncSuccessIds.push(...aforosPending.map(p => p.id));
+            }
+        }
+
+        // 1D. Movimientos de Presa (van a movimientos_presas)
+        const presasPending = pending.filter(p => p.tipo === 'presa');
+        const presasPayload = presasPending.map(p => ({
+            id: p.id,
+            presa_id: p.punto_id,
+            fecha_hora: `${p.fecha_captura}T${p.hora_captura}${offsetString}`,
+            gasto_m3s: p.valor_q,
+            fuente_dato: 'SICA_CAPTURE'
+        }));
+
+        if (presasPayload.length > 0) {
+            const { error: err } = await supabase.from('movimientos_presas').upsert(presasPayload, { onConflict: 'id' });
+            if (err) {
+                console.error('Error insertando movimientos_presas:', err.message);
+                await db.records.where('id').anyOf(presasPending.map(p => p.id)).modify({ error_sync: err.message });
+            } else {
+                syncSuccessIds.push(...presasPending.map(p => p.id as string));
             }
         }
 

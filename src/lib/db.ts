@@ -37,7 +37,7 @@ export interface OfflinePoint {
 // 2. Registro a Sincronizar (Mochila)
 export interface SicaRecord {
     id: string; // V2 Migration: Using UUIDs locally to prevent sync collisions
-    tipo: 'escala' | 'toma' | 'aforo';
+    tipo: 'escala' | 'toma' | 'aforo' | 'presa';
 
     // Auditoría
     responsable_id?: string;

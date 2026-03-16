@@ -53,7 +53,7 @@ const LiveClock = () => {
 const Capture = () => {
     const { profile } = useAuth();
     // Formularios Dinámicos
-    const [activeTab, setActiveTab] = useState<'escala' | 'toma' | 'aforo'>('escala');
+    const [activeTab, setActiveTab] = useState<'escala' | 'toma' | 'aforo' | 'presas'>('escala');
     const [estadoToma, setEstadoToma] = useState<'inicio' | 'modificacion' | 'suspension' | 'reabierto' | 'cierre' | 'continua'>('inicio');
     const [manualTime, setManualTime] = useState<string>('');
     const [showSuccessAnim, setShowSuccessAnim] = useState(false);
@@ -75,7 +75,7 @@ const Capture = () => {
     const [escalaData, setEscalaData] = useState<{ arriba: number, abajo: number, aperturas: number[] }>({ arriba: 0, abajo: 0, aperturas: [] });
     const [activeGateIndex, setActiveGateIndex] = useState(0);
 
-    const val = activeTab === 'toma'
+    const val = (activeTab === 'toma' || activeTab === 'presas')
         ? rawValue.toString()
         : activeTab === 'escala'
             ? (escalaField === 'apertura' ? ((escalaData.aperturas[activeGateIndex] || 0) / 100).toFixed(2) : (escalaData[escalaField] / 100).toFixed(2))
@@ -207,7 +207,7 @@ const Capture = () => {
 
             const payload: SicaRecord = {
                 id: editingRecord?.id || uuidv4(),
-                tipo: activeTab,
+                tipo: activeTab === 'presas' ? 'presa' : activeTab,
                 punto_id: selectedPoint,
                 fecha_captura: editingRecord?.fecha_captura || captureDateStr,
                 hora_captura: captureTimeStr,
@@ -286,7 +286,19 @@ const Capture = () => {
 
                         if (ap > 0) {
                             const area = pt.ancho_radiales * ap;
-                            q += Cd * area * Math.sqrt(2 * 9.81 * hArriba);
+                            // REGLA DE HIDRO-SINCRONÍA: El gasto depende de la CARGA (hArriba - hAbajo)
+                            const carga = Math.max(0, hArriba - hAbajo);
+                            
+                            if (carga > 0.01) { // Mínimo 1cm de diferencial para flujo significativo
+                                if (ap < hArriba) {
+                                    // Flujo por Orificio (Compuerta sumergida o parcial)
+                                    q += Cd * area * Math.sqrt(2 * 9.81 * carga);
+                                } else {
+                                    // Flujo Libre / Vertedor (Compuerta abierta arriba del nivel del agua)
+                                    // En este caso el gasto no aumenta con 'ap', solo con 'hArriba'
+                                    q += 1.84 * pt.ancho_radiales * Math.pow(carga, 1.5);
+                                }
+                            }
                         }
                     }
                 } else {
@@ -366,6 +378,14 @@ const Capture = () => {
                 // Solo divide entre 1000 si NO es canal (el canal captura directo en m3/s)
                 payload.valor_q = refPt?.type === 'canal' ? numVal : numVal / 1000;
                 payload.estado_operativo = estadoToma;
+            } else if (activeTab === 'presas') {
+                const numVal = parseFloat(val);
+                if (isNaN(numVal)) {
+                    toast.error('Gasto inválido');
+                    return;
+                }
+                payload.valor_q = numVal;
+                // No mandatory state for presas, just the flow movement
             }
 
             // ---- VALIDACIÓN GEOGRÁFICA (GEOFENCING) ----
@@ -490,7 +510,7 @@ const Capture = () => {
 
                 {/* 1. Selector de Tipo (Rediseñado Gerencial: Alto Contraste Solar) */}
                 <div className="flex bg-slate-900/90 rounded-xl p-1 mb-4 flex-shrink-0 text-[10px] sm:text-xs shadow-inner ring-1 ring-slate-800">
-                    {(['escala', 'toma', 'aforo'] as const).map(tab => {
+                    {(['escala', 'toma', 'aforo', 'presas'] as const).map(tab => {
                         // MEJ-4: Ocultar o deshabilitar tabs no relevantes
                         const isRelevant = !(activeEvent?.evento_tipo === 'LLENADO' && tab === 'aforo');
                         if (!isRelevant) return null;
@@ -504,7 +524,7 @@ const Capture = () => {
                                     : 'text-slate-500 hover:text-slate-300'
                                     }`}
                             >
-                                {tab === 'escala' ? 'Niveles' : tab === 'toma' ? 'Distribución' : 'Aforos'}
+                                {tab === 'escala' ? 'Niveles' : tab === 'toma' ? 'Distribución' : tab === 'aforo' ? 'Aforos' : 'Presas'}
                             </button>
                         );
                     })}
@@ -570,6 +590,10 @@ const Capture = () => {
                                     .filter(p => p.type === 'escala')
                                     .sort((a, b) => (a.km || 0) - (b.km || 0))
                                     .map(p => <option key={p.id} value={p.id}>{p.name} (km {p.km?.toFixed(3)})</option>)
+                            ) : activeTab === 'presas' ? (
+                                puntos
+                                    .filter(p => p.type === 'presa')
+                                    .map(p => <option key={p.id} value={p.id}>🏔️ {p.name}</option>)
                             ) : (
                                 puntos
                                     .filter(p => p.type !== 'escala' && p.type !== 'aforo')
@@ -857,11 +881,18 @@ const Capture = () => {
 
                             if (pt?.pzas_radiales && pt?.ancho_radiales && realAps.length > 0) {
                                 const Cd = 0.6;
+                                const hAbajo = escalaData.abajo / 100;
+                                const carga = Math.max(0, hArriba - hAbajo);
+
                                 for (let i = 0; i < pt.pzas_radiales; i++) {
                                     const ap = realAps[i] || 0;
-                                    if (ap > 0) {
+                                    if (ap > 0 && carga > 0.01) {
                                         hasRadialesOpen = true;
-                                        q += Cd * (pt.ancho_radiales * ap) * Math.sqrt(2 * 9.81 * hArriba);
+                                        if (ap < hArriba) {
+                                            q += Cd * (pt.ancho_radiales * ap) * Math.sqrt(2 * 9.81 * carga);
+                                        } else {
+                                            q += 1.84 * pt.ancho_radiales * Math.pow(carga, 1.5);
+                                        }
                                     }
                                 }
                             } else if (!pt?.pzas_radiales && hArriba > 0) {
