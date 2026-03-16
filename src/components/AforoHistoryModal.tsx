@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { X, Search, ArrowRight, Edit3, Trash2, History, TrendingUp } from 'lucide-react';
 import { db, type SicaAforoRecord } from '../lib/db';
+import { supabase } from '../lib/supabase';
 import { TrapezoidalSchema } from './TrapezoidalSchema';
 import { toast } from 'sonner';
 import { useAuth } from '../context/AuthContext';
@@ -15,17 +16,70 @@ export const AforoHistoryModal = ({ onClose, onEditRecord }: AforoHistoryModalPr
     const isGerente = profile?.rol === 'SRL';
     const [history, setHistory] = useState<SicaAforoRecord[]>([]);
     const [searchQuery, setSearchQuery] = useState('');
+    const [filterDate, setFilterDate] = useState('');
     const [selectedDetail, setSelectedDetail] = useState<SicaAforoRecord | null>(null);
+    const [loading, setLoading] = useState(false);
 
     const loadHistory = async () => {
-        // Query all aforos, descending by date/time
-        const records = await db.records
-            .where('tipo')
-            .equals('aforo')
-            .reverse()
-            .toArray() as SicaAforoRecord[];
+        setLoading(true);
+        try {
+            // 1. Locales
+            const records = await db.records
+                .where('tipo')
+                .equals('aforo')
+                .reverse()
+                .toArray() as SicaAforoRecord[];
 
-        setHistory(records);
+            let allRecords = [...records];
+
+            // 2. Remotos
+            if (navigator.onLine) {
+                const { data: remoteData, error } = await supabase
+                    .from('aforos')
+                    .select('*')
+                    .order('fecha', { ascending: false })
+                    .order('hora_inicio', { ascending: false })
+                    .limit(200);
+
+                if (!error && remoteData) {
+                    const mapped: SicaAforoRecord[] = remoteData.map(r => ({
+                        id: r.id,
+                        tipo: 'aforo',
+                        punto_id: r.punto_control_id,
+                        fecha_captura: r.fecha,
+                        hora_captura: r.hora_inicio,
+                        hora_inicial: r.hora_inicio,
+                        hora_final: r.hora_fin,
+                        tirante_inicial_m: r.nivel_escala_inicio_m,
+                        tirante_final_m: r.nivel_escala_fin_m,
+                        espejo_m: r.espejo_agua_m,
+                        gasto_total_m3s: r.gasto_calculado_m3s,
+                        dobelas: r.dobelas_data || [],
+                        plantilla_m: r.plantilla_m,
+                        talud_z: r.talud_z,
+                        tirante_calculo_m: r.tirante_calculo_m,
+                        area_hidraulica_m2: r.area_hidraulica_m2,
+                        velocidad_media_ms: r.velocidad_media_ms,
+                        froude: r.froude,
+                        sincronizado: 'true'
+                    }));
+
+                    const localIds = new Set(records.map(l => l.id));
+                    const newRemote = mapped.filter(r => !localIds.has(r.id));
+                    allRecords = [...allRecords, ...newRemote].sort((a, b) => {
+                        const dateA = new Date(`${a.fecha_captura}T${a.hora_inicial}`).getTime();
+                        const dateB = new Date(`${b.fecha_captura}T${b.hora_inicial}`).getTime();
+                        return dateB - dateA;
+                    });
+                }
+            }
+
+            setHistory(allRecords);
+        } catch (err) {
+            console.error(err);
+        } finally {
+            setLoading(false);
+        }
     };
 
     useEffect(() => {
@@ -41,10 +95,18 @@ export const AforoHistoryModal = ({ onClose, onEditRecord }: AforoHistoryModalPr
         }
     };
 
-    const filteredHistory = history.filter(h =>
-        h.punto_id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        h.fecha_captura.includes(searchQuery)
-    );
+    const filteredHistory = history.filter(h => {
+        const query = searchQuery.toLowerCase();
+        const puntoMatch = h.punto_id.toLowerCase().includes(query);
+        const dateMatch = h.fecha_captura.includes(query) || (filterDate && h.fecha_captura === filterDate);
+        
+        const [y, m, d] = h.fecha_captura.split('-');
+        const dateNormal = `${d}/${m}/${y}`;
+        const dateUS = `${m}/${d}/${y}`;
+        const altDateMatch = dateNormal.includes(query) || dateUS.includes(query);
+
+        return (puntoMatch || dateMatch || altDateMatch) && (!filterDate || h.fecha_captura === filterDate);
+    });
 
     return (
         <div className="fixed inset-0 bg-slate-950/90 z-50 flex items-center justify-center p-4 backdrop-blur-md">
@@ -58,7 +120,7 @@ export const AforoHistoryModal = ({ onClose, onEditRecord }: AforoHistoryModalPr
                         </h2>
                         <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mt-0.5">Historial Local y Sincronizado</p>
                     </div>
-                    <button onClick={onClose} className="p-2 rounded-full hover:bg-slate-700 text-slate-400 transition-colors">
+                    <button onClick={onClose} className="p-2 rounded-full hover:bg-slate-700 text-slate-400 transition-colors" title="Cerrar bitácora" aria-label="Cerrar">
                         <X size={24} />
                     </button>
                 </div>
@@ -67,21 +129,34 @@ export const AforoHistoryModal = ({ onClose, onEditRecord }: AforoHistoryModalPr
 
                     {/* List View */}
                     <div className="w-full sm:w-1/2 border-r border-slate-800 flex flex-col bg-slate-900/50">
-                        <div className="p-3">
-                            <div className="relative">
+                        <div className="p-3 flex gap-2">
+                            <div className="relative flex-1">
                                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={16} />
                                 <input
                                     type="text"
-                                    placeholder="Buscar por Canal o Fecha..."
+                                    placeholder="Buscar..."
                                     className="w-full bg-slate-950 border border-slate-700 rounded-xl py-2 pl-10 pr-4 text-xs text-white outline-none focus:border-mobile-accent"
                                     value={searchQuery}
                                     onChange={(e) => setSearchQuery(e.target.value)}
                                 />
                             </div>
+                            <input
+                                type="date"
+                                title="Filtrar por fecha"
+                                aria-label="Filtrar por fecha"
+                                className="bg-slate-950 border border-slate-700 rounded-xl py-2 px-3 text-xs text-white outline-none focus:border-mobile-accent w-32"
+                                value={filterDate}
+                                onChange={(e) => setFilterDate(e.target.value)}
+                            />
                         </div>
 
                         <div className="flex-1 overflow-y-auto px-3 pb-4 custom-scrollbar space-y-2">
-                            {filteredHistory.length === 0 ? (
+                            {loading ? (
+                                <div className="flex flex-col items-center justify-center py-10 gap-3">
+                                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-mobile-accent"></div>
+                                    <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest animate-pulse">Sincronizando Bitácora...</p>
+                                </div>
+                            ) : filteredHistory.length === 0 ? (
                                 <div className="text-center py-10 text-slate-600 text-xs italic">No se encontraron aforos previos.</div>
                             ) : (
                                 filteredHistory.map(record => (
@@ -129,6 +204,7 @@ export const AforoHistoryModal = ({ onClose, onEditRecord }: AforoHistoryModalPr
                                                     <button
                                                         onClick={() => handleDelete(selectedDetail.id)}
                                                         className="bg-red-500/10 text-red-400 p-2 rounded-xl border border-red-500/20 hover:bg-red-500/20"
+                                                        title="Eliminar registro"
                                                     >
                                                         <Trash2 size={16} />
                                                     </button>

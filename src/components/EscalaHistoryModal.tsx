@@ -2,6 +2,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { X, Search, ArrowRight, Edit3, Trash2, History, Scale } from 'lucide-react';
 import { db, type SicaRecord } from '../lib/db';
+import { supabase } from '../lib/supabase';
 import { toast } from 'sonner';
 import { useAuth } from '../context/AuthContext';
 
@@ -15,16 +16,68 @@ export const EscalaHistoryModal = ({ onClose, onEditRecord }: EscalaHistoryModal
     const isGerente = profile?.rol === 'SRL';
     const [history, setHistory] = useState<SicaRecord[]>([]);
     const [searchQuery, setSearchQuery] = useState('');
+    const [filterDate, setFilterDate] = useState('');
     const [selectedDetail, setSelectedDetail] = useState<SicaRecord | null>(null);
+    const [loading, setLoading] = useState(false);
 
     const loadHistory = useCallback(async () => {
-        const records = await db.records
-            .where('tipo')
-            .equals('escala')
-            .reverse()
-            .toArray();
+        setLoading(true);
+        try {
+            // 1. Cargar locales (Mochila)
+            const localRecords = await db.records
+                .where('tipo')
+                .equals('escala')
+                .reverse()
+                .toArray();
 
-        setHistory(records);
+            let allRecords = [...localRecords];
+
+            // 2. Cargar remotos si hay internet
+            if (navigator.onLine) {
+                const { data: remoteRecords, error } = await supabase
+                    .from('lecturas_escalas')
+                    .select('*')
+                    .order('fecha', { ascending: false })
+                    .order('hora_lectura', { ascending: false })
+                    .limit(200);
+
+                if (error) {
+                    console.error('Error fetching remote scales:', error);
+                } else if (remoteRecords) {
+                    // Mapear Supabase -> SicaRecord
+                    const mappedRemote: SicaRecord[] = remoteRecords.map(r => ({
+                        id: r.id,
+                        tipo: 'escala',
+                        punto_id: r.escala_id,
+                        fecha_captura: r.fecha,
+                        hora_captura: r.hora_lectura,
+                        valor_q: r.nivel_m,
+                        nivel_abajo_m: r.nivel_abajo_m,
+                        apertura_radiales_m: r.apertura_radiales_m,
+                        radiales_json: r.radiales_json,
+                        gasto_calculado_m3s: r.gasto_calculado_m3s,
+                        responsable_nombre: r.responsable,
+                        sincronizado: 'true',
+                        notas: r.notas
+                    }));
+
+                    // Mezclar deduplicando por ID
+                    const localIds = new Set(localRecords.map(l => l.id));
+                    const newRemote = mappedRemote.filter(r => !localIds.has(r.id));
+                    allRecords = [...allRecords, ...newRemote].sort((a, b) => {
+                        const dateA = new Date(`${a.fecha_captura}T${a.hora_captura}`).getTime();
+                        const dateB = new Date(`${b.fecha_captura}T${b.hora_captura}`).getTime();
+                        return dateB - dateA;
+                    });
+                }
+            }
+
+            setHistory(allRecords);
+        } catch (err) {
+            console.error('Failed to load history:', err);
+        } finally {
+            setLoading(false);
+        }
     }, []);
 
     useEffect(() => {
@@ -41,10 +94,19 @@ export const EscalaHistoryModal = ({ onClose, onEditRecord }: EscalaHistoryModal
         }
     };
 
-    const filteredHistory = history.filter(h =>
-        h.punto_id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        h.fecha_captura.includes(searchQuery)
-    );
+    const filteredHistory = history.filter(h => {
+        const query = searchQuery.toLowerCase();
+        const puntoMatch = h.punto_id.toLowerCase().includes(query);
+        const dateMatch = h.fecha_captura.includes(query) || (filterDate && h.fecha_captura === filterDate);
+        
+        // Soporte para búsqueda por fecha en formato local (DD/MM/YYYY o MM/DD/YYYY)
+        const [y, m, d] = h.fecha_captura.split('-');
+        const dateNormal = `${d}/${m}/${y}`;
+        const dateUS = `${m}/${d}/${y}`;
+        const altDateMatch = dateNormal.includes(query) || dateUS.includes(query);
+
+        return (puntoMatch || dateMatch || altDateMatch) && (!filterDate || h.fecha_captura === filterDate);
+    });
 
     return (
         <div className="fixed inset-0 bg-slate-950/90 z-50 flex items-center justify-center p-4 backdrop-blur-md">
@@ -58,7 +120,7 @@ export const EscalaHistoryModal = ({ onClose, onEditRecord }: EscalaHistoryModal
                         </h2>
                         <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mt-0.5">Historial Local de Lecturas</p>
                     </div>
-                    <button onClick={onClose} className="p-2 rounded-full hover:bg-slate-700 text-slate-400 transition-colors">
+                    <button onClick={onClose} className="p-2 rounded-full hover:bg-slate-700 text-slate-400 transition-colors" title="Cerrar bitácora" aria-label="Cerrar">
                         <X size={24} />
                     </button>
                 </div>
@@ -67,21 +129,34 @@ export const EscalaHistoryModal = ({ onClose, onEditRecord }: EscalaHistoryModal
 
                     {/* List View */}
                     <div className="w-full sm:w-1/2 border-r border-slate-800 flex flex-col bg-slate-900/50">
-                        <div className="p-3">
-                            <div className="relative">
+                        <div className="p-3 flex gap-2">
+                            <div className="relative flex-1">
                                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={16} />
                                 <input
                                     type="text"
-                                    placeholder="Buscar por Escala o Fecha..."
-                                    className="w-full bg-slate-950 border border-slate-700 rounded-xl py-2 pl-10 pr-4 text-xs text-white outline-none focus:border-mobile-accent"
+                                    placeholder="Buscar..."
+                                    className="w-full bg-slate-950 border border-slate-700 rounded-xl py-2.5 pl-10 pr-4 text-xs text-white outline-none focus:border-mobile-accent"
                                     value={searchQuery}
                                     onChange={(e) => setSearchQuery(e.target.value)}
                                 />
                             </div>
+                            <input
+                                type="date"
+                                title="Filtrar por fecha"
+                                aria-label="Filtrar por fecha"
+                                className="bg-slate-950 border border-slate-700 rounded-xl py-2 px-3 text-xs text-white outline-none focus:border-mobile-accent w-32"
+                                value={filterDate}
+                                onChange={(e) => setFilterDate(e.target.value)}
+                            />
                         </div>
 
                         <div className="flex-1 overflow-y-auto px-3 pb-4 custom-scrollbar space-y-2">
-                            {filteredHistory.length === 0 ? (
+                            {loading ? (
+                                <div className="flex flex-col items-center justify-center py-10 gap-3">
+                                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-mobile-accent"></div>
+                                    <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest animate-pulse">Sincronizando Bitácora...</p>
+                                </div>
+                            ) : filteredHistory.length === 0 ? (
                                 <div className="text-center py-10 text-slate-600 text-xs italic">No se encontraron lecturas previas.</div>
                             ) : (
                                 filteredHistory.map(record => (
@@ -128,6 +203,7 @@ export const EscalaHistoryModal = ({ onClose, onEditRecord }: EscalaHistoryModal
                                                 <button
                                                     onClick={() => handleDelete(selectedDetail.id)}
                                                     className="bg-red-500/10 text-red-400 p-2 rounded-xl border border-red-500/20 hover:bg-red-500/20"
+                                                    title="Eliminar registro"
                                                 >
                                                     <Trash2 size={16} />
                                                 </button>

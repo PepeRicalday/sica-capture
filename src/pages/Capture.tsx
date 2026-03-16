@@ -55,6 +55,7 @@ const Capture = () => {
     // Formularios Dinámicos
     const [activeTab, setActiveTab] = useState<'escala' | 'toma' | 'aforo' | 'presas'>('escala');
     const [estadoToma, setEstadoToma] = useState<'inicio' | 'modificacion' | 'suspension' | 'reabierto' | 'cierre' | 'continua'>('inicio');
+    const [manualDate, setManualDate] = useState<string>(getTodayString());
     const [manualTime, setManualTime] = useState<string>('');
     const [showSuccessAnim, setShowSuccessAnim] = useState(false);
     const [showPendingModal, setShowPendingModal] = useState(false);
@@ -188,7 +189,8 @@ const Capture = () => {
         try {
 
             // Validación de hora futura (Chihuahua Timezone forzada)
-            const captureDateStr = getTodayString();
+            // Validación de hora futura (Chihuahua Timezone forzada)
+            const captureDateStr = manualDate || getTodayString();
             const nowChihuahua = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Chihuahua' }));
 
             const hr = String(nowChihuahua.getHours()).padStart(2, '0');
@@ -197,10 +199,10 @@ const Capture = () => {
 
             const captureTimeStr = manualTime ? `${manualTime}:00` : `${hr}:${min}:${sec}`;
 
-            if (manualTime) {
+            if (manualTime || manualDate !== getTodayString()) {
                 const inputDate = new Date(`${captureDateStr}T${captureTimeStr}`);
                 if (inputDate > nowChihuahua) {
-                    toast.error('La hora seleccionada no puede ser en el futuro.');
+                    toast.error('La fecha y hora seleccionada no puede ser en el futuro.');
                     return;
                 }
             }
@@ -455,6 +457,7 @@ const Capture = () => {
             });
             setActiveGateIndex(0);
             setManualTime('');
+            setManualDate(getTodayString());
             setEditingRecord(undefined);
         } catch (e) {
             toast.error('Error al guardar reporte.');
@@ -622,23 +625,54 @@ const Capture = () => {
                     )}
                 </div>
 
-                {/* 2.1 Mini-Widget: Hora Manual de Escala (Solo Escalas) */}
-                {activeTab === 'escala' && (
-                    <div className="mb-2 flex-shrink-0 flex justify-between items-center">
-                        <button
-                            onClick={() => setShowEscalaHistoryModal(true)}
-                            className="text-[9px] bg-slate-800 text-slate-400 px-3 py-1.5 rounded-lg border border-slate-700 flex items-center gap-1.5 font-bold"
-                        >
-                            <HistoryIcon size={14} /> VER HISTORIAL
-                        </button>
-                        <div className="flex items-center gap-2 glass-pill px-2 py-1 rounded-lg">
-                            <label className="text-slate-500 text-[10px] font-bold uppercase tracking-wider">Hora Reporte:</label>
-                            <input
-                                type="time"
-                                value={manualTime || getCurrentTimeStr24()}
-                                onChange={(e) => setManualTime(e.target.value)}
-                                className="bg-slate-900 border border-slate-700/50 text-white text-xs px-2 py-1 rounded-md outline-none focus:border-mobile-accent focus:ring-1 focus:ring-mobile-accent/50 font-mono shadow-inner"
-                            />
+                {/* 2.1 Mini-Widget: Fecha y Hora de Reporte (Global) */}
+                {(activeTab === 'escala' || activeTab === 'toma' || activeTab === 'presas' || activeTab === 'aforo') && (
+                    <div className="mb-3 flex-shrink-0 flex flex-col gap-2">
+                        <div className="flex justify-between items-center">
+                            <button
+                                onClick={() => {
+                                    if (activeTab === 'escala') setShowEscalaHistoryModal(true);
+                                    if (activeTab === 'toma') setShowTomaHistoryModal(true);
+                                }}
+                                className={`text-[9px] bg-slate-800 text-slate-400 px-3 py-1.5 rounded-lg border border-slate-700 flex items-center gap-1.5 font-bold ${(activeTab === 'presas') ? 'invisible' : ''}`}
+                            >
+                                <HistoryIcon size={14} /> VER HISTORIAL
+                            </button>
+                            <div className="flex items-center gap-2 bg-slate-900 ring-1 ring-slate-800 rounded-lg p-1">
+                                <span className="text-slate-500 text-[9px] font-black uppercase px-2">Modo Manual</span>
+                                <div className="flex bg-slate-800 rounded-md p-0.5">
+                                     <button 
+                                        className={`px-2 py-1 rounded text-[9px] font-bold ${(!manualTime && manualDate === getTodayString()) ? 'bg-mobile-accent text-slate-900 shadow-sm' : 'text-slate-500'}`}
+                                        onClick={() => { setManualTime(''); setManualDate(getTodayString()); }}
+                                    >AHORA</button>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div className="grid grid-cols-2 gap-2">
+                            <div className="flex flex-col gap-1">
+                                <label className="text-slate-500 text-[9px] font-black uppercase tracking-wider ml-1">Fecha de Captura:</label>
+                                <input
+                                    type="date"
+                                    title="Fecha de Captura"
+                                    aria-label="Fecha de Captura"
+                                    value={manualDate}
+                                    onChange={(e) => setManualDate(e.target.value)}
+                                    max={getTodayString()}
+                                    className="bg-slate-900 border border-slate-800 text-white text-xs px-3 py-2.5 rounded-xl outline-none focus:border-mobile-accent focus:ring-1 focus:ring-mobile-accent/50 font-mono shadow-inner w-full"
+                                />
+                            </div>
+                            <div className="flex flex-col gap-1">
+                                <label className="text-slate-500 text-[9px] font-black uppercase tracking-wider ml-1">Hora de Captura:</label>
+                                <input
+                                    type="time"
+                                    title="Hora de Captura"
+                                    aria-label="Hora de Captura"
+                                    value={manualTime || getCurrentTimeStr24()}
+                                    onChange={(e) => setManualTime(e.target.value)}
+                                    className="bg-slate-900 border border-slate-800 text-white text-xs px-3 py-2.5 rounded-xl outline-none focus:border-mobile-accent focus:ring-1 focus:ring-mobile-accent/50 font-mono shadow-inner w-full"
+                                />
+                            </div>
                         </div>
                     </div>
                 )}
@@ -763,15 +797,6 @@ const Capture = () => {
                                     Bitácora
                                 </button>
                             </label>
-                            <div className="flex items-center gap-2">
-                                <label className="text-slate-500 text-[10px] font-bold uppercase tracking-wider">Hora:</label>
-                                <input
-                                    type="time"
-                                    value={manualTime || getCurrentTimeStr24()}
-                                    onChange={(e) => setManualTime(e.target.value)}
-                                    className="bg-slate-800 text-white text-xs px-2 py-1 rounded-md border border-slate-700 outline-none focus:border-mobile-accent font-mono shadow-inner"
-                                />
-                            </div>
                         </div>
                         <div className="flex bg-slate-800 rounded-lg p-1">
                             {(['inicio', 'modificacion', 'continua', 'suspension', 'reabierto', 'cierre'] as const).map(estado => {
@@ -823,9 +848,12 @@ const Capture = () => {
                             selectedPoint={selectedPoint}
                             isOnline={isOnline}
                             editRecord={editingAforo}
+                            manualDate={manualDate}
+                            manualTime={manualTime}
                             onSaveSuccess={() => {
                                 setRawValue(0);
                                 setManualTime('');
+                                setManualDate(getTodayString());
                                 setSelectedPoint('');
                                 setEditingAforo(undefined);
                                 setActiveTab('escala');

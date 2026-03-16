@@ -131,3 +131,56 @@ body::before {
   pointer-events: none;
   z-index: -1;
 }
+
+/* Status Banners (High Contrast - Delicias Sun Optimized) */
+.status-banner {
+  @apply sticky top-0 z-40 p-2 px-3 flex items-center gap-3 backdrop-blur-lg border-b-2 transition-colors;
+}
+
+.status-banner-icon {
+  @apply p-1.5 rounded-lg border shadow-sm;
+}
+
+.status-banner-title {
+  @apply text-[9px] font-black tracking-widest text-white/90 uppercase;
+}
+
+.status-banner-desc {
+  @apply text-[10px] text-white/70 italic leading-tight;
+}
+
+/* Variations */
+.status-llenado-prog {
+  @apply bg-amber-500/20 border-amber-500/50;
+}
+.status-llenado-prog .status-banner-icon { @apply bg-amber-500/20 border-amber-500/40 text-amber-400; }
+
+.status-llenado-active {
+  @apply bg-blue-500/20 border-blue-500/50;
+}
+.status-llenado-active .status-banner-icon { @apply bg-blue-500/20 border-blue-500/40 text-blue-400; }
+
+.status-estabilizado {
+  @apply bg-emerald-500/20 border-emerald-500/50;
+}
+.status-estabilizado .status-banner-icon { @apply bg-emerald-500/20 border-emerald-500/40 text-emerald-400; }
+
+.status-contingencia {
+  @apply bg-rose-500/20 border-rose-500/50;
+}
+.status-contingencia .status-banner-icon { @apply bg-rose-500/20 border-rose-500/40 text-rose-400; }
+
+.status-vaciado {
+  @apply bg-red-600/30 border-red-500/60;
+}
+.status-vaciado .status-banner-icon { @apply bg-red-600/30 border-red-500/40 text-red-400; }
+
+.status-anomalia {
+  @apply bg-violet-500/20 border-violet-500/50;
+}
+.status-anomalia .status-banner-icon { @apply bg-violet-500/20 border-violet-500/40 text-violet-400; }
+
+.status-unknown {
+  @apply bg-slate-800/40 border-slate-700/50;
+}
+.status-unknown .status-banner-icon { @apply bg-slate-800/40 border-slate-700/40 text-slate-400; }

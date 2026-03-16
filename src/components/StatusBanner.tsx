@@ -16,56 +16,47 @@ const StatusBanner: React.FC = () => {
         desc: 'Sincronizando con Red Mayor...'
     };
 
+    let statusClass = 'status-unknown';
+
     switch(activeEvent.evento_tipo) {
         case 'LLENADO':
-            const isProgrammed = !activeEvent.hora_apertura_real;
+            statusClass = !activeEvent.hora_apertura_real ? 'status-llenado-prog' : 'status-llenado-active';
             bannerProps = {
-                bgStart: isProgrammed ? 'rgba(245, 158, 11, 0.2)' : 'rgba(59, 130, 246, 0.2)',
-                bgEnd: isProgrammed ? 'rgba(180, 83, 9, 0.1)' : 'rgba(29, 78, 216, 0.1)',
-                borderColor: isProgrammed ? 'rgba(245, 158, 11, 0.5)' : 'rgba(59, 130, 246, 0.5)',
-                icon: <Waves size={16} className={isProgrammed ? "text-amber-400" : "text-blue-400"} />,
-                title: isProgrammed ? 'PROTOCOLO PROGRAMADO' : 'PROTOCOLO DE LLENADO ACTIVO',
-                desc: isProgrammed 
+                icon: <Waves size={16} />,
+                title: !activeEvent.hora_apertura_real ? 'PROTOCOLO PROGRAMADO' : 'PROTOCOLO DE LLENADO ACTIVO',
+                desc: !activeEvent.hora_apertura_real 
                     ? `Esperando apertura de presa. Gasto programado: ${activeEvent.gasto_solicitado_m3s || '--'} m³/s`
                     : `Onda en tránsito (${activeEvent.gasto_solicitado_m3s} m³/s). Reportar arribos.`
             };
             break;
         case 'ESTABILIZACION':
+            statusClass = 'status-estabilizado';
             bannerProps = {
-                bgStart: 'rgba(16, 185, 129, 0.2)', // emerald-500
-                bgEnd: 'rgba(4, 120, 87, 0.1)',     // emerald-700
-                borderColor: 'rgba(16, 185, 129, 0.5)',
-                icon: <Droplets size={16} className="text-emerald-400" />,
+                icon: <Droplets size={16} />,
                 title: 'FLUJO ESTABILIZADO',
                 desc: 'Operación normal. Monitoreando distribución a tomas.'
             };
             break;
         case 'CONTINGENCIA_LLUVIA':
+            statusClass = 'status-contingencia';
             bannerProps = {
-                bgStart: 'rgba(245, 158, 11, 0.2)', // amber-500
-                bgEnd: 'rgba(180, 83, 9, 0.1)',     // amber-700
-                borderColor: 'rgba(245, 158, 11, 0.5)',
-                icon: <AlertTriangle size={16} className="text-amber-400" />,
+                icon: <AlertTriangle size={16} />,
                 title: 'CONTINGENCIA POR EXCEDENTES',
                 desc: 'Alerta climática. Inspeccionar nivel y desfogues.'
             };
             break;
         case 'VACIADO':
+            statusClass = 'status-vaciado';
             bannerProps = {
-                bgStart: 'rgba(239, 68, 68, 0.2)',  // red-500
-                bgEnd: 'rgba(185, 28, 28, 0.1)',    // red-700
-                borderColor: 'rgba(239, 68, 68, 0.5)',
-                icon: <Shield size={16} className="text-red-400" />,
+                icon: <Shield size={16} />,
                 title: 'CORTINA EN VACIADO',
                 desc: 'Cierre en progreso. Vigilar abatimiento max 30cm/día.'
             };
             break;
         case 'ANOMALIA_BAJA':
+            statusClass = 'status-anomalia';
             bannerProps = {
-                bgStart: 'rgba(124, 58, 237, 0.2)', // violet-500
-                bgEnd: 'rgba(91, 33, 182, 0.1)',    // violet-700
-                borderColor: 'rgba(124, 58, 237, 0.5)',
-                icon: <AlertTriangle size={16} className="text-violet-400" />,
+                icon: <AlertTriangle size={16} />,
                 title: 'ANOMALÍA: BAJA SÚBITA',
                 desc: 'Caída nivel no programada. Inspección de ruta requerida.'
             };
@@ -73,31 +64,15 @@ const StatusBanner: React.FC = () => {
     }
 
     return (
-        <div style={{
-            background: `linear-gradient(90deg, ${bannerProps.bgStart} 0%, ${bannerProps.bgEnd} 100%)`,
-            borderBottom: `2px solid ${bannerProps.borderColor}`,
-            padding: '8px 12px',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '12px',
-            position: 'sticky',
-            top: 0,
-            zIndex: 40, // Below header
-            backdropFilter: 'blur(8px)'
-        }}>
-            <div style={{
-                background: bannerProps.bgEnd,
-                padding: '6px',
-                borderRadius: '8px',
-                border: `1px solid ${bannerProps.borderColor}`
-            }}>
+        <div className={`status-banner ${statusClass}`}>
+            <div className="status-banner-icon">
                 {bannerProps.icon}
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column' }}>
-                <span className="text-[10px] font-black tracking-widest text-slate-200">
+            <div className="flex flex-col">
+                <span className="status-banner-title">
                     {bannerProps.title}
                 </span>
-                <span className="text-[10px] text-slate-300 italic opacity-90 leading-tight">
+                <span className="status-banner-desc">
                     {bannerProps.desc}
                 </span>
             </div>

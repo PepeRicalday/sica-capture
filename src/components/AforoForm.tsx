@@ -14,9 +14,11 @@ interface AforoFormProps {
     isOnline: boolean;
     onSaveSuccess: () => void;
     editRecord?: SicaAforoRecord;
+    manualDate?: string;
+    manualTime?: string;
 }
 
-export const AforoForm = ({ selectedPoint, isOnline, onSaveSuccess, editRecord }: AforoFormProps) => {
+export const AforoForm = ({ selectedPoint, isOnline, onSaveSuccess, editRecord, manualDate, manualTime }: AforoFormProps) => {
     const { profile } = useAuth();
 
     // 1. Estados Simples Genéricos de Aforo
@@ -223,18 +225,15 @@ export const AforoForm = ({ selectedPoint, isOnline, onSaveSuccess, editRecord }
             return;
         }
 
-        const now = new Date();
-        const y = now.getFullYear();
-        const m = String(now.getMonth() + 1).padStart(2, '0');
-        const d = String(now.getDate()).padStart(2, '0');
-        const captureDateStr = `${y}-${m}-${d}`;
+        const captureDateStr = manualDate || new Date().toISOString().split('T')[0];
+        const captureTimeStr = manualTime ? `${manualTime}:00` : new Date().toTimeString().split(' ')[0];
 
         const payload: SicaAforoRecord = {
             id: editRecord?.id || uuidv4(),
             tipo: 'aforo',
             punto_id: selectedPoint,
             fecha_captura: editRecord?.fecha_captura || captureDateStr,
-            hora_captura: editRecord?.hora_captura || now.toTimeString().split(' ')[0],
+            hora_captura: editRecord?.hora_captura || captureTimeStr,
             sincronizado: 'false',
             responsable_id: profile?.id,
             responsable_nombre: profile?.nombre || 'Operador Móvil',
@@ -316,11 +315,11 @@ export const AforoForm = ({ selectedPoint, isOnline, onSaveSuccess, editRecord }
                 <div className="grid grid-cols-2 gap-2">
                     <div>
                         <label className="text-[10px] text-slate-400 font-bold uppercase">Hora Inicial</label>
-                        <input type="time" value={horaInicial} onChange={e => setHoraInicial(e.target.value)} className="w-full bg-slate-900 border border-slate-700 rounded p-1.5 text-white text-sm" />
+                        <input type="time" title="Hora Inicial" aria-label="Hora Inicial" value={horaInicial} onChange={e => setHoraInicial(e.target.value)} className="w-full bg-slate-900 border border-slate-700 rounded p-1.5 text-white text-sm" />
                     </div>
                     <div>
                         <label className="text-[10px] text-slate-400 font-bold uppercase">Hora Final</label>
-                        <input type="time" value={horaFinal} onChange={e => setHoraFinal(e.target.value)} className="w-full bg-slate-900 border border-slate-700 rounded p-1.5 text-white text-sm" />
+                        <input type="time" title="Hora Final" aria-label="Hora Final" value={horaFinal} onChange={e => setHoraFinal(e.target.value)} className="w-full bg-slate-900 border border-slate-700 rounded p-1.5 text-white text-sm" />
                     </div>
                 </div>
                 <div className="grid grid-cols-2 gap-2">
