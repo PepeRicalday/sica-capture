@@ -8,9 +8,6 @@ const StatusBanner: React.FC = () => {
     if (isLoading || !activeEvent) return null;
 
     let bannerProps = {
-        bgStart: '#1e293b', 
-        bgEnd: '#0f172a',
-        borderColor: '#334155',
         icon: <Waves size={16} />,
         title: 'ESTADO DESCONOCIDO',
         desc: 'Sincronizando con Red Mayor...'
