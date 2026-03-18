@@ -71,7 +71,7 @@ export const TomaHistoryModal: React.FC<TomaHistoryModalProps> = ({ isOpen, onCl
                         const todayMidnight = new Date();
                         todayMidnight.setHours(0, 0, 0, 0);
 
-                        processedHistory.push({
+                        (processedHistory as any[]).push({
                             id: `virtual-cont-${Date.now()}`,
                             fecha_hora: todayMidnight.toISOString(),
                             valor_q: lastEv.valor_q,
