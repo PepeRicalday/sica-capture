@@ -9,7 +9,7 @@
         localStorage.setItem('sica_active_epoch', EPOCH_ID);
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.getRegistrations().then(regs => {
-                for (let reg of regs) reg.unregister();
+                for (const reg of regs) reg.unregister();
                 window.location.reload();
             });
         } else {

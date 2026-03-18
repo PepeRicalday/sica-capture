@@ -9,11 +9,16 @@ const Layout = ({ children }: { children: ReactNode }) => {
     const { signOut } = useAuth();
     const navigate = useNavigate();
     const [lastSync, setLastSync] = useState<number | null>(null);
+    const [syncLatency, setSyncLatency] = useState<number>(0);
 
     useEffect(() => {
         const checkSync = () => {
             const ls = localStorage.getItem('sica_last_sync');
-            if (ls) setLastSync(parseInt(ls));
+            if (ls) {
+                const last = parseInt(ls);
+                setLastSync(last);
+                setSyncLatency(Math.floor((Date.now() - last) / 60000));
+            }
         };
         checkSync();
         const interval = setInterval(checkSync, 10000);
@@ -83,9 +88,9 @@ const Layout = ({ children }: { children: ReactNode }) => {
                     </span>
                     {lastSync && (
                         <span className={`text-[8px] font-mono tracking-wider px-1.5 py-0.5 rounded-sm ${
-                            ((Date.now() - lastSync) / 60000) > 30 ? 'bg-amber-500/10 text-amber-500' : 'text-slate-500'
+                            syncLatency > 30 ? 'bg-amber-500/10 text-amber-500' : 'text-slate-500'
                         }`}>
-                            Sync: {Math.floor((Date.now() - lastSync) / 60000)}m
+                            Sync: {syncLatency}m
                         </span>
                     )}
                 </div>
