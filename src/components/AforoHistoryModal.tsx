@@ -19,6 +19,7 @@ export const AforoHistoryModal = ({ onClose, onEditRecord }: AforoHistoryModalPr
     const [filterDate, setFilterDate] = useState('');
     const [selectedDetail, setSelectedDetail] = useState<SicaAforoRecord | null>(null);
     const [loading, setLoading] = useState(false);
+    const [puntosMap, setPuntosMap] = useState<Record<string, string>>({});
 
     const loadHistory = async () => {
         setLoading(true);
@@ -29,6 +30,12 @@ export const AforoHistoryModal = ({ onClose, onEditRecord }: AforoHistoryModalPr
                 .equals('aforo')
                 .reverse()
                 .toArray() as SicaAforoRecord[];
+
+            // Cargar nombres de puntos
+            const puntos = await db.puntos.where('type').equals('aforo').toArray();
+            const names: Record<string, string> = {};
+            puntos.forEach(p => { names[p.id] = p.name; });
+            setPuntosMap(names);
 
             let allRecords = [...records];
 
@@ -96,8 +103,9 @@ export const AforoHistoryModal = ({ onClose, onEditRecord }: AforoHistoryModalPr
     };
 
     const filteredHistory = history.filter(h => {
+        const name = puntosMap[h.punto_id] || h.punto_id;
         const query = searchQuery.toLowerCase();
-        const puntoMatch = h.punto_id.toLowerCase().includes(query);
+        const puntoMatch = h.punto_id.toLowerCase().includes(query) || name.toLowerCase().includes(query);
         const dateMatch = h.fecha_captura.includes(query) || (filterDate && h.fecha_captura === filterDate);
         
         const [y, m, d] = h.fecha_captura.split('-');
@@ -106,6 +114,19 @@ export const AforoHistoryModal = ({ onClose, onEditRecord }: AforoHistoryModalPr
         const altDateMatch = dateNormal.includes(query) || dateUS.includes(query);
 
         return (puntoMatch || dateMatch || altDateMatch) && (!filterDate || h.fecha_captura === filterDate);
+    });
+
+    // NUEVA LÓGICA: Obtener solo el más reciente de cada punto
+    const latestByPoint = Array.from(
+        filteredHistory.reduce((map, record) => {
+            if (!map.has(record.punto_id)) {
+                map.set(record.punto_id, record);
+            }
+            return map;
+        }, new Map<string, SicaAforoRecord>()).values()
+    ).sort((a, b) => {
+        // Ordenar por ID de Punto (CANAL-000, CANAL-104...) de menor a mayor
+        return a.punto_id.localeCompare(b.punto_id, undefined, { numeric: true, sensitivity: 'base' });
     });
 
     return (
@@ -156,10 +177,10 @@ export const AforoHistoryModal = ({ onClose, onEditRecord }: AforoHistoryModalPr
                                     <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-mobile-accent"></div>
                                     <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest animate-pulse">Sincronizando Bitácora...</p>
                                 </div>
-                            ) : filteredHistory.length === 0 ? (
+                            ) : latestByPoint.length === 0 ? (
                                 <div className="text-center py-10 text-slate-600 text-xs italic">No se encontraron aforos previos.</div>
                             ) : (
-                                filteredHistory.map(record => (
+                                latestByPoint.map((record: SicaAforoRecord) => (
                                     <div
                                         key={record.id}
                                         onClick={() => setSelectedDetail(record)}
@@ -171,7 +192,9 @@ export const AforoHistoryModal = ({ onClose, onEditRecord }: AforoHistoryModalPr
                                             </span>
                                             <span className="text-[10px] font-mono text-slate-500">{record.fecha_captura}</span>
                                         </div>
-                                        <h3 className="text-sm font-bold text-white mt-1 truncate">{record.punto_id}</h3>
+                                        <h3 className="text-sm font-bold text-white mt-1 truncate">
+                                            {puntosMap[record.punto_id] || record.punto_id}
+                                        </h3>
                                         <div className="mt-2 flex justify-between items-center text-xs">
                                             <div className="flex flex-col">
                                                 <span className="text-slate-500 text-[9px] uppercase font-bold">Gasto</span>
@@ -191,7 +214,9 @@ export const AforoHistoryModal = ({ onClose, onEditRecord }: AforoHistoryModalPr
                             <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
                                 <div>
                                     <div className="flex justify-between items-center mb-4">
-                                        <h3 className="text-lg font-black text-white tracking-tight uppercase">{selectedDetail.punto_id}</h3>
+                                        <h3 className="text-lg font-black text-white tracking-tight uppercase">
+                                            {puntosMap[selectedDetail.punto_id] || selectedDetail.punto_id}
+                                        </h3>
                                         <div className="flex gap-2">
                                             {isGerente && (
                                                 <>
@@ -266,7 +291,9 @@ export const AforoHistoryModal = ({ onClose, onEditRecord }: AforoHistoryModalPr
                                 <div className="w-10"></div>
                             </div>
                             <div className="flex-1 overflow-y-auto p-5">
-                                <h3 className="text-xl font-black text-white mb-4">{selectedDetail.punto_id}</h3>
+                                <h3 className="text-xl font-black text-white mb-4">
+                                    {puntosMap[selectedDetail.punto_id] || selectedDetail.punto_id}
+                                </h3>
                                 <TrapezoidalSchema dobelasCount={selectedDetail.dobelas.length} />
                                 <div className="grid grid-cols-2 gap-3 mt-6">
                                     <div className="bg-slate-900 p-3 rounded-xl">

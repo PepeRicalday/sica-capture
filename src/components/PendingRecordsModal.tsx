@@ -9,10 +9,17 @@ interface PendingRecordsModalProps {
 
 export const PendingRecordsModal = ({ onClose }: PendingRecordsModalProps) => {
     const [pendingRecords, setPendingRecords] = useState<SicaRecord[]>([]);
+    const [puntosMap, setPuntosMap] = useState<Record<string, string>>({});
 
     const loadPending = async () => {
         const records = await db.records.where({ sincronizado: 'false' }).toArray();
         setPendingRecords(records);
+
+        // Cargar nombres de puntos
+        const puntos = await db.puntos.toArray();
+        const names: Record<string, string> = {};
+        puntos.forEach(p => { names[p.id] = p.name; });
+        setPuntosMap(names);
     };
 
     useEffect(() => {
@@ -65,7 +72,7 @@ export const PendingRecordsModal = ({ onClose }: PendingRecordsModalProps) => {
 
                                     {/* Data Visualizer based on Type */}
                                     <div className="text-xs space-y-1 font-mono text-slate-300">
-                                        <p><span className="text-slate-500">Punto ID:</span> {record.punto_id}</p>
+                                        <p><span className="text-slate-500">Ubicación:</span> {puntosMap[record.punto_id] || record.punto_id}</p>
 
                                         {record.tipo === 'toma' && (
                                             <>

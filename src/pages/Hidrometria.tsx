@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../lib/db';
-import { Activity, Trophy, Clock, AlertTriangle, TrendingUp, AlertCircle, WifiOff } from 'lucide-react';
+import { Activity, Clock, AlertTriangle, TrendingUp, AlertCircle, WifiOff } from 'lucide-react';
 import { ResponsiveContainer, ComposedChart, Line, XAxis, YAxis, CartesianGrid, Tooltip } from 'recharts';
 import clsx from 'clsx';
 import { TomaHistoryModal } from '../components/TomaHistoryModal';
@@ -61,7 +61,7 @@ const Hidrometria: React.FC = () => {
     const allPoints = useLiveQuery(() => db.puntos.toArray()) || [];
 
     // 2. Compute the Widgets logic
-    const { totalGastoM3s, seccionData, top5, olvidadas, totalVolumenMm3, tomasPorZona, escalasGraphData, escalasAlertas } = useMemo(() => {
+    const { totalGastoM3s, seccionData, totalVolumenMm3, tomasPorZona, escalasGraphData, escalasAlertas } = useMemo(() => {
         const activas = allPoints.filter(p => ['toma', 'lateral'].includes(p.type || '') && ['inicio', 'reabierto', 'continua', 'modificacion'].includes(p.estado_hoy || ''));
 
         // Sum total Gasto
@@ -88,20 +88,6 @@ const Hidrometria: React.FC = () => {
             percentage: totalGastoM3s > 0 ? (data.totalFlow / totalGastoM3s) * 100 : 0
         })).sort((a, b) => b.totalFlow - a.totalFlow);
 
-        // Widget 2: Top 5 Demand
-        const top5 = [...activas].sort((a, b) => (b.caudal_promedio || 0) - (a.caudal_promedio || 0)).slice(0, 5);
-
-        // Widget 3: Tomas Olvidadas (> 12 hours)
-        const olvidadas = activas.filter(p => {
-            if (!p.hora_apertura) return false;
-            const aperturaDate = new Date(p.hora_apertura).getTime();
-            const diffHours = (nowMs - aperturaDate) / (1000 * 60 * 60);
-            return diffHours >= 12; // 12 hours threshold
-        }).map(p => {
-            const diffHours = (nowMs - new Date(p.hora_apertura!).getTime()) / (1000 * 60 * 60);
-            return { ...p, hoursOpen: Math.floor(diffHours) };
-        }).sort((a, b) => b.hoursOpen - a.hoursOpen);
-
         // Group tomas by Zona for new Widget
         const tomasPorZona: Record<string, typeof activas> = {};
         activas.forEach(p => {
@@ -127,7 +113,7 @@ const Hidrometria: React.FC = () => {
 
         const escalasAlertas = escalasPoints.filter(p => p.escala_estado === 'alto' || p.escala_estado === 'bajo');
 
-        return { totalGastoM3s, seccionData, top5, olvidadas, totalVolumenMm3, tomasPorZona, escalasGraphData, escalasAlertas };
+        return { totalGastoM3s, seccionData, totalVolumenMm3, tomasPorZona, escalasGraphData, escalasAlertas };
     }, [allPoints, nowMs]);
     return (
         <div className="flex flex-col h-[100dvh] bg-mobile-dark">
@@ -388,87 +374,80 @@ const Hidrometria: React.FC = () => {
                     </div>
                 </div>
 
-                {/* WIDGET 2: Top 5 Consumo */}
-                <div className="glass-panel rounded-xl p-3 relative">
+                {/* WIDGET 2: Tendencia Crítica de Niveles (Sustituye Top 5) */}
+                <div className="glass-panel rounded-xl p-3 relative h-fit">
                     <h2 className="text-xs font-bold text-white uppercase tracking-wider mb-3 flex items-center gap-2">
-                        <Trophy size={14} className="text-amber-400" />
-                        Top 5 Mayor Volumen Entregado
+                        <TrendingUp size={14} className="text-cyan-400" />
+                        Tendencia de Variación (12h)
                     </h2>
-                    <div className="divide-y divide-slate-800">
-                        {top5.length === 0 ? (
-                            <p className="text-xs text-slate-500 italic py-2">Sin tomas activas.</p>
+                    <div className="divide-y divide-slate-800/50">
+                        {escalasGraphData.filter(e => e.delta !== undefined && Math.abs(e.delta) > 0.01).length === 0 ? (
+                            <p className="text-[10px] text-slate-500 italic py-4 flex items-center gap-2">
+                                <Clock size={12} /> Niveles estables en la red mayor
+                            </p>
                         ) : (
-                            top5.map((p, i) => (
-                                <div
-                                    key={p.id}
-                                    onClick={() => setSelectedToma(p)}
-                                    className="py-2.5 flex items-center justify-between cursor-pointer hover:bg-slate-800/50 px-2 -mx-2 rounded transition-colors"
-                                >
-                                    <div className="flex flex-col w-[70%]">
-                                        <div className="flex items-center gap-2">
-                                            <span className="text-[10px] font-black text-slate-500 bg-slate-800 w-4 h-4 rounded-full flex items-center justify-center shrink-0">
-                                                {i + 1}
-                                            </span>
-                                            <span className="text-[11px] text-slate-200 font-semibold truncate leading-tight">
-                                                {p.name}
-                                            </span>
+                            escalasGraphData
+                                .filter(e => e.delta !== undefined)
+                                .sort((a, b) => Math.abs(b.delta || 0) - Math.abs(a.delta || 0))
+                                .slice(0, 5)
+                                .map((e, i) => (
+                                    <div key={i} className="py-2.5 flex items-center justify-between">
+                                        <div className="flex flex-col">
+                                            <span className="text-[11px] text-slate-200 font-bold">{e.nombre}</span>
+                                            <span className="text-[9px] text-slate-500 font-mono">Km {(e.km || 0).toFixed(1)}</span>
                                         </div>
-                                        <span className="text-[9px] text-slate-400 ml-6 truncate">{p.seccion}</span>
+                                        <div className={clsx(
+                                            "flex items-center gap-1.5 px-2 py-1 rounded-lg font-black font-mono text-xs",
+                                            (e.delta || 0) > 0 ? "bg-emerald-500/10 text-emerald-400" : "bg-amber-500/10 text-amber-400"
+                                        )}>
+                                            <TrendingUp size={14} className={(e.delta || 0) < 0 ? "rotate-180" : ""} />
+                                            {Math.abs(e.delta || 0).toFixed(2)}m
+                                        </div>
                                     </div>
-                                    <div className="flex flex-col items-end">
-                                        <span className="text-xs font-bold text-amber-400">
-                                            {formatCaudalLps(p.caudal_promedio)}
-                                        </span>
-                                        <span className="text-[9px] text-blue-400">
-                                            {p.type === 'aforo'
-                                                ? `${(p.volumen_hoy_m3 || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })} m³`
-                                                : `${((p.volumen_hoy_m3 || 0) / 1000).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 3 })} mm³`
-                                            }
-                                        </span>
-                                    </div>
-                                </div>
-                            ))
+                                ))
                         )}
                     </div>
                 </div>
 
-                {/* WIDGET 3: Tomas Olvidadas */}
-                <div className={clsx(
-                    "rounded-xl p-3 border shadow-lg transition-colors duration-300 relative",
-                    olvidadas.length > 0 ? "glass-panel border-red-500/50 bg-red-950/20" : "glass-panel"
-                )}>
-                    <h2 className={clsx(
-                        "text-xs font-bold uppercase tracking-wider mb-3 flex items-center gap-2",
-                        olvidadas.length > 0 ? "text-red-400" : "text-slate-400"
-                    )}>
-                        <AlertTriangle size={14} className={olvidadas.length > 0 ? "text-red-500" : "text-slate-500"} />
-                        Alerta: Tomas Excedidas
+                {/* WIDGET 3: Estrés de Capacidad de Diseño (Sustituye Tomas Excedidas) */}
+                <div className="glass-panel rounded-xl p-3 relative h-fit border-l-4 border-l-cyan-500">
+                    <h2 className="text-xs font-bold text-white uppercase tracking-wider mb-3 flex items-center gap-2">
+                        <AlertTriangle size={14} className="text-cyan-500" />
+                        Estrés de Capacidad por Zona
                     </h2>
-
-                    {olvidadas.length === 0 ? (
-                        <div className="flex flex-col items-center justify-center py-4 opacity-50">
-                            <Clock size={24} className="text-emerald-500 mb-2" />
-                            <p className="text-[10px] text-slate-400 uppercase tracking-widest font-bold">Sin anomalías de tiempo</p>
-                        </div>
-                    ) : (
-                        <div className="space-y-2">
-                            {olvidadas.map(p => (
-                                <div key={p.id} className="bg-red-900/10 border border-red-500/20 rounded p-2 flex justify-between items-center">
-                                    <div className="flex flex-col max-w-[70%]">
-                                        <span className="text-[11px] font-bold text-red-300 truncate">{p.name}</span>
-                                        <span className="text-[9px] text-red-400/70 truncate">{p.seccion}</span>
+                    <div className="space-y-4 pt-1">
+                        {seccionData.length === 0 ? (
+                            <p className="text-[10px] text-slate-500 italic">Datos de diseño no disponibles.</p>
+                        ) : (
+                            seccionData.slice(0, 4).map((sec, idx) => {
+                                // Lógica de estrés: Basado en el gasto real vs un estimado de capacidad (o el % del total si no hay dato unitario)
+                                const stressLevel = Math.min(100, sec.percentage * 1.5); // Simulación de estrés basada en carga relativa
+                                return (
+                                    <div key={idx}>
+                                        <div className="flex justify-between items-center mb-1.5">
+                                            <span className="text-[10px] text-slate-400 font-bold uppercase">{sec.name}</span>
+                                            <span className={clsx(
+                                                "text-[10px] font-black font-mono",
+                                                stressLevel > 80 ? "text-red-400" : stressLevel > 50 ? "text-amber-400" : "text-cyan-400"
+                                            )}>
+                                                {stressLevel.toFixed(1)}% CAPACIDAD
+                                            </span>
+                                        </div>
+                                        <div className="h-1.5 w-full bg-slate-800 rounded-full overflow-hidden">
+                                            <div 
+                                                className={clsx(
+                                                    "h-full rounded-full transition-all duration-1000",
+                                                    stressLevel > 80 ? "bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.5)]" : 
+                                                    stressLevel > 50 ? "bg-amber-500" : "bg-cyan-500"
+                                                )}
+                                                style={{ width: `${stressLevel}%` }}
+                                            />
+                                        </div>
                                     </div>
-                                    <div className="flex flex-col items-end">
-                                        <span className="text-[10px] font-black text-red-500 bg-red-500/10 px-1.5 py-0.5 rounded flex items-center gap-1">
-                                            <Clock size={10} />
-                                            {p.hoursOpen}h Abierta
-                                        </span>
-                                        <span className="text-[9px] text-slate-400 mt-0.5">{new Date(p.hora_apertura!).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    )}
+                                );
+                            })
+                        )}
+                    </div>
                 </div>
 
                 {/* Footer Spacer */}

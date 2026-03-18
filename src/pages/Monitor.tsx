@@ -61,32 +61,55 @@ const Monitor = () => {
         window.addEventListener('online', handleOnline);
         window.addEventListener('offline', handleOffline);
 
-        const fetchAforos = async () => {
+        const fetchBalanceData = async () => {
             if (!navigator.onLine) return;
             try {
                 const today = new Date().toLocaleDateString('en-CA'); // YYYY-MM-DD
-                const { data } = await supabase
+                
+                // 1. Obtener Aforos (Prioridad)
+                const { data: aforos } = await supabase
                     .from('aforos')
                     .select('punto_control_id, gasto_calculado_m3s, hora_fin')
                     .eq('fecha', today)
                     .in('punto_control_id', ['CANAL-000', 'CANAL-104'])
                     .order('hora_fin', { ascending: false });
 
-                if (data && data.length > 0) {
-                    const latest000 = data.find(d => d.punto_control_id === 'CANAL-000');
-                    const latest104 = data.find(d => d.punto_control_id === 'CANAL-104');
-                    setBalanceCanal({
-                        entrada000: latest000?.gasto_calculado_m3s || 0,
-                        salida104: latest104?.gasto_calculado_m3s || 0
-                    });
+                // 2. Obtener última lectura de escala en K-0 para el cálculo de radiales
+                let theoreticalFlow000 = 0;
+                const { data: scale } = await supabase
+                    .from('escalas')
+                    .select('id')
+                    .eq('km', 0)
+                    .maybeSingle();
+
+                if (scale) {
+                    const { data: reading } = await supabase
+                        .from('lecturas_escalas')
+                        .select('gasto_calculado_m3s')
+                        .eq('escala_id', scale.id)
+                        .order('creado_en', { ascending: false })
+                        .limit(1)
+                        .maybeSingle();
+                    
+                    if (reading) theoreticalFlow000 = reading.gasto_calculado_m3s || 0;
                 }
+
+                const latest000Aforo = aforos?.find(d => d.punto_control_id === 'CANAL-000');
+                const latest104Aforo = aforos?.find(d => d.punto_control_id === 'CANAL-104');
+
+                setBalanceCanal({
+                    entrada000: (latest000Aforo?.gasto_calculado_m3s && latest000Aforo.gasto_calculado_m3s > 0)
+                        ? latest000Aforo.gasto_calculado_m3s
+                        : theoreticalFlow000,
+                    salida104: latest104Aforo?.gasto_calculado_m3s || 0
+                });
             } catch (error) {
-                console.error("Error fetching aforos for balance", error);
+                console.error("Error fetching data for balance", error);
             }
         };
 
-        fetchAforos();
-        const aforoInterval = setInterval(fetchAforos, 60000); // 1 min refresh
+        fetchBalanceData();
+        const aforoInterval = setInterval(fetchBalanceData, 60000); // 1 min refresh
 
         const timer = setInterval(() => setCurrentTime(new Date()), 1000);
         return () => {
