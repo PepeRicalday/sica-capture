@@ -59,7 +59,29 @@ export const TomaHistoryModal: React.FC<TomaHistoryModalProps> = ({ isOpen, onCl
                     }
                 }
 
-                setHistorial(currentCycleEvents.reverse());
+                const processedHistory = currentCycleEvents.reverse();
+
+                // Síntesis de continuidad (Si el último evento fue ayer y sigue abierto)
+                if (processedHistory.length > 0) {
+                    const lastEv = processedHistory[processedHistory.length - 1];
+                    const lastDate = new Date(lastEv.fecha_hora).toLocaleDateString('es-MX', { day: '2-digit', month: '2-digit', year: 'numeric' });
+                    const todayDate = new Date().toLocaleDateString('es-MX', { day: '2-digit', month: '2-digit', year: 'numeric' });
+
+                    if (lastDate !== todayDate && lastEv.estado_evento !== 'cierre' && lastEv.estado_evento !== 'suspension') {
+                        const todayMidnight = new Date();
+                        todayMidnight.setHours(0, 0, 0, 0);
+
+                        processedHistory.push({
+                            id: `virtual-cont-${Date.now()}`,
+                            fecha_hora: todayMidnight.toISOString(),
+                            valor_q: lastEv.valor_q,
+                            estado_evento: 'continua',
+                            virtual: true
+                        });
+                    }
+                }
+
+                setHistorial(processedHistory);
 
                 // 2. Fetch daily aggregate
                 const { data: reportes, error: errorReportes } = await supabase

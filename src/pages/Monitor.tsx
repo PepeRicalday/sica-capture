@@ -74,24 +74,34 @@ const Monitor = () => {
                     .in('punto_control_id', ['CANAL-000', 'CANAL-104'])
                     .order('hora_fin', { ascending: false });
 
-                // 2. Obtener última lectura de escala en K-0 para el cálculo de radiales
+                // 2. Obtener flujos teóricos (Escalas/Manning/Radiales) como fallback
                 let theoreticalFlow000 = 0;
-                const { data: scale } = await supabase
-                    .from('escalas')
-                    .select('id')
-                    .eq('km', 0)
-                    .maybeSingle();
+                let theoreticalFlow104 = 0;
 
-                if (scale) {
-                    const { data: reading } = await supabase
+                const { data: scales } = await supabase
+                    .from('escalas')
+                    .select('id, km')
+                    .in('km', [0, 104]);
+
+                if (scales && scales.length > 0) {
+                    const scaleIds = scales.map(s => s.id);
+                    const { data: readings } = await supabase
                         .from('lecturas_escalas')
-                        .select('gasto_calculado_m3s')
-                        .eq('escala_id', scale.id)
-                        .order('creado_en', { ascending: false })
-                        .limit(1)
-                        .maybeSingle();
-                    
-                    if (reading) theoreticalFlow000 = reading.gasto_calculado_m3s || 0;
+                        .select('escala_id, gasto_calculado_m3s, creado_en')
+                        .in('escala_id', scaleIds)
+                        .order('creado_en', { ascending: false });
+
+                    const id000 = scales.find(s => s.km === 0)?.id;
+                    const id104 = scales.find(s => s.km === 104)?.id;
+
+                    if (id000) {
+                        const r000 = readings?.find(r => r.escala_id === id000);
+                        if (r000) theoreticalFlow000 = r000.gasto_calculado_m3s || 0;
+                    }
+                    if (id104) {
+                        const r104 = readings?.find(r => r.escala_id === id104);
+                        if (r104) theoreticalFlow104 = r104.gasto_calculado_m3s || 0;
+                    }
                 }
 
                 const latest000Aforo = aforos?.find(d => d.punto_control_id === 'CANAL-000');
@@ -101,7 +111,9 @@ const Monitor = () => {
                     entrada000: (latest000Aforo?.gasto_calculado_m3s && latest000Aforo.gasto_calculado_m3s > 0)
                         ? latest000Aforo.gasto_calculado_m3s
                         : theoreticalFlow000,
-                    salida104: latest104Aforo?.gasto_calculado_m3s || 0
+                    salida104: (latest104Aforo?.gasto_calculado_m3s && latest104Aforo.gasto_calculado_m3s > 0)
+                        ? latest104Aforo.gasto_calculado_m3s
+                        : theoreticalFlow104
                 });
             } catch (error) {
                 console.error("Error fetching data for balance", error);
