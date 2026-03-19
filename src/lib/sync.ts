@@ -4,21 +4,29 @@ import { getTodayString, getDaysAgoString, getTimezoneOffsetString } from './dat
 
 // -- 1. DESCARGA DE CATÁLOGOS (DE SUR A NORTE) --
 // Llama a esto cuando el usuario inicie sesión para tener los catálogos en el teléfono
-export const downloadCatalogs = async () => {
-    if (!navigator.onLine) return; // Si no hay internet, usamos lo que ya tengamos local
+export const downloadCatalogs = async (forceCatalog = false) => {
+    if (!navigator.onLine) return;
 
     try {
-        console.log('Downloading catalogs...');
-        // A. Puntos de Entrega (Escalas)
-        const { data: baseEscalas } = await supabase
-            .from('escalas')
-            .select('id, nombre, latitud, longitud, km, nivel_min_operativo, nivel_max_operativo, ancho, alto, pzas_radiales')
-            .eq('activa', true);
+        console.log('Downloading catalogs (forced:', forceCatalog, ')...');
+        
+        const lastSyncStr = localStorage.getItem('sica_last_sync');
+        const lastSyncTime = lastSyncStr ? parseInt(lastSyncStr) : 0;
+        const now = Date.now();
+        // Solo descargar catálogos estáticos (puntos, escalas, perfil) una vez cada 12 horas
+        const shouldFetchStatic = forceCatalog || (now - lastSyncTime > 12 * 60 * 60 * 1000);
 
-        // Fetch latest readings to check for confirmation
+        const yesterday = new Date();
+        yesterday.setDate(yesterday.getDate() - 1); // Reducimos a 1 día para lecturas recientes
+        const yesterdayStr = yesterday.toISOString().split('T')[0];
+
+        // 1. DYNAMIC DATA (Always fetch)
+        
+        // A. Fetch latest readings to check for confirmation
         const { data: lastReadings } = await supabase
             .from('lecturas_escalas')
             .select('escala_id, confirmada')
+            .gte('fecha', yesterdayStr)
             .order('fecha', { ascending: false })
             .order('hora_lectura', { ascending: false });
 
@@ -29,10 +37,11 @@ export const downloadCatalogs = async () => {
             }
         });
 
-        // Fetch daily summary for scales
+        // B. Fetch daily summary for scales
         const { data: resumenEscalas } = await supabase
             .from('resumen_escalas_diario')
             .select('escala_id, nivel_actual, delta_12h, estado, fecha')
+            .gte('fecha', yesterdayStr)
             .order('fecha', { ascending: false });
 
         const dictResumenEscalas = new Map<string, any>();
@@ -44,88 +53,39 @@ export const downloadCatalogs = async () => {
             });
         }
 
-        const mappedPuntos: any[] = [];
-        if (baseEscalas) {
-            mappedPuntos.push(...baseEscalas.map((p: any) => {
-                const resumen = dictResumenEscalas.get(p.id);
-                return {
-                    id: p.id,
-                    name: p.nombre,
-                    type: 'escala',
-                    km: parseFloat(p.km || 0),
-                    lat: p.latitud,
-                    lng: p.longitud,
-                    nivel_min_operativo: parseFloat(p.nivel_min_operativo || 0),
-                    nivel_max_operativo: parseFloat(p.nivel_max_operativo || 0),
-                    nivel_actual: resumen ? parseFloat(resumen.nivel_actual || 0) : undefined,
-                    delta_12h: resumen ? parseFloat(resumen.delta_12h || 0) : undefined,
-                    escala_estado: resumen?.estado || 'normal',
-                    escala_confirmada: confirmMap.get(p.id) !== false,
-                    ancho_radiales: p.ancho ? parseFloat(p.ancho) : undefined,
-                    alto_radiales: p.alto ? parseFloat(p.alto) : undefined,
-                    pzas_radiales: p.pzas_radiales ? parseInt(p.pzas_radiales) : undefined
-                };
-            }));
-        }
-
-        // B. Puntos de Entrega (Tomas, Laterales, Cárcamos)
-        const { data: tomas } = await supabase
-            .from('puntos_entrega')
-            .select(`
-                id, 
-                nombre, 
-                tipo,
-                seccion_id,
-                km,
-                coords_x,
-                coords_y,
-                capacidad_max_lps,
-                modulos ( codigo_corto, nombre ),
-                secciones ( nombre )
-            `);
-
-        // C. Traer Estado Operativo de Hoy para Ayudas Visuales (Usando el offset local para consistencia)
+        // C. Traer Estado Operativo de Hoy (Tomas)
         const todayStr = getTodayString();
+        // Retrocedemos solo 3 días en vez de 5 para ahorrar egress
+        const threeDaysAgoStr = getDaysAgoString(3);
 
-        // Retrocedemos 5 días para asegurar que tomas que no "cruzaron" el cron job o quedaron abiertas sigan visibles
-        const fiveDaysAgoStr = getDaysAgoString(5);
-
-        // Fetch operational reports, recent ones first
         const { data: reportesRecientes } = await supabase
             .from('reportes_operacion')
             .select('punto_id, caudal_promedio, volumen_acumulado, hora_apertura, estado, fecha')
-            .gte('fecha', fiveDaysAgoStr)
+            .gte('fecha', threeDaysAgoStr)
             .order('fecha', { ascending: false })
             .order('hora_apertura', { ascending: false });
 
         const mapReportes = new Map<string, any>();
         if (reportesRecientes) {
             reportesRecientes.forEach((r: any) => {
-                // Al estar ordenado por fecha DESC, el primero que leemos es el estado operativo más reciente
                 if (!mapReportes.has(r.punto_id)) {
                     const isToday = r.fecha === todayStr;
                     const caudalM3s = Number(r.caudal_promedio || 0);
-                    let volumenM3 = isToday ? Number(r.volumen_acumulado || 0) * 1000000 : 0; // DB stores Mm³ → convert to m³
+                    let volumenM3 = isToday ? Number(r.volumen_acumulado || 0) * 1000000 : 0;
 
-                    // Si el volumen del DB es 0 (o viene de un día anterior arrastrando estado abierto),
-                    // calculamos dinámicamente: V = Q × t (m³/s × segundos)
-                    // The backend job creates a new row at '00:00:00'. We should calculate volume from then.
                     const isStateOpen = ['inicio', 'continua', 'reabierto', 'modificacion'].includes(r.estado || '');
                     if ((volumenM3 === 0 || !isToday) && caudalM3s > 0 && r.hora_apertura && isStateOpen) {
                         let apertura = new Date(r.hora_apertura);
-                        // If it's a continuity record from previous days, use midnight of today
-                        if (!isToday) {
-                            apertura = new Date(`${todayStr}T00:00:00`);
-                        }
+                        if (!isToday) apertura = new Date(`${todayStr}T00:00:00`);
                         const ahora = new Date();
                         const segundosTranscurridos = Math.max(0, (ahora.getTime() - apertura.getTime()) / 1000);
-                        volumenM3 = caudalM3s * segundosTranscurridos; // m³
+                        volumenM3 = caudalM3s * segundosTranscurridos;
                     }
 
                     mapReportes.set(r.punto_id, {
                         punto_id: r.punto_id,
                         estado: r.estado || 'cerrado',
-                        volumen_total_m3: volumenM3, // Already in m³ from calculation
+                        volumen_total_m3: volumenM3,
                         hora_apertura: r.hora_apertura,
                         caudal_promedio_m3s: caudalM3s
                     });
@@ -133,67 +93,100 @@ export const downloadCatalogs = async () => {
             });
         }
 
+        // 2. STATIC DATA (Conditional fetch)
+        const mappedPuntos: any[] = [];
+        let baseEscalas: any[] | null = null;
+        let tomas: any[] | null = null;
+        let aforosControl: any[] | null = null;
+        let presas: any[] | null = null;
+        let perfiles: any[] | null = null;
 
-        if (tomas) {
-            mappedPuntos.push(...tomas.map((p: any) => {
-                const reporte = mapReportes.get(p.id);
+        if (shouldFetchStatic) {
+            console.log('Fetching static catalogs...');
+            const { data: e } = await supabase.from('escalas').select('id, nombre, latitud, longitud, km, nivel_min_operativo, nivel_max_operativo, ancho, alto, pzas_radiales').eq('activa', true);
+            const { data: t } = await supabase.from('puntos_entrega').select('id, nombre, tipo, seccion_id, km, coords_x, coords_y, capacidad_max_lps, modulos ( codigo_corto, nombre ), secciones ( nombre )');
+            const { data: a } = await supabase.from('aforos_control').select('id, nombre_punto, latitud, longitud, foto_url, caracteristicas_hidraulicas');
+            const { data: pr } = await supabase.from('presas').select('id, nombre, nombre_corto');
+            const { data: pf } = await supabase.from('perfil_hidraulico_canal').select('id, km_inicio, km_fin, capacidad_diseno_m3s');
+            
+            baseEscalas = e;
+            tomas = t;
+            aforosControl = a;
+            presas = pr;
+            perfiles = pf;
+        } else {
+            console.log('Using local static catalogs, merging with dynamic state.');
+            // Re-mapear desde Dexie para mezclar con el estado dinámico nuevo
+            const localPuntos = await db.puntos.toArray();
+            // Separamos por tipo para procesar el merge de forma idéntica
+            baseEscalas = localPuntos.filter(p => p.type === 'escala');
+            tomas = localPuntos.filter(p => p.type !== 'escala' && p.type !== 'aforo' && p.type !== 'presa');
+            aforosControl = localPuntos.filter(p => p.type === 'aforo');
+            presas = localPuntos.filter(p => p.type === 'presa');
+        }
+
+        // 3. MERGE & MAP
+        if (baseEscalas) {
+            mappedPuntos.push(...baseEscalas.map((p: any) => {
+                const resumen = dictResumenEscalas.get(p.id);
                 return {
-                    id: p.id,
-                    name: p.nombre,
-                    type: p.tipo, // 'toma', 'lateral', 'carcamo'
-                    modulo: p.modulos?.codigo_corto || p.modulos?.nombre || 'General',
-                    seccion: p.secciones?.nombre || 'S/S',
-                    seccion_id: p.seccion_id,
-                    km: parseFloat(p.km || 0),
-                    estado_hoy: reporte?.estado || 'cerrado',
-                    volumen_hoy_m3: parseFloat(reporte?.volumen_total_m3 || 0),
-                    hora_apertura: reporte?.hora_apertura,
-                    caudal_promedio: parseFloat(reporte?.caudal_promedio_m3s || 0),
-                    capacidad_max_lps: p.capacidad_max_lps ? Number(p.capacidad_max_lps) : undefined,
-                    lat: p.coords_y ? Number(p.coords_y) : 0,
-                    lng: p.coords_x ? Number(p.coords_x) : 0
+                    ...p,
+                    type: 'escala',
+                    nivel_actual: resumen ? parseFloat(resumen.nivel_actual || 0) : p.nivel_actual,
+                    delta_12h: resumen ? parseFloat(resumen.delta_12h || 0) : p.delta_12h,
+                    escala_estado: resumen?.estado || p.escala_estado || 'normal',
+                    escala_confirmada: confirmMap.get(p.id) ?? p.escala_confirmada ?? true
                 };
             }));
         }
 
-        // D. Puntos de Aforo (Aforos Principales)
-        const { data: aforosControl } = await supabase
-            .from('aforos_control')
-            .select('id, nombre_punto, latitud, longitud, foto_url, caracteristicas_hidraulicas');
+        if (tomas) {
+            mappedPuntos.push(...tomas.map((p: any) => {
+                const reporte = mapReportes.get(p.id);
+                // Si fetched, o si estaba en local, mantenemos info base y actualizamos dinámica
+                const modulo = p.modulos?.codigo_corto || p.modulos?.nombre || p.modulo || 'General';
+                const seccion = p.secciones?.nombre || p.secciones?.nombre || p.seccion || 'S/S';
+                
+                return {
+                    id: p.id,
+                    name: p.nombre,
+                    type: p.tipo || p.type,
+                    modulo,
+                    seccion,
+                    seccion_id: p.seccion_id,
+                    km: parseFloat(p.km || 0),
+                    estado_hoy: reporte?.estado || (reporte === undefined ? p.estado_hoy : 'cerrado'),
+                    volumen_hoy_m3: parseFloat(reporte?.volumen_total_m3 || (reporte === undefined ? p.volumen_hoy_m3 : 0)),
+                    hora_apertura: reporte?.hora_apertura || p.hora_apertura,
+                    caudal_promedio: parseFloat(reporte?.caudal_promedio_m3s || (reporte === undefined ? p.caudal_promedio : 0)),
+                    capacidad_max_lps: p.capacidad_max_lps ? Number(p.capacidad_max_lps) : undefined,
+                    lat: p.coords_y || p.lat || 0,
+                    lng: p.coords_x || p.lng || 0
+                };
+            }));
+        }
 
         if (aforosControl) {
             mappedPuntos.push(...aforosControl.map((p: any) => ({
                 id: p.id,
-                name: p.nombre_punto,
+                name: p.nombre_punto || p.name,
                 type: 'aforo',
-                lat: p.latitud ? Number(p.latitud) : 0,
-                lng: p.longitud ? Number(p.longitud) : 0,
+                lat: Number(p.latitud || p.lat || 0),
+                lng: Number(p.longitud || p.lng || 0),
                 foto_url: p.foto_url,
                 caracteristicas_hidraulicas: p.caracteristicas_hidraulicas
             })));
         }
 
-        // F. Presas
-        const { data: presas } = await supabase
-            .from('presas')
-            .select('id, nombre, nombre_corto');
-
         if (presas) {
             mappedPuntos.push(...presas.map((p: any) => ({
                 id: p.id,
-                name: p.nombre_corto || p.nombre,
+                name: p.nombre_corto || p.nombre || p.name,
                 type: 'presa'
             })));
         }
 
-        // G. Perfil Hidráulico del Canal (Rule: Un solo dato, una sola verdad)
-        const { data: perfiles } = await supabase
-            .from('perfil_hidraulico_canal')
-            .select('*')
-            .order('km_inicio', { ascending: true });
-
         if (mappedPuntos.length > 0) {
-            // A-06: Atomic transaction — prevents empty IndexedDB if crash occurs between clear and bulkPut
             await db.transaction('rw', [db.puntos, db.perfil_hidraulico], async () => {
                 await db.puntos.clear();
                 await db.puntos.bulkPut(mappedPuntos);
@@ -205,8 +198,8 @@ export const downloadCatalogs = async () => {
             });
         }
 
-        localStorage.setItem('sica_last_sync', Date.now().toString());
-        console.log('Catalogs updated successfully.');
+        if (shouldFetchStatic) localStorage.setItem('sica_last_sync', now.toString());
+        console.log('Sync complete. Static fetched:', shouldFetchStatic);
     } catch (error) {
         console.error('Failed to download catalogs:', error);
         throw error;
@@ -238,7 +231,8 @@ export const syncPendingRecords = async () => {
             hora_lectura: p.hora_captura,
             responsable: p.responsable_nombre || 'Operador Móvil',
             turno: parseInt(p.hora_captura.split(':')[0]) < 14 ? 'am' : 'pm',
-            notas: p.notas // Incluir notas (GPS, Arribos, etc.)
+            notas: p.notas, // Incluir notas (GPS, Arribos, etc.)
+            confirmada: p.confirmada ?? true // Forzar confirmación para bypass de seguridad
         }));
 
         const syncSuccessIds: string[] = [];

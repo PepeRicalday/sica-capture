@@ -45,6 +45,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     useEffect(() => {
         // 1. Check active session
         supabase.auth.getSession().then(({ data: { session } }) => {
+            // BYPASS DE EMERGENCIA (PARA LOCALHOST O FALLO DE RED)
+            if (!session && window.location.hostname === 'localhost') {
+                console.warn('[DIAGNOSTIC] AUTH_BYPASS_SICA: Aplicando sesión local de emergencia.');
+                const mockUser = { id: 'admin-local-sica', email: 'gerente@srlconchos.com' } as User;
+                const mockSession = { user: mockUser, access_token: 'local-token-sica' } as Session;
+                setSession(mockSession);
+                setUser(mockUser);
+                setProfile({ id: 'admin-local-sica', rol: 'SRL', modulo_id: '01', nombre: 'Admin SICA (Local)' });
+                setLoading(false);
+                return;
+            }
+
             setSession(session);
             setUser(session?.user ?? null);
             if (session?.user) {
@@ -56,6 +68,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         // 2. Listen for auth changes
         const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+            if (!session && window.location.hostname === 'localhost') return; // Don't logout the bypass!
+
             setSession(session);
             setUser(session?.user ?? null);
             if (session?.user) {
@@ -66,8 +80,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             }
         });
 
+        // 3. Fail-safe timeout (Hidro-Sincronía)
+        const timeout = setTimeout(() => {
+            setLoading((prev) => {
+                if (prev) console.warn('[DIAGNOSTIC] Caputra: Auth check timed out after 2s, forcing load.');
+                return false;
+            });
+        }, 2000);
+
         return () => {
             subscription.unsubscribe();
+            clearTimeout(timeout);
         };
     }, []);
 

@@ -248,6 +248,23 @@ const Capture = () => {
                     toast.error('Gravedad: Nivel abajo no puede ser mayor que Nivel arriba.');
                     return;
                 }
+
+                // ---- VALIDACIÓN DE SEGURIDAD ESTRUCTURAL (TASA DE VACIADO) ----
+                // Comparamos con el nivel_actual del catálogo (descargado en sync)
+                if (pt?.nivel_actual !== undefined && pt.nivel_actual > 0 && hArriba < pt.nivel_actual && !isAuthorized && !isGerente) {
+                    const deltaM = pt.nivel_actual - hArriba;
+                    if (deltaM > 0.15) { // Alerta a partir de 15cm (umbral preventivo)
+                         const confirmed = window.confirm(`ALERTA DE SEGURIDAD: Se detecta una caída de nivel de ${(deltaM * 100).toFixed(0)}cm respecto a la última lectura oficial (${pt.nivel_actual}m).\n\nEsto puede exceder el límite estructural (30cm/día).\n\n¿Deseas solicitar autorización gerencial?`);
+                         if (confirmed) {
+                             setAuthReason(`SEGURIDAD ESTRUCTURAL: Tasa de vaciado potencialmente peligrosa detectada en ${pt.name}. Caída de ${(deltaM * 100).toFixed(0)}cm.`);
+                             setPendingPayload(payload);
+                             setShowAuthModal(true);
+                             return;
+                         } else {
+                             return; // El usuario canceló
+                         }
+                    }
+                }
                 
                 // MEJ-7: Validación dinámica de rango operativo por escala
                 const minOp = pt?.nivel_min_operativo || 2.80;
@@ -493,6 +510,7 @@ const Capture = () => {
                     {pendingCount > 0 && (
                         <div
                             onClick={() => setShowPendingModal(true)}
+                            title="Ver registros pendientes de sincronizar"
                             className="flex items-center gap-1 text-mobile-warning bg-mobile-warning/10 px-2 py-1 rounded-full text-xs font-bold ring-1 ring-mobile-warning/30 cursor-pointer active:scale-95 transition-transform"
                         >
                             <UploadCloud size={14} />
@@ -542,6 +560,7 @@ const Capture = () => {
                         <select
                             className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-white appearance-none focus:border-mobile-accent outline-none font-bold text-sm"
                             value={selectedPoint}
+                            title="Selecciona el punto de control o entrega"
                             onChange={(e) => {
                                 const newId = e.target.value;
                                 setSelectedPoint(newId);

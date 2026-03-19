@@ -1,15 +1,21 @@
-import { useState, useEffect } from 'react';
-import { X, Trash2, CloudOff, Info } from 'lucide-react';
 import { db, type SicaRecord, type SicaAforoRecord } from '../lib/db';
 import { toast } from 'sonner';
+import { useAuth } from '../context/AuthContext';
+import { ManagerAuthModal } from './ManagerAuthModal';
+import { syncPendingRecords } from '../lib/sync';
+import { ShieldCheck, RefreshCw } from 'lucide-react';
 
 interface PendingRecordsModalProps {
     onClose: () => void;
 }
 
 export const PendingRecordsModal = ({ onClose }: PendingRecordsModalProps) => {
+    const { profile } = useAuth();
     const [pendingRecords, setPendingRecords] = useState<SicaRecord[]>([]);
     const [puntosMap, setPuntosMap] = useState<Record<string, string>>({});
+    const [showAuthModal, setShowAuthModal] = useState(false);
+    const [selectedRecordForAuth, setSelectedRecordForAuth] = useState<SicaRecord | null>(null);
+    const [isSyncing, setIsSyncing] = useState(false);
 
     const loadPending = async () => {
         const records = await db.records.where({ sincronizado: 'false' }).toArray();
@@ -32,6 +38,33 @@ export const PendingRecordsModal = ({ onClose }: PendingRecordsModalProps) => {
             await db.records.delete(id);
             toast.success('Registro eliminado');
             loadPending();
+        }
+    };
+
+    const handleAuthSuccess = async () => {
+        if (!selectedRecordForAuth) return;
+
+        try {
+            // Marcamos el registro con el bypass y limpiamos el error para re-intentar
+            const bypassNote = `\n[AUTORIZADO: Bypass Gerencial SRL - ${new Date().toLocaleString()}]`;
+            await db.records.update(selectedRecordForAuth.id, {
+                notas: (selectedRecordForAuth.notas || '') + bypassNote,
+                error_sync: undefined,
+                confirmada: true
+            });
+
+            setShowAuthModal(false);
+            setSelectedRecordForAuth(null);
+            toast.success('Registro Autorizado Localmente');
+            
+            // Intentar re-sincronizar de inmediato
+            setIsSyncing(true);
+            await syncPendingRecords();
+            await loadPending();
+            setIsSyncing(false);
+        } catch (error) {
+            toast.error('Error al autorizar el registro');
+            console.error(error);
         }
     };
 
@@ -65,9 +98,28 @@ export const PendingRecordsModal = ({ onClose }: PendingRecordsModalProps) => {
                                             <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">#{idx + 1} - Tipo: <span className="text-white">{record.tipo}</span></span>
                                             <h3 className="text-amber-400 font-mono text-xs mt-0.5">{record.fecha_captura} | {record.hora_captura}</h3>
                                         </div>
-                                        <button onClick={() => handleDelete(record.id)} className="text-red-400 hover:text-red-300 bg-red-950/30 p-1.5 rounded-lg border border-red-900/50">
-                                            <Trash2 size={16} />
-                                        </button>
+                                        <div className="flex gap-2">
+                                            {record.error_sync && record.error_sync.includes('ESTRUCTURAL') && (
+                                                <button 
+                                                    onClick={() => {
+                                                        setSelectedRecordForAuth(record);
+                                                        setShowAuthModal(true);
+                                                    }}
+                                                    title="Autorizar Bypass Gerencial"
+                                                    className="text-orange-400 hover:text-orange-300 bg-orange-950/30 p-1.5 rounded-lg border border-orange-900/50"
+                                                >
+                                                    <ShieldCheck size={16} />
+                                                </button>
+                                            )}
+                                            <button 
+                                                onClick={() => handleDelete(record.id)} 
+                                                title="Eliminar Registro Permanente"
+                                                aria-label="Eliminar Registro"
+                                                className="text-red-400 hover:text-red-300 bg-red-950/30 p-1.5 rounded-lg border border-red-900/50"
+                                            >
+                                                <Trash2 size={16} />
+                                            </button>
+                                        </div>
                                     </div>
 
                                     {/* Data Visualizer based on Type */}
@@ -107,10 +159,34 @@ export const PendingRecordsModal = ({ onClose }: PendingRecordsModalProps) => {
                 </div>
 
                 <div className="p-4 border-t border-slate-800 text-center bg-slate-900">
-                    <button onClick={onClose} className="w-full bg-slate-800 hover:bg-slate-700 text-white py-3 rounded-xl font-bold text-sm transition-colors border border-slate-700">
+                    <button 
+                        onClick={async () => {
+                            if (isSyncing) return;
+                            setIsSyncing(true);
+                            await syncPendingRecords();
+                            await loadPending();
+                            setIsSyncing(false);
+                        }} 
+                        disabled={isSyncing || pendingRecords.length === 0}
+                        title="Resincronizar registros pendientes con Supabase"
+                        aria-label="Resincronizar Ahora"
+                        className="w-full bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-white py-3 rounded-xl font-bold text-sm transition-colors border border-slate-700 flex items-center justify-center gap-2 mb-2"
+                    >
+                        {isSyncing ? <RefreshCw className="animate-spin" size={18} /> : <RefreshCw size={18} />}
+                        Reintentar Sincronización
+                    </button>
+                    <button onClick={onClose} className="w-full bg-slate-950 hover:bg-slate-900 text-slate-400 py-3 rounded-xl font-bold text-sm transition-colors border border-slate-800">
                         Regresar a Captura
                     </button>
                 </div>
+
+                {showAuthModal && selectedRecordForAuth && (
+                    <ManagerAuthModal 
+                        reason={selectedRecordForAuth.error_sync || 'Autorización de Registro'}
+                        onClose={() => setShowAuthModal(false)}
+                        onSuccess={handleAuthSuccess}
+                    />
+                )}
             </div>
         </div>
     );
