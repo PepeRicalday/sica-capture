@@ -1,16 +1,17 @@
+import { useState, useEffect } from 'react';
 import { db, type SicaRecord, type SicaAforoRecord } from '../lib/db';
 import { toast } from 'sonner';
-import { useAuth } from '../context/AuthContext';
+// import { useAuth } from '../context/AuthContext';
 import { ManagerAuthModal } from './ManagerAuthModal';
 import { syncPendingRecords } from '../lib/sync';
-import { ShieldCheck, RefreshCw } from 'lucide-react';
+import { ShieldCheck, RefreshCw, X, CloudOff, Info, Trash2 } from 'lucide-react';
 
 interface PendingRecordsModalProps {
     onClose: () => void;
 }
 
 export const PendingRecordsModal = ({ onClose }: PendingRecordsModalProps) => {
-    const { profile } = useAuth();
+    // const { profile } = useAuth();
     const [pendingRecords, setPendingRecords] = useState<SicaRecord[]>([]);
     const [puntosMap, setPuntosMap] = useState<Record<string, string>>({});
     const [showAuthModal, setShowAuthModal] = useState(false);
