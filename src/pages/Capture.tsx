@@ -618,20 +618,20 @@ const Capture = () => {
                                     .map(p => <option key={p.id} value={p.id}>🏔️ {p.name}</option>)
                             ) : (
                                 puntos
-                                    .filter(p => p.type !== 'escala' && p.type !== 'aforo')
+                                    .filter(p => p.type !== 'escala' && p.type !== 'aforo' && p.type !== 'presa')
                                     .sort((a, b) => (a.km || 0) - (b.km || 0))
                                     .map(p => {
-                                        const modSec = [p.modulo && `Mod: ${p.modulo}`, p.seccion && `Sec: ${p.seccion}`].filter(Boolean).join(' | ');
-                                        const suffix = modSec ? ` [${modSec}]` : '';
-                                        const icon = ['inicio', 'reabierto', 'continua', 'modificacion'].includes(p.estado_hoy || '') ? '🟢' : '🔴';
+                                        const isOpened = ['inicio', 'reabierto', 'continua', 'modificacion'].includes(p.estado_hoy || '');
+                                        const icon = isOpened ? '🟢' : '🔴';
                                         
                                         // Bloqueo visual por Hidro-Sincronía
                                         const isBlocked = activeEvent?.evento_tipo === 'LLENADO' && (p.km || 0) > maxKmAlcanzado;
-                                        const lockIcon = isBlocked ? '🔒 VACIÓ - ' : '';
+                                        
+                                        const modSuffix = p.modulo ? ` [Mod: ${p.modulo}]` : '';
 
                                         return (
                                             <option key={p.id} value={p.id}>
-                                                {lockIcon}{icon} km {p.km?.toFixed(3)} - {p.name}{suffix}
+                                                {icon} km {p.km?.toFixed(3)} - {p.name || (p as any).nombre || 'Sin Nombre'}{modSuffix} {isBlocked ? '(Bloqueado por Hidro-Sincronía)' : ''}
                                             </option>
                                         );
                                     })
@@ -1043,12 +1043,23 @@ const Capture = () => {
                 <EscalaHistoryModal
                     onClose={() => setShowEscalaHistoryModal(false)}
                     onEditRecord={(record: SicaRecord) => {
+                        const pt = puntos.find(p => p.id === record.punto_id);
+                        const pzas = pt?.pzas_radiales || (record.radiales_json || []).length || 0;
+                        
+                        // Reconstruir el arreglo de aperturas con la longitud correcta
+                        const fullAps = Array(pzas).fill(0);
+                        (record.radiales_json || []).forEach((r: any) => {
+                            if (r.index !== undefined && r.index < pzas) {
+                                fullAps[r.index] = Math.round(r.apertura_m * 100);
+                            }
+                        });
+
                         setEditingRecord(record);
                         setSelectedPoint(record.punto_id);
                         setEscalaData({
                             arriba: Math.round((record.valor_q || 0) * 100),
                             abajo: Math.round((record.nivel_abajo_m || 0) * 100),
-                            aperturas: (record.radiales_json || []).map((r: any) => Math.round(r.apertura_m * 100))
+                            aperturas: fullAps
                         });
                         setManualTime(record.hora_captura.substring(0, 5));
                         setShowEscalaHistoryModal(false);
@@ -1094,6 +1105,21 @@ const Capture = () => {
                     }}
                 />
             )}
+
+            {/* Version Footer & Force Update */}
+            <div className="fixed bottom-1 left-3 flex items-center gap-3 opacity-30 hover:opacity-100 transition-opacity z-10">
+                <span className="text-[9px] font-bold text-slate-500 tracking-tighter">SICA v2.4.4</span>
+                <button 
+                    onClick={() => {
+                        if (confirm('¿Forzar actualización de aplicación? Esto limpiará la caché y recargará.')) {
+                            window.location.href = window.location.origin + window.location.pathname + '?v=244&t=' + Date.now();
+                        }
+                    }}
+                    className="text-[9px] font-bold text-cyan-500 uppercase cursor-pointer hover:underline"
+                >
+                    Actualizar Ahora
+                </button>
+            </div>
         </div>
     );
 };

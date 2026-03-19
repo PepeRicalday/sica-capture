@@ -131,6 +131,7 @@ export const downloadCatalogs = async (forceCatalog = false) => {
                 const resumen = dictResumenEscalas.get(p.id);
                 return {
                     ...p,
+                    name: p.nombre || p.name,
                     type: 'escala',
                     nivel_actual: resumen ? parseFloat(resumen.nivel_actual || 0) : p.nivel_actual,
                     delta_12h: resumen ? parseFloat(resumen.delta_12h || 0) : p.delta_12h,
@@ -149,7 +150,7 @@ export const downloadCatalogs = async (forceCatalog = false) => {
                 
                 return {
                     id: p.id,
-                    name: p.nombre,
+                    name: p.nombre || p.name,
                     type: p.tipo || p.type,
                     modulo,
                     seccion,
