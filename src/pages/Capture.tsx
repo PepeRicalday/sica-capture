@@ -251,17 +251,25 @@ const Capture = () => {
 
                 // ---- VALIDACIÓN DE SEGURIDAD ESTRUCTURAL (TASA DE VACIADO) ----
                 // Comparamos con el nivel_actual del catálogo (descargado en sync)
-                if (pt?.nivel_actual !== undefined && pt.nivel_actual > 0 && hArriba < pt.nivel_actual && !isAuthorized && !isGerente) {
+                if (pt?.nivel_actual !== undefined && pt.nivel_actual > 0 && hArriba < pt.nivel_actual && !isAuthorized) {
                     const deltaM = pt.nivel_actual - hArriba;
                     if (deltaM > 0.15) { // Alerta a partir de 15cm (umbral preventivo)
-                         const confirmed = window.confirm(`ALERTA DE SEGURIDAD: Se detecta una caída de nivel de ${(deltaM * 100).toFixed(0)}cm respecto a la última lectura oficial (${pt.nivel_actual}m).\n\nEsto puede exceder el límite estructural (30cm/día).\n\n¿Deseas solicitar autorización gerencial?`);
-                         if (confirmed) {
-                             setAuthReason(`SEGURIDAD ESTRUCTURAL: Tasa de vaciado potencialmente peligrosa detectada en ${pt.name}. Caída de ${(deltaM * 100).toFixed(0)}cm.`);
-                             setPendingPayload(payload);
-                             setShowAuthModal(true);
-                             return;
+                         const msg = `ALERTA DE SEGURIDAD: Se detecta una caída de nivel de ${(deltaM * 100).toFixed(0)}cm respecto a la última lectura oficial (${pt.nivel_actual}m).\n\nEsto puede exceder el límite estructural (30cm/día).`;
+                         
+                         if (isGerente) {
+                             const ok = window.confirm(`${msg}\n\n¿Desea guardar el registro asumiendo responsabilidad gerencial?`);
+                             if (!ok) return;
+                             payload.notas = (payload.notas || '') + ` [ALERTA SEGURIDAD CONFIRMADA POR GERENCIA]`;
                          } else {
-                             return; // El usuario canceló
+                             const confirmed = window.confirm(`${msg}\n\n¿Deseas solicitar autorización gerencial?`);
+                             if (confirmed) {
+                                 setAuthReason(`SEGURIDAD ESTRUCTURAL: Tasa de vaciado potencialmente peligrosa detectada en ${pt.name || (pt as any).nombre}. Caída de ${(deltaM * 100).toFixed(0)}cm.`);
+                                 setPendingPayload(payload);
+                                 setShowAuthModal(true);
+                                 return;
+                             } else {
+                                 return;
+                             }
                          }
                     }
                 }
@@ -410,9 +418,8 @@ const Capture = () => {
             // ---- VALIDACIÓN GEOGRÁFICA (GEOFENCING) ----
             // Si el punto tiene coordenadas, validar que el usuario esté cerca (ej. < 1km)
             const pt = puntos.find(p => p.id === selectedPoint);
-            const shouldCheckLocation = !isGerente && !isAuthorized && pt?.lat && pt?.lng;
-
-            if (shouldCheckLocation && pt?.lat && pt?.lng) {
+            const ptName = pt?.name || (pt as any).nombre || 'punto';
+            if (pt?.lat && pt?.lng) {
                 try {
                     const pos: any = await new Promise((resolve, reject) => {
                         navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 5000 });
@@ -421,17 +428,26 @@ const Capture = () => {
                     const dist = getDistanceMeters(pos.coords.latitude, pos.coords.longitude, pt.lat, pt.lng);
                     
                     if (dist > 1000) { // 1km de radio permitido
-                        setAuthReason(`USUARIO FUERA DE UBICACIÓN: Estás a ${(dist / 1000).toFixed(1)}km del punto ${pt.name}. Se requiere autorización del Gerente.`);
+                        if (isGerente || isAuthorized) {
+                            const ok = window.confirm(`DISTANCIA EXCESIVA: Estás a ${(dist / 1000).toFixed(1)}km del punto ${ptName}.\n\n¿Deseas guardar de todas formas?`);
+                            if (!ok) return;
+                            payload.notas = (payload.notas || '') + ` [CAPTURA DISTANTE: ${(dist/1000).toFixed(1)}km]`;
+                        } else {
+                            setAuthReason(`USUARIO FUERA DE UBICACIÓN: Estás a ${(dist / 1000).toFixed(1)}km del punto ${ptName}. Se requiere autorización.`);
+                            setPendingPayload(payload);
+                            setShowAuthModal(true);
+                            return;
+                        }
+                    }
+                } catch (err) {
+                    if (isGerente || isAuthorized) {
+                        toast.warning(`No se pudo verificar GPS para ${ptName}, pero se permite captura por cuenta Gerencial.`);
+                    } else {
+                        setAuthReason(`ERROR GPS: Imposible verificar distancia a ${ptName}.`);
                         setPendingPayload(payload);
                         setShowAuthModal(true);
                         return;
                     }
-                } catch (err) {
-                    toast.warning("No se pudo verificar ubicación GPS. Se requiere autorización gerencial por seguridad.");
-                    setAuthReason(`ERROR GPS: Imposible verificar distancia a ${pt.name}.`);
-                    setPendingPayload(payload);
-                    setShowAuthModal(true);
-                    return;
                 }
             }
 
@@ -1108,12 +1124,10 @@ const Capture = () => {
 
             {/* Version Footer & Force Update */}
             <div className="fixed bottom-1 left-3 flex items-center gap-3 opacity-30 hover:opacity-100 transition-opacity z-10">
-                <span className="text-[9px] font-bold text-slate-500 tracking-tighter">SICA v2.4.4</span>
+                <span className="text-[9px] font-bold text-slate-500 tracking-tighter">SICA v2.4.8</span>
                 <button 
                     onClick={() => {
-                        if (confirm('¿Forzar actualización de aplicación? Esto limpiará la caché y recargará.')) {
-                            window.location.href = window.location.origin + window.location.pathname + '?v=244&t=' + Date.now();
-                        }
+                        window.location.replace('/?v=248&t=' + Date.now());
                     }}
                     className="text-[9px] font-bold text-cyan-500 uppercase cursor-pointer hover:underline"
                 >
