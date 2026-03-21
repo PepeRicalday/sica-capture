@@ -12,9 +12,20 @@ export const downloadCatalogs = async (forceCatalog = false) => {
         
         const lastSyncStr = localStorage.getItem('sica_last_sync');
         const lastSyncTime = lastSyncStr ? parseInt(lastSyncStr) : 0;
+        const lastVersion = localStorage.getItem('sica_app_version');
+        const currentVersion = __APP_VERSION__;
+        
         const now = Date.now();
         // Solo descargar catálogos estáticos (puntos, escalas, perfil) una vez cada 12 horas
-        const shouldFetchStatic = forceCatalog || (now - lastSyncTime > 12 * 60 * 60 * 1000);
+        // o si la versión de la app ha cambiado
+        const shouldFetchStatic = forceCatalog || 
+                                (lastVersion !== currentVersion) ||
+                                (now - lastSyncTime > 12 * 60 * 60 * 1000);
+
+        if (lastVersion !== currentVersion) {
+            console.log('App version changed from', lastVersion, 'to', currentVersion, '. Forcing static fetch.');
+            localStorage.setItem('sica_app_version', currentVersion);
+        }
 
         const yesterday = new Date();
         yesterday.setDate(yesterday.getDate() - 1); // Reducimos a 1 día para lecturas recientes
