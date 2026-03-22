@@ -1,13 +1,12 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
-import basicSsl from '@vitejs/plugin-basic-ssl'
 import pkg from './package.json'
 
 export default defineConfig({
   define: {
     '__APP_VERSION__': JSON.stringify(pkg.version),
-    '__BUILD_HASH__': JSON.stringify('v2.5.0-hydra-sync'),
+    '__BUILD_HASH__': JSON.stringify('v2.5.2-audit-p2'),
     '__BUILD_DATE__': JSON.stringify(new Date().toISOString())
   },
   server: {
@@ -16,10 +15,10 @@ export default defineConfig({
   },
   plugins: [
     react(),
-    basicSsl(),
+    // basicSsl(), // Desactivado para local para evitar bloqueos de certificado en el navegador
     VitePWA({
       registerType: 'autoUpdate',
-      filename: 'sw-sica-v2.5.0.js',
+      filename: 'sw-sica-v2.5.2.js',
       manifest: {
         name: 'SICA Captura | S.R.L. Unidad Conchos',
         short_name: 'SICA Captura',
