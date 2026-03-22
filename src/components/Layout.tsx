@@ -3,7 +3,7 @@ import { MapPin, LogOut, Activity, Droplets } from 'lucide-react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
-const APP_VERSION = __APP_VERSION__;
+const APP_VERSION = __V2_APP_VERSION__;
 
 const Layout = ({ children }: { children: ReactNode }) => {
     const { signOut } = useAuth();

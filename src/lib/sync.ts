@@ -13,7 +13,7 @@ export const downloadCatalogs = async (forceCatalog = false) => {
         const lastSyncStr = localStorage.getItem('sica_last_sync');
         const lastSyncTime = lastSyncStr ? parseInt(lastSyncStr) : 0;
         const lastVersion = localStorage.getItem('sica_app_version');
-        const currentVersion = __APP_VERSION__;
+        const currentVersion = __V2_APP_VERSION__;
         
         const now = Date.now();
         // Solo descargar catálogos estáticos (puntos, escalas, perfil) una vez cada 12 horas

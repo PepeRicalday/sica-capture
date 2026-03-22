@@ -4,8 +4,8 @@ import { useNavigate } from 'react-router-dom';
 import { LogIn, Lock, Mail } from 'lucide-react';
 
 
-const APP_VERSION = __APP_VERSION__;
-const BUILD_HASH = __BUILD_HASH__;
+const APP_VERSION = __V2_APP_VERSION__;
+const BUILD_HASH = __V2_BUILD_HASH__;
 
 const Login = () => {
     const [email, setEmail] = useState('');

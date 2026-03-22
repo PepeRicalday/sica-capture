@@ -1,8 +1,8 @@
 /// <reference types="vite/client" />
 
 // SICA Capture — Build-time constants injected by vite.config.ts `define`
-declare const __APP_VERSION__: string;
-declare const __BUILD_HASH__: string;
+declare const __V2_APP_VERSION__: string;
+declare const __V2_BUILD_HASH__: string;
 declare const __BUILD_DATE__: string;
 
 // Virtual module provided by vite-plugin-pwa at build time
