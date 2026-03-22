@@ -20,6 +20,9 @@ export interface OfflinePoint {
     nivel_min_operativo?: number;
     nivel_max_operativo?: number;
     nivel_actual?: number;
+    nivel_abajo_m?: number;
+    apertura_radiales_m?: number;
+    radiales_json?: any[];
     delta_12h?: number;
     escala_estado?: string;
     escala_confirmada?: boolean;

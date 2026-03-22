@@ -508,6 +508,7 @@ const Capture = () => {
                 </div>
                 <div className="flex gap-3">
                     <button
+                        title="Sincronizar Catálogos"
                         onClick={async () => {
                             toast.promise(
                                 (async () => {
@@ -583,10 +584,21 @@ const Capture = () => {
                                 if (activeTab === 'escala') {
                                     const pt = puntos.find(p => p.id === newId);
                                     const lastLevelCm = pt?.nivel_actual ? Math.round(pt.nivel_actual * 100) : 0;
+                                    const lastAbajoCm = pt?.nivel_abajo_m ? Math.round(pt.nivel_abajo_m * 100) : 0;
+                                    const lastAperturasCm: number[] = Array(pt?.pzas_radiales || 0).fill(0);
+                                    
+                                    if (pt?.radiales_json && Array.isArray(pt.radiales_json)) {
+                                        pt.radiales_json.forEach((rj: any) => {
+                                            if (rj.index !== undefined && rj.apertura_m !== undefined) {
+                                                lastAperturasCm[rj.index] = Math.round(rj.apertura_m * 100);
+                                            }
+                                        });
+                                    }
+
                                     setEscalaData({
                                         arriba: lastLevelCm,
-                                        abajo: 0,
-                                        aperturas: Array(pt?.pzas_radiales || 0).fill(0)
+                                        abajo: lastAbajoCm,
+                                        aperturas: lastAperturasCm
                                     });
                                     setEscalaField('arriba');
                                     setActiveGateIndex(0);
@@ -594,15 +606,20 @@ const Capture = () => {
                                 } else if (activeTab === 'toma') {
                                     const pt = puntos.find(p => p.id === newId);
                                     const openStates = ['inicio', 'continua', 'modificacion', 'reabierto'];
-                                    if (pt && openStates.includes(pt.estado_hoy || '') && pt.caudal_promedio) {
+                                    const isPtOpen = openStates.includes(pt?.estado_hoy || '');
+                                    
+                                    if (pt && isPtOpen && pt.caudal_promedio) {
                                         const prevQ = Number(pt.caudal_promedio);
                                         if (pt.type === 'canal') {
                                             setRawValue(Math.round(prevQ));
                                         } else {
                                             setRawValue(Math.round(prevQ * 1000));
                                         }
+                                        // Default to "continua" if it's already open
+                                        setEstadoToma('continua');
                                     } else {
                                         setRawValue(0);
+                                        setEstadoToma('inicio');
                                     }
                                 } else {
                                     setRawValue(0);
@@ -931,8 +948,15 @@ const Capture = () => {
                                 Captura de Gasto (L/s)
                             </div>
                         )}
-                        <div className="text-right text-5xl sm:text-6xl font-mono font-bold text-white mb-1 tracking-tighter truncate flex-shrink-0">
-                            {val}
+                        <div className="flex flex-col items-end flex-shrink-0">
+                            {selectedPoint && (
+                                <span className="text-[8px] sm:text-[10px] text-mobile-accent bg-mobile-accent/10 px-2 py-0.5 rounded uppercase font-black tracking-widest border border-mobile-accent/30 mb-1">
+                                    REFERENCIA ÚLTIMA
+                                </span>
+                            )}
+                            <div className="text-right text-5xl sm:text-6xl font-mono font-bold text-white mb-1 tracking-tighter truncate w-full">
+                                {val}
+                            </div>
                         </div>
                         {activeTab === 'escala' && (() => {
                             const pt = puntos.find(p => p.id === selectedPoint);

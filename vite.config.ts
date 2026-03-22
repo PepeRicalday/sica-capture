@@ -12,7 +12,7 @@ export default defineConfig({
   },
   server: {
     host: true, // Expone el servidor a la red local (WIFI)
-    port: 5174,
+    port: 5176,
   },
   plugins: [
     react(),

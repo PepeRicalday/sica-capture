@@ -33,18 +33,18 @@ export const downloadCatalogs = async (forceCatalog = false) => {
 
         // 1. DYNAMIC DATA (Always fetch)
         
-        // A. Fetch latest readings to check for confirmation
+        // A. Fetch latest readings to check for confirmation AND pre-fill values
         const { data: lastReadings } = await supabase
             .from('lecturas_escalas')
-            .select('escala_id, confirmada')
+            .select('escala_id, confirmada, nivel_m, nivel_abajo_m, apertura_radiales_m, radiales_json')
             .gte('fecha', yesterdayStr)
             .order('fecha', { ascending: false })
             .order('hora_lectura', { ascending: false });
 
-        const confirmMap = new Map<string, boolean>();
+        const readingsMap = new Map<string, any>();
         (lastReadings || []).forEach(lr => {
-            if (!confirmMap.has(lr.escala_id)) {
-                confirmMap.set(lr.escala_id, lr.confirmada !== false);
+            if (!readingsMap.has(lr.escala_id)) {
+                readingsMap.set(lr.escala_id, lr);
             }
         });
 
@@ -140,14 +140,18 @@ export const downloadCatalogs = async (forceCatalog = false) => {
         if (baseEscalas) {
             mappedPuntos.push(...baseEscalas.map((p: any) => {
                 const resumen = dictResumenEscalas.get(p.id);
+                const reading = readingsMap.get(p.id);
                 return {
                     ...p,
                     name: p.nombre || p.name,
                     type: 'escala',
-                    nivel_actual: resumen ? parseFloat(resumen.nivel_actual || 0) : p.nivel_actual,
+                    nivel_actual: (reading?.nivel_m !== undefined) ? reading.nivel_m : (resumen ? parseFloat(resumen.nivel_actual || 0) : p.nivel_actual),
+                    nivel_abajo_m: reading?.nivel_abajo_m ?? p.nivel_abajo_m,
+                    apertura_radiales_m: reading?.apertura_radiales_m ?? p.apertura_radiales_m,
+                    radiales_json: reading?.radiales_json ?? p.radiales_json,
                     delta_12h: resumen ? parseFloat(resumen.delta_12h || 0) : p.delta_12h,
                     escala_estado: resumen?.estado || p.escala_estado || 'normal',
-                    escala_confirmada: confirmMap.get(p.id) ?? p.escala_confirmada ?? true
+                    escala_confirmada: reading ? (reading.confirmada !== false) : (p.escala_confirmada ?? true)
                 };
             }));
         }
