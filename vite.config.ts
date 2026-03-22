@@ -7,7 +7,7 @@ import pkg from './package.json'
 export default defineConfig({
   define: {
     '__APP_VERSION__': JSON.stringify(pkg.version),
-    '__BUILD_HASH__': JSON.stringify('v2.4.9-infra-sync'),
+    '__BUILD_HASH__': JSON.stringify('v2.5.0-hydra-sync'),
     '__BUILD_DATE__': JSON.stringify(new Date().toISOString())
   },
   server: {
@@ -18,9 +18,8 @@ export default defineConfig({
     react(),
     basicSsl(),
     VitePWA({
-      registerType: 'autoUpdate',   // SW se actualiza sin prompt NUNCA
-        swDest: 'dist/sw-sica-v2.5.0.js',
-       // Nombre nuevo para forzar invalidación total
+      registerType: 'autoUpdate',
+      filename: 'sw-sica-v2.5.0.js',
       manifest: {
         name: 'SICA Captura | S.R.L. Unidad Conchos',
         short_name: 'SICA Captura',
