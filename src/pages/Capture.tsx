@@ -483,11 +483,9 @@ const Capture = () => {
             setTimeout(() => setShowSuccessAnim(false), 1500);
 
             setRawValue(0);
-            setEscalaData({
-                arriba: 0,
-                abajo: 0,
-                aperturas: Array(puntos.find(p => p.id === selectedPoint)?.pzas_radiales || 0).fill(0)
-            });
+            // Mantener los valores capturados como referencia visual para la siguiente lectura.
+            // El operador ve el último registro y solo modifica lo que cambió.
+            // (escalaData se mantiene — no se resetea a 0)
             setActiveGateIndex(0);
             setManualTime('');
             setManualDate(getTodayString());

@@ -145,6 +145,9 @@ export const downloadCatalogs = async (forceCatalog = false) => {
                     ...p,
                     name: p.nombre || p.name,
                     type: 'escala',
+                    // Alias: DB uses 'ancho'/'alto', OfflinePoint interface expects 'ancho_radiales'/'alto_radiales'
+                    ancho_radiales: p.ancho,
+                    alto_radiales: p.alto,
                     nivel_actual: (reading?.nivel_m !== undefined) ? reading.nivel_m : (resumen ? parseFloat(resumen.nivel_actual || 0) : p.nivel_actual),
                     nivel_abajo_m: reading?.nivel_abajo_m ?? p.nivel_abajo_m,
                     apertura_radiales_m: reading?.apertura_radiales_m ?? p.apertura_radiales_m,
