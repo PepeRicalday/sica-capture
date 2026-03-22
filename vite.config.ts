@@ -18,7 +18,7 @@ export default defineConfig({
     // basicSsl(), // Desactivado para local para evitar bloqueos de certificado en el navegador
     VitePWA({
       registerType: 'autoUpdate',
-      filename: 'sw-sica-v2.5.2.js',
+      filename: 'sw-sica-v-force-2.5.6.js',
       manifest: {
         name: 'SICA Captura | S.R.L. Unidad Conchos',
         short_name: 'SICA Captura',
