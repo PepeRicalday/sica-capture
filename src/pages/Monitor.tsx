@@ -8,6 +8,7 @@ import { Droplet, Activity, WifiOff, Scale, Calculator, AlertCircle } from 'luci
 import { supabase } from '../lib/supabase';
 import StatusBanner from '../components/StatusBanner';
 import { useHydricStatus } from '../context/HydricStatusContext';
+import { getTodayString } from '../lib/dateHelpers';
 
 const MapBounds = ({ bounds }: { bounds: [number, number][] }) => {
     const map = useMap();
@@ -64,9 +65,15 @@ const Monitor = () => {
         const fetchBalanceData = async () => {
             if (!navigator.onLine) return;
             try {
-                const today = new Date().toLocaleDateString('en-CA'); // YYYY-MM-DD
-                
-                // 1. Obtener Aforos (Prioridad)
+                // Usar helper con timezone America/Chihuahua para consistencia
+                const today = getTodayString();
+
+                // CRITERIO ENTRADA/SALIDA:
+                // 1. Si existe aforo del día en CANAL-000 / CANAL-104 → usar aforo (medición directa)
+                // 2. Si no hay aforo del día → usar gasto_calculado_m3s de la lectura de escala
+                //    más reciente DE HOY en K-0 / K-104 (calculado desde aperturas de compuertas)
+
+                // 1. Aforos del día (prioridad máxima)
                 const { data: aforos } = await supabase
                     .from('aforos')
                     .select('punto_control_id, gasto_calculado_m3s, hora_fin')
@@ -74,38 +81,49 @@ const Monitor = () => {
                     .in('punto_control_id', ['CANAL-000', 'CANAL-104'])
                     .order('hora_fin', { ascending: false });
 
-                // 2. Obtener flujos teóricos (Escalas/Manning/Radiales) como fallback
+                const latest000Aforo = aforos?.find(d => d.punto_control_id === 'CANAL-000');
+                const latest104Aforo = aforos?.find(d => d.punto_control_id === 'CANAL-104');
+
+                // 2. Fallback: lectura de escala del día (solo si no hay aforo del día)
                 let theoreticalFlow000 = 0;
                 let theoreticalFlow104 = 0;
 
-                const { data: scales } = await supabase
-                    .from('escalas')
-                    .select('id, km')
-                    .in('km', [0, 104]);
+                const needs000 = !(latest000Aforo?.gasto_calculado_m3s && latest000Aforo.gasto_calculado_m3s > 0);
+                const needs104 = !(latest104Aforo?.gasto_calculado_m3s && latest104Aforo.gasto_calculado_m3s > 0);
 
-                if (scales && scales.length > 0) {
-                    const scaleIds = scales.map(s => s.id);
-                    const { data: readings } = await supabase
-                        .from('lecturas_escalas')
-                        .select('escala_id, gasto_calculado_m3s, creado_en')
-                        .in('escala_id', scaleIds)
-                        .order('creado_en', { ascending: false });
+                if (needs000 || needs104) {
+                    const kmsNeeded = [
+                        ...(needs000 ? [0] : []),
+                        ...(needs104 ? [104] : [])
+                    ];
+                    const { data: scales } = await supabase
+                        .from('escalas')
+                        .select('id, km')
+                        .in('km', kmsNeeded);
 
-                    const id000 = scales.find(s => s.km === 0)?.id;
-                    const id104 = scales.find(s => s.km === 104)?.id;
+                    if (scales && scales.length > 0) {
+                        const scaleIds = scales.map(s => s.id);
+                        // Solo lecturas de HOY — el gasto viene del cálculo de aperturas del momento
+                        const { data: readings } = await supabase
+                            .from('lecturas_escalas')
+                            .select('escala_id, gasto_calculado_m3s, hora_lectura')
+                            .in('escala_id', scaleIds)
+                            .eq('fecha', today)
+                            .order('hora_lectura', { ascending: false });
 
-                    if (id000) {
-                        const r000 = readings?.find(r => r.escala_id === id000);
-                        if (r000) theoreticalFlow000 = r000.gasto_calculado_m3s || 0;
-                    }
-                    if (id104) {
-                        const r104 = readings?.find(r => r.escala_id === id104);
-                        if (r104) theoreticalFlow104 = r104.gasto_calculado_m3s || 0;
+                        const id000 = scales.find(s => s.km === 0)?.id;
+                        const id104 = scales.find(s => s.km === 104)?.id;
+
+                        if (needs000 && id000) {
+                            const r = readings?.find(r => r.escala_id === id000);
+                            if (r) theoreticalFlow000 = r.gasto_calculado_m3s || 0;
+                        }
+                        if (needs104 && id104) {
+                            const r = readings?.find(r => r.escala_id === id104);
+                            if (r) theoreticalFlow104 = r.gasto_calculado_m3s || 0;
+                        }
                     }
                 }
-
-                const latest000Aforo = aforos?.find(d => d.punto_control_id === 'CANAL-000');
-                const latest104Aforo = aforos?.find(d => d.punto_control_id === 'CANAL-104');
 
                 setBalanceCanal({
                     entrada000: (latest000Aforo?.gasto_calculado_m3s && latest000Aforo.gasto_calculado_m3s > 0)
