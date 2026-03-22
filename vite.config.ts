@@ -19,7 +19,8 @@ export default defineConfig({
     basicSsl(),
     VitePWA({
       registerType: 'autoUpdate',   // SW se actualiza sin prompt NUNCA
-      filename: 'sw-sica-v2.4.9.js',       // Nombre nuevo para forzar invalidación total
+        swDest: 'dist/sw-sica-v2.5.0.js',
+       // Nombre nuevo para forzar invalidación total
       manifest: {
         name: 'SICA Captura | S.R.L. Unidad Conchos',
         short_name: 'SICA Captura',
