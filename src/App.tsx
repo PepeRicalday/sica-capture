@@ -24,6 +24,35 @@ import { HydricStatusProvider } from './context/HydricStatusContext';
  * 5. VersionGuard solo actúa si min_supported_version > local (caso extremo).
  */
 
+/** NukePage — limpia SW + caches y recarga desde red. Accesible sin auth. */
+function NukePage() {
+  useEffect(() => {
+    const nuke = async () => {
+      try {
+        if ('serviceWorker' in navigator) {
+          const regs = await navigator.serviceWorker.getRegistrations();
+          await Promise.all(regs.map(r => r.unregister()));
+        }
+        if ('caches' in window) {
+          const keys = await caches.keys();
+          await Promise.all(keys.map(k => caches.delete(k)));
+        }
+      } catch { /* ignorar errores parciales */ }
+      window.location.replace('/?v=' + Date.now());
+    };
+    nuke();
+  }, []);
+
+  return (
+    <div className="flex items-center justify-center h-screen bg-mobile-dark text-mobile-accent">
+      <div className="text-center">
+        <div className="animate-spin text-4xl mb-4">⟳</div>
+        <div className="font-bold text-sm uppercase tracking-widest">Limpiando caché...</div>
+      </div>
+    </div>
+  );
+}
+
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { session, loading } = useAuth();
 
@@ -101,6 +130,7 @@ function AppContent() {
       <Route path="/monitor" element={<ProtectedRoute><Monitor /></ProtectedRoute>} />
       <Route path="/hidrometria" element={<ProtectedRoute><Hidrometria /></ProtectedRoute>} />
       <Route path="/captura" element={<ProtectedRoute><Capture /></ProtectedRoute>} />
+      <Route path="/nuke" element={<NukePage />} />
       <Route path="/" element={<Navigate to="/monitor" replace />} />
       <Route path="*" element={<Navigate to="/monitor" replace />} />
     </Routes>

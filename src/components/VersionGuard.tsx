@@ -44,10 +44,15 @@ export const VersionGuard = ({ children }: { children: ReactNode }) => {
                     .eq('app_id', 'capture')
                     .single();
 
-                if (error || !data) return;
-
-                // Solo bloquear si min_supported es mayor que la local
+                // effectiveMin hardcoded — el banner se muestra aunque el DB falle
                 const effectiveMin = '2.5.8';
+                if (error || !data) {
+                    if (isVersionLower(CURRENT_VERSION, effectiveMin)) {
+                        setServerVersion(effectiveMin);
+                        setShowBanner(true);
+                    }
+                    return;
+                }
                 if (isVersionLower(CURRENT_VERSION, effectiveMin)) {
                     setServerVersion(effectiveMin);
                     setShowBanner(true);
