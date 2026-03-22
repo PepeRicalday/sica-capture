@@ -482,10 +482,12 @@ const Capture = () => {
             setShowSuccessAnim(true);
             setTimeout(() => setShowSuccessAnim(false), 1500);
 
-            setRawValue(0);
             // Mantener los valores capturados como referencia visual para la siguiente lectura.
             // El operador ve el último registro y solo modifica lo que cambió.
-            // (escalaData se mantiene — no se resetea a 0)
+            // - escalaData se mantiene (niveles y aperturas de escala)
+            // - rawValue se mantiene para 'toma' (gasto en L/s queda como referencia)
+            // - rawValue se resetea solo para 'presas' y 'escala' (irrelevante para escala)
+            if (activeTab !== 'toma') setRawValue(0);
             setActiveGateIndex(0);
             setManualTime('');
             setManualDate(getTodayString());

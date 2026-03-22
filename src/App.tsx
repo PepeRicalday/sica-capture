@@ -1,5 +1,5 @@
 
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import Layout from './components/Layout';
 import Capture from './pages/Capture';
@@ -72,6 +72,23 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
 };
 
 function AppContent() {
+  const { session } = useAuth();
+  const lastSessionId = useRef<string | null>(null);
+
+  // Re-sync catalogs whenever auth session is established or changes.
+  // This ensures that if downloadCatalogs() ran before auth was ready
+  // (e.g. on fresh browser load), we retry once auth is confirmed.
+  useEffect(() => {
+    const currentId = session?.user?.id ?? null;
+    if (currentId !== lastSessionId.current) {
+      lastSessionId.current = currentId;
+      if (currentId) {
+        console.log('[SICA] Sesión establecida. Sincronizando catálogos...');
+        downloadCatalogs(true);
+      }
+    }
+  }, [session]);
+
   useEffect(() => {
     // --- PWA SERVICE WORKER: Registro silencioso ---
     if ('serviceWorker' in navigator && !import.meta.env.DEV) {
@@ -92,7 +109,7 @@ function AppContent() {
       });
     }
 
-    // --- Sincronización de catálogos ---
+    // --- Sincronización inicial de catálogos (pre-auth, anon) ---
     downloadCatalogs();
 
     // Sync pending records when device comes online
