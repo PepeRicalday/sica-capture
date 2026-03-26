@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { Camera, Loader2, CheckCircle2, XCircle, ScanLine } from 'lucide-react';
+import { Camera, Image, Loader2, CheckCircle2, XCircle, ScanLine } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '../lib/supabase';
 
@@ -35,6 +35,7 @@ type Estado = 'idle' | 'preview' | 'extracting' | 'ok' | 'error';
 
 export const AforoImageCapture = ({ onExtracted }: Props) => {
     const inputRef = useRef<HTMLInputElement>(null);
+    const galleryRef = useRef<HTMLInputElement>(null);
     const [estado, setEstado] = useState<Estado>('idle');
     const [preview, setPreview] = useState<string | null>(null);
     const [imageBase64, setImageBase64] = useState<string | null>(null);
@@ -103,19 +104,27 @@ export const AforoImageCapture = ({ onExtracted }: Props) => {
 
             {/* Estado: idle */}
             {(estado === 'idle' || estado === 'ok') && (
-                <button
-                    onClick={() => inputRef.current?.click()}
-                    className={`w-full flex items-center justify-center gap-2 py-2.5 rounded-lg border text-sm font-bold transition-all ${
-                        estado === 'ok'
-                            ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400'
-                            : 'border-indigo-500/40 bg-indigo-500/10 text-indigo-300 active:scale-95'
-                    }`}
-                >
-                    {estado === 'ok'
-                        ? <><CheckCircle2 size={16} /> Capturar otra imagen</>
-                        : <><Camera size={16} /> Fotografiar formato de aforo</>
-                    }
-                </button>
+                <div className="grid grid-cols-2 gap-2">
+                    <button
+                        type="button"
+                        onClick={() => inputRef.current?.click()}
+                        className="flex items-center justify-center gap-2 py-2.5 rounded-lg border border-indigo-500/40 bg-indigo-500/10 text-indigo-300 text-sm font-bold active:scale-95 transition-all"
+                    >
+                        <Camera size={15} /> Cámara
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => galleryRef.current?.click()}
+                        className="flex items-center justify-center gap-2 py-2.5 rounded-lg border border-slate-600 bg-slate-800 text-slate-300 text-sm font-bold active:scale-95 transition-all"
+                    >
+                        <Image size={15} /> Galería
+                    </button>
+                    {estado === 'ok' && (
+                        <span className="col-span-2 text-center text-[10px] text-emerald-400 font-bold">
+                            ↑ Capturar nuevo formato
+                        </span>
+                    )}
+                </div>
             )}
 
             {/* Estado: preview */}
@@ -166,12 +175,21 @@ export const AforoImageCapture = ({ onExtracted }: Props) => {
                 </div>
             )}
 
-            {/* Input oculto — activa cámara en móvil */}
+            {/* Input cámara — abre cámara directamente en móvil */}
             <input
                 ref={inputRef}
                 type="file"
                 accept="image/*"
                 capture="environment"
+                className="hidden"
+                onChange={handleFileChange}
+            />
+            {/* Input galería — abre selector de archivos/fotos */}
+            <input
+                ref={galleryRef}
+                type="file"
+                accept="image/*"
+                title="Seleccionar imagen de galería"
                 className="hidden"
                 onChange={handleFileChange}
             />
