@@ -4,8 +4,8 @@ import { VitePWA } from 'vite-plugin-pwa'
 
 export default defineConfig({
   define: {
-    '__V2_APP_VERSION__': JSON.stringify('2.5.9'),
-    '__V2_BUILD_HASH__': JSON.stringify('v2.5.9'),
+    '__V2_APP_VERSION__': JSON.stringify('2.6.0'),
+    '__V2_BUILD_HASH__': JSON.stringify('v2.6.0'),
     '__BUILD_DATE__': JSON.stringify(new Date().toISOString())
   },
   server: {
@@ -17,7 +17,7 @@ export default defineConfig({
     // basicSsl(), // Desactivado para local para evitar bloqueos de certificado en el navegador
     VitePWA({
       registerType: 'autoUpdate',
-      filename: 'sw-sica-v2.5.9.js',
+      filename: 'sw-sica-v2.6.0.js',
       manifest: {
         name: 'SICA Captura | S.R.L. Unidad Conchos',
         short_name: 'SICA Captura',
