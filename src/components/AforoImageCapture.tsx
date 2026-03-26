@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { Camera, Image, Loader2, CheckCircle2, XCircle, ScanLine } from 'lucide-react';
+import { Camera, Image, Loader2, XCircle, ScanLine } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '../lib/supabase';
 
