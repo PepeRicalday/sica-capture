@@ -40,6 +40,7 @@ export const AforoImageCapture = ({ onExtracted }: Props) => {
     const [preview, setPreview] = useState<string | null>(null);
     const [imageBase64, setImageBase64] = useState<string | null>(null);
     const [mediaType, setMediaType] = useState<string>('image/jpeg');
+    const [errorMsg, setErrorMsg] = useState<string>('');
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
@@ -70,6 +71,8 @@ export const AforoImageCapture = ({ onExtracted }: Props) => {
             });
 
             if (error) throw new Error(error.message);
+            // La función devolvió { error: "..." } en lugar de { data: ... }
+            if (data?.error) throw new Error(data.error);
             if (!data?.data) throw new Error('Respuesta vacía del servidor');
 
             onExtracted(data.data as AforoExtraido);
@@ -78,7 +81,8 @@ export const AforoImageCapture = ({ onExtracted }: Props) => {
         } catch (err: any) {
             console.error('Error extrayendo aforo:', err);
             setEstado('error');
-            toast.error(`Error al extraer: ${err.message}`);
+            setErrorMsg(err.message || 'Error desconocido');
+            toast.error(err.message, { duration: 8000 });
         }
     };
 
@@ -86,6 +90,7 @@ export const AforoImageCapture = ({ onExtracted }: Props) => {
         setEstado('idle');
         setPreview(null);
         setImageBase64(null);
+        setErrorMsg('');
     };
 
     return (
@@ -162,9 +167,9 @@ export const AforoImageCapture = ({ onExtracted }: Props) => {
             {/* Estado: error */}
             {estado === 'error' && (
                 <div className="flex flex-col gap-2">
-                    <div className="flex items-center gap-2 text-red-400 text-xs">
-                        <XCircle size={14} />
-                        <span>No se pudo extraer los datos. Intenta con mejor imagen.</span>
+                    <div className="flex items-start gap-2 text-red-400 text-xs">
+                        <XCircle size={14} className="shrink-0 mt-0.5" />
+                        <span className="break-all">{errorMsg || 'Error al extraer datos'}</span>
                     </div>
                     <button
                         onClick={handleReset}
