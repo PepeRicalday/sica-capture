@@ -8,6 +8,7 @@ import { syncPendingRecords } from '../lib/sync';
 import { v4 as uuidv4 } from 'uuid';
 import { TrapezoidalSchema } from './TrapezoidalSchema';
 import { supabase } from '../lib/supabase';
+import { AforoImageCapture, type AforoExtraido } from './AforoImageCapture';
 
 interface AforoFormProps {
     selectedPoint: string;
@@ -39,6 +40,12 @@ export const AforoForm = ({ selectedPoint, isOnline, onSaveSuccess, editRecord, 
     const [activeDobelaIdx, setActiveDobelaIdx] = useState<number>(0);
     const [channelProfile, setChannelProfile] = useState<any>(null);
     const [_isLoadingProfile, setIsLoadingProfile] = useState(false);
+
+    // Campos extendidos del formato de aforo por molinete
+    const [molineteModelo, setMolineteModelo] = useState('');
+    const [molineteSerie, setMolineteSerie] = useState('');
+    const [aforador, setAforador] = useState('');
+    const [tirante, setTirante] = useState<number | ''>('');
 
     // 2. Estado Complejo: Lista de Dobelas
     const [dobelas, setDobelas] = useState<AforoDobela[]>([
@@ -86,6 +93,43 @@ export const AforoForm = ({ selectedPoint, isOnline, onSaveSuccess, editRecord, 
             });
         }
     }, [editRecord, selectedPoint]);
+
+    // Handler: pre-llenar formulario desde datos extraídos de imagen
+    const handleImageExtracted = (data: AforoExtraido) => {
+        if (data.hora_inicio) setHoraInicial(data.hora_inicio);
+        if (data.hora_fin) setHoraFinal(data.hora_fin);
+        if (data.escala_inicial != null) setEscalaInicial(data.escala_inicial);
+        if (data.escala_final != null) setEscalaFinal(data.escala_final);
+        if (data.espejo_m != null) setEspejo(data.espejo_m);
+        if (data.plantilla_m != null) setPlantilla(data.plantilla_m);
+        if (data.tirante_m != null) setTirante(data.tirante_m);
+        if (data.molinete_modelo) setMolineteModelo(data.molinete_modelo);
+        if (data.molinete_serie) setMolineteSerie(data.molinete_serie);
+        if (data.aforador) setAforador(data.aforador);
+
+        if (data.dobelas && data.dobelas.length > 0) {
+            const convertidas: AforoDobela[] = data.dobelas.map(d => ({
+                base_m: d.base_m || 0,
+                tirante_m: d.tirante_m || 0,
+                velocidades_revoluciones: [
+                    d.revoluciones || 0,
+                    d.revoluciones || 0,
+                    d.revoluciones || 0
+                ],
+                velocidades_segundos: (d.lecturas || [])
+                    .slice(0, 3)
+                    .map(l => l.tiempo_s || 0)
+            }));
+            setDobelas(convertidas);
+            setNumDobelasInput(convertidas.length);
+            setActiveDobelaIdx(0);
+            toast.info(`${convertidas.length} dobelas importadas desde imagen`);
+        }
+
+        if (data.punto_control) {
+            toast.info(`Estación detectada: ${data.punto_control} — selecciona el punto manualmente`);
+        }
+    };
 
     // Sugerir Distribución de Dobelas
     const handleSugerirDistribucion = () => {
@@ -249,7 +293,11 @@ export const AforoForm = ({ selectedPoint, isOnline, onSaveSuccess, editRecord, 
             tirante_calculo_m: tiranteCalc !== '' ? Number(tiranteCalc) : undefined,
             area_hidraulica_m2: datosCalculados.areaTotal,
             velocidad_media_ms: datosCalculados.areaTotal > 0 ? (datosCalculados.gastoTotal / datosCalculados.areaTotal) : 0,
-            froude: datosCalculados.froude
+            froude: datosCalculados.froude,
+            molinete_modelo: molineteModelo || undefined,
+            molinete_serie: molineteSerie || undefined,
+            aforador: aforador || undefined,
+            tirante_m: tirante !== '' ? Number(tirante) : undefined
         };
 
         try {
@@ -290,6 +338,11 @@ export const AforoForm = ({ selectedPoint, isOnline, onSaveSuccess, editRecord, 
                 </div>
                 {editRecord && <span className="text-[9px] bg-amber-500 text-white px-2 py-0.5 rounded-full animate-pulse uppercase font-black">Modo Corrección</span>}
             </h2>
+
+            {/* Captura desde imagen */}
+            {!editRecord && (
+                <AforoImageCapture onExtracted={handleImageExtracted} />
+            )}
 
             {/* Información del Punto Seleccionado */}
             {selectedPoint && selectedPtInfo && (
@@ -338,14 +391,33 @@ export const AforoForm = ({ selectedPoint, isOnline, onSaveSuccess, editRecord, 
                         <input type="number" step="0.01" value={espejo} onChange={e => setEspejo(parseFloat(e.target.value))} className="w-full bg-slate-900 border border-slate-700 rounded p-1.5 text-white text-sm" placeholder="Espejo real" />
                     </div>
                     <div>
-                        <label className="text-[10px] text-sky-400 font-bold uppercase">Ayuda: Diseño</label>
-                        <button
-                            onClick={handleSugerirDistribucion}
-                            className="w-full bg-sky-500/10 border border-sky-500/30 text-sky-400 rounded p-1.5 text-[9px] font-black uppercase tracking-tighter"
-                        >
-                            Calcular Geometría
-                        </button>
+                        <label className="text-[10px] text-slate-400 font-bold uppercase">Tirante y (m)</label>
+                        <input type="number" step="0.01" value={tirante} onChange={e => setTirante(parseFloat(e.target.value))} className="w-full bg-slate-900 border border-slate-700 rounded p-1.5 text-white text-sm" placeholder="Tirante medido" />
                     </div>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                    <div>
+                        <label className="text-[10px] text-slate-400 font-bold uppercase">Molinete Modelo</label>
+                        <input type="text" value={molineteModelo} onChange={e => setMolineteModelo(e.target.value)} className="w-full bg-slate-900 border border-slate-700 rounded p-1.5 text-white text-sm" placeholder="Ej. ROSSBACH_PRICE" />
+                    </div>
+                    <div>
+                        <label className="text-[10px] text-slate-400 font-bold uppercase">No. Serie</label>
+                        <input type="text" value={molineteSerie} onChange={e => setMolineteSerie(e.target.value)} className="w-full bg-slate-900 border border-slate-700 rounded p-1.5 text-white text-sm" placeholder="Ej. 7320" />
+                    </div>
+                </div>
+                <div>
+                    <label className="text-[10px] text-slate-400 font-bold uppercase">Aforador</label>
+                    <input type="text" value={aforador} onChange={e => setAforador(e.target.value)} className="w-full bg-slate-900 border border-slate-700 rounded p-1.5 text-white text-sm" placeholder="Nombre del ingeniero aforador" />
+                </div>
+                <div>
+                    <label className="text-[10px] text-sky-400 font-bold uppercase">Ayuda: Diseño</label>
+                    <button
+                        type="button"
+                        onClick={handleSugerirDistribucion}
+                        className="w-full bg-sky-500/10 border border-sky-500/30 text-sky-400 rounded p-1.5 text-[9px] font-black uppercase tracking-tighter"
+                    >
+                        Calcular Geometría
+                    </button>
                 </div>
             </div>
 

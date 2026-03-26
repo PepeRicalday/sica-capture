@@ -49,12 +49,15 @@ const createColoredIcon = (colorName: string) => new L.Icon({
     shadowSize: [41, 41]
 });
 
+const STALE_HOURS = 8;
+
 const Monitor = () => {
     const { activeEvent } = useHydricStatus();
     const puntos = useLiveQuery(() => db.puntos.toArray()) || [];
     const [currentTime, setCurrentTime] = useState<Date>(() => new Date());
     const [isOnline, setIsOnline] = useState(navigator.onLine);
     const [balanceCanal, setBalanceCanal] = useState({ entrada000: 0, salida104: 0 });
+    const [ultimasMediciones, setUltimasMediciones] = useState<Record<string, { fechaHora: string; aperturaTotal: number }>>({});
 
     useEffect(() => {
         const handleOnline = () => setIsOnline(true);
@@ -172,6 +175,40 @@ const Monitor = () => {
         ['inicio', 'reabierto', 'continua', 'modificacion'].includes(p.estado_hoy || '') &&
         p.lat !== undefined && p.lng !== undefined && p.lat !== 0 && p.lng !== 0
     );
+
+    const activePuntoIds = puntosActivosMapa.map(p => p.id).sort().join(',');
+
+    useEffect(() => {
+        const ids = activePuntoIds.split(',').filter(Boolean);
+        if (!isOnline || ids.length === 0) return;
+        let cancelled = false;
+        const fetchUltimas = async () => {
+            try {
+                const { data } = await supabase
+                    .from('mediciones')
+                    .select('punto_id, fecha_hora, apertura_radiales_m, radiales_json')
+                    .in('punto_id', ids)
+                    .order('fecha_hora', { ascending: false });
+                if (cancelled || !data) return;
+                const map: Record<string, { fechaHora: string; aperturaTotal: number }> = {};
+                for (const row of data) {
+                    if (map[row.punto_id]) continue;
+                    const radiales = Array.isArray(row.radiales_json) ? row.radiales_json : [];
+                    const sum = radiales.reduce((s: number, v: any) => s + (parseFloat(String(v)) || 0), 0);
+                    map[row.punto_id] = {
+                        fechaHora: row.fecha_hora,
+                        aperturaTotal: sum > 0 ? sum : (row.apertura_radiales_m || 0)
+                    };
+                }
+                setUltimasMediciones(map);
+            } catch (e) {
+                console.error('Error fetching ultimas mediciones', e);
+            }
+        };
+        fetchUltimas();
+        const interval = setInterval(fetchUltimas, 60000);
+        return () => { cancelled = true; clearInterval(interval); };
+    }, [activePuntoIds, isOnline]);
 
     // 3. Calcular Gasto Instantáneo Total Extraído (m3/s)
     const entregadoModulosM3s = tomas.filter(p => ['inicio', 'reabierto', 'continua', 'modificacion'].includes(p.estado_hoy || '')).reduce((acc, p) => acc + (p.caudal_promedio || 0), 0);
@@ -354,6 +391,17 @@ const Monitor = () => {
                                 {puntosActivosMapa.length > 0 && <MapBounds bounds={puntosActivosMapa.map(p => [p.lat!, p.lng!] as [number, number])} />}
                                 {puntosActivosMapa.map(p => {
                                     const theme = getModuloTheme(p.modulo || 'general');
+                                    const ultima = ultimasMediciones[p.id];
+                                    const esViejo = ultima
+                                        ? (Date.now() - new Date(ultima.fechaHora).getTime()) > STALE_HOURS * 3600000
+                                        : false;
+                                    const ultimaStr = ultima
+                                        ? new Date(ultima.fechaHora).toLocaleString('es-MX', {
+                                            timeZone: 'America/Chihuahua',
+                                            day: '2-digit', month: '2-digit',
+                                            hour: '2-digit', minute: '2-digit'
+                                        })
+                                        : null;
                                     return (
                                         <Marker key={p.id} position={[p.lat!, p.lng!]} icon={createColoredIcon(theme.leafletColor)}>
                                             <Popup className="custom-popup">
@@ -370,6 +418,16 @@ const Monitor = () => {
                                                                     ? `${(p.volumen_hoy_m3 || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })} m³`
                                                                     : `${((p.volumen_hoy_m3 || 0) / 1000).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 3 })} mm³`
                                                                 }
+                                                            </span>
+                                                        )}
+                                                        {ultimaStr && (
+                                                            <span className={`block font-mono text-xs font-bold mt-0.5 ${esViejo ? 'text-red-400' : 'text-slate-300'}`}>
+                                                                ⏱ {ultimaStr}{esViejo ? ' ⚠' : ''}
+                                                            </span>
+                                                        )}
+                                                        {ultima && ultima.aperturaTotal > 0 && (
+                                                            <span className="block font-mono text-cyan-400 text-xs">
+                                                                ↕ Ap: {ultima.aperturaTotal.toFixed(2)} m
                                                             </span>
                                                         )}
                                                     </div>

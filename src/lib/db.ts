@@ -90,6 +90,11 @@ export interface SicaAforoRecord extends SicaRecord {
     area_hidraulica_m2?: number;
     velocidad_media_ms?: number;
     froude?: number;
+    // Campos extendidos del formato de aforo por molinete
+    molinete_modelo?: string;  // Ej. "ROSSBACH_PRICE"
+    molinete_serie?: string;   // Ej. "7320"
+    aforador?: string;         // Nombre del ingeniero aforador
+    tirante_m?: number;        // Tirante y medido en campo
 }
 
 export interface PerfilHidraulico {

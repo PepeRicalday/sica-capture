@@ -95,7 +95,7 @@ export const downloadCatalogs = async (forceCatalog = false) => {
 
                     mapReportes.set(r.punto_id, {
                         punto_id: r.punto_id,
-                        estado: r.estado || 'cerrado',
+                        estado: r.estado || 'cierre',
                         volumen_total_m3: volumenM3,
                         hora_apertura: r.hora_apertura,
                         caudal_promedio_m3s: caudalM3s
@@ -311,7 +311,11 @@ export const syncPendingRecords = async () => {
             tirante_calculo_m: p.tirante_calculo_m,
             area_hidraulica_m2: p.area_hidraulica_m2,
             velocidad_media_ms: p.velocidad_media_ms,
-            froude: p.froude
+            froude: p.froude,
+            molinete_modelo: p.molinete_modelo,
+            molinete_serie: p.molinete_serie,
+            aforador: p.aforador,
+            tirante_m: p.tirante_m
         }));
 
         if (aforosPayload.length > 0) {
