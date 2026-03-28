@@ -8,27 +8,41 @@ import { TomaHistoryModal } from '../components/TomaHistoryModal';
 import { formatCaudalLps } from '../lib/formatters';
 import StatusBanner from '../components/StatusBanner';
 
+const STALE_HOURS = 8;
+
 // Custom Tooltip for Escalas Graph
 const EscalasTooltip = ({ active, payload }: any) => {
     if (active && payload && payload.length) {
         const data = payload[0].payload;
+        const esViejo = data.ultima_lectura
+            ? (Date.now() - new Date(data.ultima_lectura).getTime()) > STALE_HOURS * 3600000
+            : false;
+        const ultimaStr = data.ultima_lectura
+            ? new Date(data.ultima_lectura).toLocaleString('es-MX', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false })
+            : null;
+        const tendencia = data.delta !== undefined && data.delta !== 0
+            ? data.delta > 0 ? '↑' : '↓'
+            : '→';
+        const tendenciaColor = data.delta > 0 ? 'text-emerald-400' : data.delta < 0 ? 'text-amber-400' : 'text-slate-500';
         return (
-            <div className="bg-slate-900 border border-slate-700 p-2 rounded-lg shadow-xl text-xs">
+            <div className="bg-slate-900 border border-slate-700 p-2 rounded-lg shadow-xl text-xs min-w-[120px]">
                 <p className="text-white font-bold mb-1 border-b border-slate-700 pb-1">{data.nombre}</p>
                 <p className="text-slate-400">Km: <span className="text-white font-mono">{data.km}</span></p>
                 {data.nivel_actual !== undefined ? (
-                    <>
-                        <p className="text-cyan-400 font-bold mt-1">Nivel: {data.nivel_actual.toFixed(2)}m</p>
-                        <p className="text-slate-500">Min: {data.min?.toFixed(2)}m | Max: {data.max?.toFixed(2)}m</p>
-                        {data.delta !== 0 && data.delta !== undefined && (
-                            <p className={clsx("mt-1 flex items-center gap-1 font-bold", data.delta > 0 ? "text-emerald-400" : "text-amber-400")}>
-                                <TrendingUp size={12} className={data.delta < 0 ? "rotate-180" : ""} />
-                                {Math.abs(data.delta).toFixed(2)}m (12h)
-                            </p>
-                        )}
-                    </>
+                    <p className="text-cyan-400 font-bold mt-1 flex items-center gap-1">
+                        Nivel: {data.nivel_actual.toFixed(2)}m
+                        <span className={clsx("font-black text-sm", tendenciaColor)}>{tendencia}</span>
+                    </p>
                 ) : (
                     <p className="text-amber-500/70 italic mt-1">Sin lectura reciente</p>
+                )}
+                {ultimaStr && (
+                    <p className={clsx("mt-1 font-mono", esViejo ? "text-red-400 font-bold" : "text-slate-400")}>
+                        ⏱ {ultimaStr}{esViejo ? ' ⚠' : ''}
+                    </p>
+                )}
+                {data.apertura_total > 0 && (
+                    <p className="text-cyan-400 mt-0.5 font-mono">↕ Ap: {data.apertura_total.toFixed(2)} m</p>
                 )}
             </div>
         );
@@ -59,6 +73,7 @@ const Hidrometria: React.FC = () => {
 
     // 1. Fetch points from offline DB
     const allPoints = useLiveQuery(() => db.puntos.toArray()) || [];
+
 
     // 2. Compute the Widgets logic
     const { totalGastoM3s, seccionData, totalVolumenMm3, tomasPorZona, escalasGraphData, escalasAlertas } = useMemo(() => {
@@ -101,15 +116,21 @@ const Hidrometria: React.FC = () => {
             .filter(p => p.type === 'escala' && p.km !== undefined)
             .sort((a, b) => (a.km || 0) - (b.km || 0));
 
-        const escalasGraphData = escalasPoints.map(p => ({
-            nombre: p.name,
-            km: p.km,
-            nivel_actual: p.nivel_actual, // can be undefined
-            min: p.nivel_min_operativo,
-            max: p.nivel_max_operativo,
-            delta: p.delta_12h,
-            estado: p.escala_estado
-        }));
+        const escalasGraphData = escalasPoints.map(p => {
+            const radiales = Array.isArray(p.radiales_json) ? p.radiales_json : [];
+            const aperturaTotal = radiales.reduce((s: number, v: any) => s + (parseFloat(String(v)) || 0), 0) || (p.apertura_radiales_m || 0);
+            return {
+                nombre: p.name,
+                km: p.km,
+                nivel_actual: p.nivel_actual,
+                min: p.nivel_min_operativo,
+                max: p.nivel_max_operativo,
+                delta: p.delta_12h,
+                estado: p.escala_estado,
+                apertura_total: aperturaTotal,
+                ultima_lectura: p.ultima_lectura_ts || null
+            };
+        });
 
         const escalasAlertas = escalasPoints.filter(p => p.escala_estado === 'alto' || p.escala_estado === 'bajo');
 

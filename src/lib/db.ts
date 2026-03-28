@@ -26,6 +26,7 @@ export interface OfflinePoint {
     delta_12h?: number;
     escala_estado?: string;
     escala_confirmada?: boolean;
+    ultima_lectura_ts?: string; // ISO timestamp de la última lectura de escala
 
     // Configuración Radiales de la Escala
     ancho_radiales?: number;

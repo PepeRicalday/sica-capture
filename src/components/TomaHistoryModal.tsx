@@ -41,16 +41,17 @@ export const TomaHistoryModal: React.FC<TomaHistoryModalProps> = ({ isOpen, onCl
         const fetchHistory = async () => {
             setLoading(true);
             try {
-                // 1. Fetch exact modifications (mediciones) for this point looking backwards.
+                // 1. Fetch individual events (mediciones) for this point
                 const { data: eventos, error: errorEventos } = await supabase
                     .from('mediciones')
                     .select('id, fecha_hora, valor_q, estado_evento, usuario_id')
                     .eq('punto_id', punto.id)
                     .order('fecha_hora', { ascending: false })
-                    .limit(20);
+                    .limit(30);
 
                 if (errorEventos) throw errorEventos;
 
+                // Break at the first real (non-automatic) 'cierre' going backwards
                 const currentCycleEvents = [];
                 for (const ev of (eventos || [])) {
                     currentCycleEvents.push(ev);
@@ -59,7 +60,57 @@ export const TomaHistoryModal: React.FC<TomaHistoryModalProps> = ({ isOpen, onCl
                     }
                 }
 
-                const processedHistory = currentCycleEvents.reverse();
+                // 2. Fetch daily reports to fill gaps where mediciones are missing
+                const { data: reportesDiarios, error: errorReportes2 } = await supabase
+                    .from('reportes_operacion')
+                    .select('id, fecha, estado, caudal_promedio, hora_apertura')
+                    .eq('punto_id', punto.id)
+                    .order('fecha', { ascending: false })
+                    .limit(20);
+
+                if (!errorReportes2 && reportesDiarios && reportesDiarios.length > 0) {
+                    // Build a set of dates already covered by mediciones events
+                    const fechasConMedicion = new Set(
+                        currentCycleEvents.map(ev =>
+                            new Date(ev.fecha_hora).toLocaleDateString('en-CA') // YYYY-MM-DD
+                        )
+                    );
+
+                    // Determine start of current cycle (earliest medicion or first apertura)
+                    const cicloInicio = currentCycleEvents.length > 0
+                        ? new Date(currentCycleEvents[currentCycleEvents.length - 1].fecha_hora)
+                        : null;
+
+                    for (const rep of reportesDiarios) {
+                        // Skip days beyond start of current medicion cycle
+                        if (cicloInicio && new Date(rep.hora_apertura || rep.fecha) < cicloInicio) break;
+                        // Skip closed/suspended reports (they end the cycle)
+                        if (rep.estado === 'cierre' || rep.estado === 'suspension') break;
+                        // Skip days that already have a medicion event
+                        if (fechasConMedicion.has(rep.fecha)) continue;
+
+                        // Add a synthetic daily entry for this gap day
+                        const apertura = rep.hora_apertura
+                            ? new Date(rep.hora_apertura)
+                            : new Date(`${rep.fecha}T06:00:00Z`);
+
+                        currentCycleEvents.push({
+                            id: `daily-${rep.id}`,
+                            fecha_hora: apertura.toISOString(),
+                            valor_q: rep.caudal_promedio,
+                            estado_evento: rep.estado,
+                            virtual: true,
+                            fromReporte: true
+                        });
+                    }
+                }
+
+                // Sort all events ascending by timestamp
+                currentCycleEvents.sort((a: any, b: any) =>
+                    new Date(a.fecha_hora).getTime() - new Date(b.fecha_hora).getTime()
+                );
+
+                const processedHistory = currentCycleEvents;
 
                 // Síntesis de continuidad (Si el último evento fue ayer y sigue abierto)
                 if (processedHistory.length > 0) {
@@ -96,7 +147,7 @@ export const TomaHistoryModal: React.FC<TomaHistoryModalProps> = ({ isOpen, onCl
                 let sumVolMm3 = 0;
                 let daysCount = 0;
                 for (const rep of (reportes || [])) {
-                    if (rep.estado === 'cerrado' && daysCount > 0) break;
+                    if (rep.estado === 'cierre' && daysCount > 0) break;
                     sumVolMm3 += Number(rep.volumen_acumulado || 0) * 1000000;
                     daysCount++;
                 }

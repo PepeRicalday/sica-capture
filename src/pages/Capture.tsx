@@ -275,8 +275,10 @@ const Capture = () => {
                 }
                 
                 // MEJ-7: Validación dinámica de rango operativo por escala
-                const minOp = pt?.nivel_min_operativo || 2.80;
-                const maxOp = pt?.nivel_max_operativo || 3.40;
+                // Fallback solo si el catálogo no trae valores (escala sin configurar)
+                const minOp = (pt?.nivel_min_operativo && pt.nivel_min_operativo > 0) ? pt.nivel_min_operativo : 2.80;
+                const maxOp = (pt?.nivel_max_operativo && pt.nivel_max_operativo > 0) ? pt.nivel_max_operativo : 3.40;
+                if (!pt?.nivel_min_operativo) console.warn(`[SICA] Escala ${selectedPoint}: nivel_min_operativo no en catálogo, usando fallback ${minOp}m`);
                 
                 // Si es Gerente, SRL o está en LLENADO, no molestamos con el rango óptimo si es menor (porque está llenando)
                 const skipRangeCheck = isAuthorized || isGerente || (isLlenado && hArriba < minOp);

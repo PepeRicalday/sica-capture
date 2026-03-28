@@ -28,24 +28,37 @@ export const downloadCatalogs = async (forceCatalog = false) => {
         }
 
         const yesterday = new Date();
-        yesterday.setDate(yesterday.getDate() - 1); // Reducimos a 1 día para lecturas recientes
+        yesterday.setDate(yesterday.getDate() - 1);
         const yesterdayStr = yesterday.toISOString().split('T')[0];
 
+        // Ventana extendida para pre-llenado de nivel_abajo y aperturas:
+        // Las escalas no se leen todos los días — con 1 día se perdía el último registro
+        // si no hubo lectura ayer. 7 días garantiza capturar la última lectura real.
+        const sevenDaysAgo = new Date();
+        sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+        const sevenDaysAgoStr = sevenDaysAgo.toISOString().split('T')[0];
+
         // 1. DYNAMIC DATA (Always fetch)
-        
+
         // A. Fetch latest readings to check for confirmation AND pre-fill values
+        // Incluye nivel_abajo_m y radiales_json (no existen en tabla escalas estática).
+        // Se traen TODAS las lecturas de los últimos 7 días (no solo 1 por escala)
+        // porque el registro más reciente puede tener esos campos en null si el
+        // operador solo capturó nivel_arriba. Se busca el último valor no-nulo
+        // de cada campo de forma independiente.
         const { data: lastReadings } = await supabase
             .from('lecturas_escalas')
-            .select('escala_id, confirmada, nivel_m, nivel_abajo_m, apertura_radiales_m, radiales_json')
-            .gte('fecha', yesterdayStr)
+            .select('escala_id, confirmada, nivel_m, nivel_abajo_m, apertura_radiales_m, radiales_json, fecha, hora_lectura')
+            .gte('fecha', sevenDaysAgoStr)
             .order('fecha', { ascending: false })
             .order('hora_lectura', { ascending: false });
 
-        const readingsMap = new Map<string, any>();
+        // readingsMap: escala_id → array de lecturas ordenadas desc
+        // Permite buscar el último valor no-nulo por campo
+        const readingsMap = new Map<string, any[]>();
         (lastReadings || []).forEach(lr => {
-            if (!readingsMap.has(lr.escala_id)) {
-                readingsMap.set(lr.escala_id, lr);
-            }
+            if (!readingsMap.has(lr.escala_id)) readingsMap.set(lr.escala_id, []);
+            readingsMap.get(lr.escala_id)!.push(lr);
         });
 
         // B. Fetch daily summary for scales
@@ -112,6 +125,14 @@ export const downloadCatalogs = async (forceCatalog = false) => {
         let presas: any[] | null = null;
         let perfiles: any[] | null = null;
 
+        // Mapa de respaldo: última lectura conocida del catálogo local Dexie.
+        // Necesario cuando shouldFetchStatic=true: la tabla 'escalas' no tiene
+        // nivel_abajo_m ni radiales_json. Este mapa preserva esos campos de la
+        // descarga anterior para no perderlos en un refresco de catálogo estático.
+        const localEscalasFallback = new Map<string, any>();
+        const localDexieEscalas = await db.puntos.where('type').equals('escala').toArray();
+        localDexieEscalas.forEach(p => localEscalasFallback.set(p.id, p));
+
         if (shouldFetchStatic) {
             console.log('Fetching static catalogs...');
             const { data: e } = await supabase.from('escalas').select('id, nombre, latitud, longitud, km, nivel_min_operativo, nivel_max_operativo, ancho, alto, pzas_radiales').eq('activa', true);
@@ -139,22 +160,40 @@ export const downloadCatalogs = async (forceCatalog = false) => {
         // 3. MERGE & MAP
         if (baseEscalas) {
             mappedPuntos.push(...baseEscalas.map((p: any) => {
-                const resumen = dictResumenEscalas.get(p.id);
-                const reading = readingsMap.get(p.id);
+                const resumen   = dictResumenEscalas.get(p.id);
+                const readings  = readingsMap.get(p.id) || [];  // array ordenado desc
+                const fallback  = localEscalasFallback.get(p.id);
+
+                // Para cada campo: tomar el primer registro (más reciente) que lo tenga no-nulo.
+                // Así si hoy solo se capturó nivel_arriba, nivel_abajo sigue desde la última lectura
+                // que sí lo incluía (puede ser de hace 3-4 días).
+                const latest    = readings[0];   // lectura más reciente (nivel_m, confirmada, ts)
+                const rAbajo    = readings.find((r: any) => r.nivel_abajo_m    != null);
+                const rApertura = readings.find((r: any) =>
+                    r.apertura_radiales_m != null || (r.radiales_json != null && Array.isArray(r.radiales_json) && r.radiales_json.length > 0)
+                );
+
                 return {
                     ...p,
                     name: p.nombre || p.name,
                     type: 'escala',
-                    // Alias: DB uses 'ancho'/'alto', OfflinePoint interface expects 'ancho_radiales'/'alto_radiales'
                     ancho_radiales: p.ancho,
-                    alto_radiales: p.alto,
-                    nivel_actual: (reading?.nivel_m !== undefined) ? reading.nivel_m : (resumen ? parseFloat(resumen.nivel_actual || 0) : p.nivel_actual),
-                    nivel_abajo_m: reading?.nivel_abajo_m ?? p.nivel_abajo_m,
-                    apertura_radiales_m: reading?.apertura_radiales_m ?? p.apertura_radiales_m,
-                    radiales_json: reading?.radiales_json ?? p.radiales_json,
-                    delta_12h: resumen ? parseFloat(resumen.delta_12h || 0) : p.delta_12h,
-                    escala_estado: resumen?.estado || p.escala_estado || 'normal',
-                    escala_confirmada: reading ? (reading.confirmada !== false) : (p.escala_confirmada ?? true)
+                    alto_radiales:  p.alto,
+                    // nivel_actual: lectura más reciente > resumen diario > fallback Dexie
+                    nivel_actual: (latest?.nivel_m != null)
+                        ? latest.nivel_m
+                        : (resumen ? parseFloat(resumen.nivel_actual || 0) : (p.nivel_actual ?? fallback?.nivel_actual)),
+                    // nivel_abajo_m: último registro que lo tenga → fallback Dexie → estático
+                    nivel_abajo_m:       rAbajo?.nivel_abajo_m        ?? fallback?.nivel_abajo_m        ?? p.nivel_abajo_m,
+                    // apertura_radiales_m y radiales_json: último registro con apertura → fallback
+                    apertura_radiales_m: rApertura?.apertura_radiales_m ?? fallback?.apertura_radiales_m ?? p.apertura_radiales_m,
+                    radiales_json:       rApertura?.radiales_json        ?? fallback?.radiales_json        ?? p.radiales_json,
+                    delta_12h: resumen ? parseFloat(resumen.delta_12h || 0) : (p.delta_12h ?? fallback?.delta_12h ?? 0),
+                    escala_estado: resumen?.estado || p.escala_estado || fallback?.escala_estado || 'normal',
+                    escala_confirmada: latest ? true : (p.escala_confirmada ?? fallback?.escala_confirmada ?? true),
+                    ultima_lectura_ts: latest?.fecha && latest?.hora_lectura
+                        ? `${latest.fecha}T${latest.hora_lectura}`
+                        : (p.ultima_lectura_ts ?? fallback?.ultima_lectura_ts)
                 };
             }));
         }
@@ -348,16 +387,18 @@ export const syncPendingRecords = async () => {
             }
         }
 
-        // Si se subieron bien, *SOLO ESTOS* se marcan como sincronizados y se limpia el error
+        // Marcar como sincronizados solo los registros exitosos
         if (syncSuccessIds.length > 0) {
             await db.records.where('id').anyOf(syncSuccessIds).modify({ sincronizado: 'true', error_sync: undefined });
             console.log(`Sync complete. Successfully synced ${syncSuccessIds.length}/${pending.length} records.`);
-
-            // 🔥 CRITICAL: Refresh catalogs to get the new 'estado_hoy' computed by DB triggers
-            await downloadCatalogs();
         } else {
             console.log('Sync attempted but no records were successfully transmitted.');
         }
+
+        // Refrescar catálogo SIEMPRE después del intento (con o sin éxito):
+        // Necesario para que nivel_actual, estado_hoy y escala_confirmada reflejen
+        // el estado real de la BD, incluso si algunos registros fallaron por constraints.
+        await downloadCatalogs();
 
     } catch (error) {
         console.error('Failed to sync records:', error);
