@@ -76,11 +76,17 @@ const Capture = () => {
     const [escalaData, setEscalaData] = useState<{ arriba: number, abajo: number, aperturas: number[] }>({ arriba: 0, abajo: 0, aperturas: [] });
     const [activeGateIndex, setActiveGateIndex] = useState(0);
 
-    const val = (activeTab === 'toma' || activeTab === 'presas')
+    // val: valor formateado para el display principal
+    // - toma:   entero L/s  (rawValue directo)
+    // - presas: m³/s con 2 decimales (rawValue / 100, igual que escala almacena cm)
+    // - escala: metros con 2 decimales (rawValue / 100)
+    const val = activeTab === 'toma'
         ? rawValue.toString()
-        : activeTab === 'escala'
-            ? (escalaField === 'apertura' ? ((escalaData.aperturas[activeGateIndex] || 0) / 100).toFixed(2) : (escalaData[escalaField] / 100).toFixed(2))
-            : '0.00'; // Listros/seg para Tomas, Metros para Escalas
+        : activeTab === 'presas'
+            ? (rawValue / 100).toFixed(2)
+            : activeTab === 'escala'
+                ? (escalaField === 'apertura' ? ((escalaData.aperturas[activeGateIndex] || 0) / 100).toFixed(2) : (escalaData[escalaField] / 100).toFixed(2))
+                : '0.00';
 
     // Hydric Status
     const { activeEvent, maxKmAlcanzado } = useHydricStatus();
@@ -408,12 +414,13 @@ const Capture = () => {
                 payload.valor_q = refPt?.type === 'canal' ? numVal : numVal / 1000;
                 payload.estado_operativo = estadoToma;
             } else if (activeTab === 'presas') {
+                // val está en m³/s con 2 decimales (rawValue / 100)
                 const numVal = parseFloat(val);
-                if (isNaN(numVal)) {
+                if (isNaN(numVal) || numVal < 0) {
                     toast.error('Gasto inválido');
                     return;
                 }
-                payload.valor_q = numVal;
+                payload.valor_q = numVal; // ya en m³/s — sync maps directo a gasto_m3s
                 // No mandatory state for presas, just the flow movement
             }
 
@@ -558,7 +565,7 @@ const Capture = () => {
                         return (
                             <button
                                 key={tab}
-                                onClick={() => { setActiveTab(tab); setSelectedPoint(''); }}
+                                onClick={() => { setActiveTab(tab); setSelectedPoint(''); setRawValue(0); setEscalaData({ arriba: 0, abajo: 0, aperturas: [] }); }}
                                 className={`flex-1 py-3 px-1 rounded-lg font-black uppercase tracking-wider transition-all duration-300 ${activeTab === tab
                                     ? 'bg-mobile-accent text-slate-900 shadow-lg shadow-mobile-accent/30 scale-[1.02]'
                                     : 'text-slate-500 hover:text-slate-300'
@@ -959,7 +966,7 @@ const Capture = () => {
                             </div>
                         ) : (
                             <div className="text-right text-slate-400 text-xs font-semibold mb-1 flex-shrink-0">
-                                Captura de Gasto (L/s)
+                                {activeTab === 'presas' ? 'Gasto de Extracción (m³/s)' : 'Captura de Gasto (L/s)'}
                             </div>
                         )}
                         <div className="flex flex-col items-end flex-shrink-0">
