@@ -942,6 +942,18 @@ const Capture = () => {
                                                 ? ((escalaData.aperturas[activeGateIndex] || 0) / 100).toFixed(2)
                                                 : (escalaData[f.id as 'arriba' | 'abajo'] / 100).toFixed(2)}m
                                         </span>
+                                        {/* Apertura total acumulada (Σ todas las compuertas) */}
+                                        {f.id === 'apertura' && (() => {
+                                            const totalAp = (escalaData.aperturas || []).reduce((s, a) => s + a, 0) / 100;
+                                            const abiertas = (escalaData.aperturas || []).filter(a => a > 0).length;
+                                            const pt2 = puntos.find(p => p.id === selectedPoint);
+                                            if (!pt2?.pzas_radiales || totalAp <= 0) return null;
+                                            return (
+                                                <span className={`text-[9px] font-mono mt-0.5 opacity-90 ${escalaField === 'apertura' ? 'text-mobile-dark' : 'text-mobile-accent'}`}>
+                                                    Σ {totalAp.toFixed(2)}m · {abiertas}/{pt2.pzas_radiales}
+                                                </span>
+                                            );
+                                        })()}
                                     </button>
                                 ))}
                             </div>
@@ -1004,11 +1016,27 @@ const Capture = () => {
                                         </div>
                                     )}
 
-                                    <div className="text-right text-mobile-accent font-mono font-bold text-lg mb-4 flex-shrink-0 bg-slate-900/50 rounded p-1">
-                                        <span className="text-slate-500 text-xs mr-2">
-                                            {pt?.pzas_radiales && hasRadialesOpen ? 'Gasto Sumado (Radiales):' : 'Gasto Calculado:'}
-                                        </span>
-                                        {q.toFixed(3)} m³/s
+                                    <div className="flex-shrink-0 bg-slate-900/50 rounded p-1 mb-4">
+                                        {/* Apertura Total Acumulada — visible solo con compuertas radiales */}
+                                        {pt?.pzas_radiales && pt.pzas_radiales > 0 && (() => {
+                                            const totalAp  = realAps.reduce((s, a) => s + a, 0);
+                                            const abiertas = realAps.filter(a => a > 0).length;
+                                            return (
+                                                <div className="flex items-center justify-between border-b border-slate-700/50 pb-1 mb-1">
+                                                    <span className="text-[10px] text-slate-500 uppercase tracking-wide font-bold">Apertura Total Acumulada</span>
+                                                    <span className="font-mono font-bold text-sm text-cyan-300">
+                                                        {totalAp.toFixed(2)} m
+                                                        <span className="text-slate-500 font-normal text-[10px] ml-1">· {abiertas}/{pt.pzas_radiales} abiertas</span>
+                                                    </span>
+                                                </div>
+                                            );
+                                        })()}
+                                        <div className="flex items-center justify-end">
+                                            <span className="text-slate-500 text-xs mr-2">
+                                                {pt?.pzas_radiales && hasRadialesOpen ? 'Gasto Sumado (Radiales):' : 'Gasto Calculado:'}
+                                            </span>
+                                            <span className="text-mobile-accent font-mono font-bold text-lg">{q.toFixed(3)} m³/s</span>
+                                        </div>
                                     </div>
                                 </>
                             );
