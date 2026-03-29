@@ -1,7 +1,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
-import { X, Clock, Droplets, Activity, WifiOff, History, Edit3, CalendarRange } from 'lucide-react';
+import { X, Clock, Droplets, Activity, WifiOff, History, Edit3 } from 'lucide-react';
 import type { OfflinePoint, SicaRecord } from '../lib/db';
 import clsx from 'clsx';
 import { formatCaudalLps } from '../lib/formatters';
@@ -285,21 +285,22 @@ export const TomaHistoryModal: React.FC<TomaHistoryModalProps> = ({ isOpen, onCl
             const fmt = (d: Date) => d.toLocaleDateString('es-MX', { day: '2-digit', month: 'short' });
             return (
                 <div key={ev.id} className="relative pl-10">
-                    <div className="absolute left-2.5 top-1.5 w-2.5 h-2.5 rounded-full bg-cyan-800 ring-4 ring-mobile-dark z-10"></div>
-                    <div className="glass-panel rounded-lg p-2.5 border border-cyan-900/40 shadow-md">
-                        <div className="flex justify-between items-center mb-1">
-                            <span className="text-xs font-bold uppercase tracking-wide text-cyan-600 flex items-center gap-1">
-                                <CalendarRange size={11} />
-                                CONTINUA · {ev._days} días
+                    <div className="absolute left-2.5 top-1.5 w-2.5 h-2.5 rounded-full bg-cyan-500 ring-4 ring-mobile-dark z-10"></div>
+                    <div className="glass-panel rounded-lg p-2.5 border-t border-b-0 border-r-0 border-l border-white/5 shadow-md">
+                        <div className="flex justify-between items-start mb-1">
+                            <span className="text-xs font-bold uppercase tracking-wide drop-shadow-sm text-cyan-400">
+                                CONTINUA
                             </span>
-                            <span className="text-[10px] text-slate-500 font-mono">
+                            <span className="text-[10px] text-slate-400 font-mono">
                                 {fmt(startDate)} → {fmt(endDate)}
                             </span>
                         </div>
-                        <div className="flex items-center gap-2">
-                            <Activity size={12} className="text-slate-500" />
-                            <span className="text-sm font-bold text-white">{formatCaudalLps(Number(ev.valor_q))}</span>
-                            <span className="text-[10px] text-slate-500 italic">sin modificaciones</span>
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                                <Activity size={12} className="text-slate-500" />
+                                <span className="text-sm font-bold text-white">{formatCaudalLps(Number(ev.valor_q))}</span>
+                            </div>
+                            <span className="text-[10px] text-slate-500 font-mono">{ev._days} días · sin cambios</span>
                         </div>
                     </div>
                 </div>
