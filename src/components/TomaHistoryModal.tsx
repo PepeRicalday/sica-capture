@@ -113,23 +113,19 @@ export const TomaHistoryModal: React.FC<TomaHistoryModalProps> = ({ isOpen, onCl
                     .order('fecha', { ascending: false })
                     .limit(60);
 
-                // Recorrer de más reciente a más antiguo hasta encontrar cierre/suspension
+                // Recorrer de más reciente a más antiguo.
+                // El ciclo activo termina al encontrar el primer 'inicio'/'reabierto'
+                // (caminando hacia atrás ese ES el inicio del ciclo — no seguir más allá).
                 const cicloReportes: any[] = [];
                 let cycleStartTs: string | null = null;
 
                 for (const rep of (reportesDiarios || [])) {
-                    if (rep.estado === 'suspension' && cicloReportes.length === 0) {
-                        cicloReportes.push(rep);
-                        break;
-                    }
-                    if (rep.estado === 'cierre') {
-                        cicloReportes.push(rep);
-                        break;
-                    }
+                    if (rep.estado === 'cierre') break;
+                    if (rep.estado === 'suspension' && cicloReportes.length > 0) break;
                     cicloReportes.push(rep);
-                    // El inicio real del ciclo: el primer 'inicio' o 'reabierto' encontrado
                     if (rep.estado === 'inicio' || rep.estado === 'reabierto') {
                         cycleStartTs = rep.hora_apertura || `${rep.fecha}T06:00:00Z`;
+                        break; // ← inicio encontrado: aquí nació el ciclo, no seguir
                     }
                 }
 
@@ -151,23 +147,22 @@ export const TomaHistoryModal: React.FC<TomaHistoryModalProps> = ({ isOpen, onCl
                 });
 
                 // ── 3. Construir lista unificada ──────────────────────────────
-                // Días cubiertos por mediciones reales
-                const fechasConMedicion = new Set(
-                    medicionesCiclo.map(m =>
-                        new Date(m.fecha_hora).toLocaleDateString('en-CA')
-                    )
-                );
+                // Timezone Chihuahua para clasificar fechas (evita que medianoche UTC
+                // caiga en el día anterior y genere duplicados)
+                const toChihuahuaDate = (ts: string) =>
+                    new Date(ts).toLocaleDateString('en-CA', { timeZone: 'America/Chihuahua' });
+
+                const fechasConMedicion = new Set(medicionesCiclo.map(m => toChihuahuaDate(m.fecha_hora)));
 
                 const allEvents: any[] = [...medicionesCiclo];
 
                 // Agregar entradas sintéticas de reportes para días sin medición real
                 for (const rep of cicloReportes) {
-                    if (rep.estado === 'cierre') continue; // el cierre ya lo incluye medicion
+                    if (rep.estado === 'cierre') continue;
                     const apertura = rep.hora_apertura
                         ? new Date(rep.hora_apertura)
                         : new Date(`${rep.fecha}T06:00:00Z`);
-                    const repDate = apertura.toLocaleDateString('en-CA');
-                    if (fechasConMedicion.has(repDate)) continue;
+                    if (fechasConMedicion.has(toChihuahuaDate(apertura.toISOString()))) continue;
 
                     allEvents.push({
                         id: `rep-${rep.id}`,
@@ -183,17 +178,46 @@ export const TomaHistoryModal: React.FC<TomaHistoryModalProps> = ({ isOpen, onCl
                     new Date(a.fecha_hora).getTime() - new Date(b.fecha_hora).getTime()
                 );
 
+                // ── Deduplicar por fecha Chihuahua ────────────────────────────
+                // Si hay 2+ eventos en el mismo día, conservar el real (no virtual)
+                // más reciente. Elimina duplicados del cron que sobrevivieron al filtro.
+                const byDateMap = new Map<string, any>();
+                for (const ev of allEvents) {
+                    const key = toChihuahuaDate(ev.fecha_hora);
+                    const prev = byDateMap.get(key);
+                    if (!prev) { byDateMap.set(key, ev); continue; }
+                    // Preferir real sobre virtual; si iguales, el más reciente
+                    const prevReal = !prev.virtual;
+                    const currReal = !ev.virtual;
+                    if (currReal && !prevReal) { byDateMap.set(key, ev); continue; }
+                    if (!currReal && prevReal) continue;
+                    if (new Date(ev.fecha_hora) > new Date(prev.fecha_hora)) byDateMap.set(key, ev);
+                }
+                const dedupedEvents = Array.from(byDateMap.values()).sort(
+                    (a, b) => new Date(a.fecha_hora).getTime() - new Date(b.fecha_hora).getTime()
+                );
+
+                // ── Detectar INICIO doble (anomalía de registro) ──────────────
+                // Si después de limpiar sigue habiendo 2 INICIO en el mismo ciclo,
+                // marcar el primero como anomalía para mostrarlo diferente en UI.
+                let iniciosSeen = 0;
+                for (const ev of dedupedEvents) {
+                    if (ev.estado_evento === 'inicio' || ev.estado_evento === 'reabierto') {
+                        iniciosSeen++;
+                        if (iniciosSeen > 1) ev._anomalia = true;
+                    }
+                }
+
                 // ── 4. Cálculo de horas activas (desde el INICIO real) ────────
-                // cycleStartTs es la hora_apertura del primer 'inicio'/'reabierto'
                 const actualStartTs = cycleStartTs || punto.hora_apertura;
                 const hoursOpen = actualStartTs
                     ? (Date.now() - new Date(actualStartTs).getTime()) / 3_600_000
                     : 0;
 
                 // ── 5. Cálculo de volumen por Q×Δt ────────────────────────────
-                const volM3 = calcVolumeM3(allEvents);
+                const volM3 = calcVolumeM3(dedupedEvents);
 
-                setHistorial(allEvents);
+                setHistorial(dedupedEvents);
                 setTotales({ volumenM3: volM3, horasContinuas: hoursOpen });
 
             } catch (err) {
@@ -312,13 +336,20 @@ export const TomaHistoryModal: React.FC<TomaHistoryModalProps> = ({ isOpen, onCl
             <div key={ev.id ?? i} className="relative pl-10">
                 <div className={clsx(
                     "absolute left-2.5 top-1.5 w-2.5 h-2.5 rounded-full ring-4 ring-mobile-dark z-10",
-                    dot,
+                    ev._anomalia ? "bg-amber-500" : dot,
                     isFirst && "animate-pulse ring-cyan-900/50"
                 )}></div>
-                <div className="glass-panel rounded-lg p-2.5 border-t border-b-0 border-r-0 border-l border-white/5 shadow-md">
+                <div className={clsx(
+                    "glass-panel rounded-lg p-2.5 shadow-md",
+                    ev._anomalia
+                        ? "border border-amber-800/50"
+                        : "border-t border-b-0 border-r-0 border-l border-white/5"
+                )}>
                     <div className="flex justify-between items-start mb-1">
-                        <span className={clsx("text-xs font-bold uppercase tracking-wide drop-shadow-sm", text)}>
+                        <span className={clsx("text-xs font-bold uppercase tracking-wide drop-shadow-sm flex items-center gap-1",
+                            ev._anomalia ? "text-amber-400" : text)}>
                             {ev.estado_evento}{ev._isNow ? ' (ahora)' : ''}
+                            {ev._anomalia && <span className="text-[9px] font-normal normal-case text-amber-600">· posible duplicado</span>}
                         </span>
                         <span className="text-[10px] text-slate-400 font-mono">
                             {date.toLocaleDateString('es-MX', { day: '2-digit', month: 'short' })}{' '}
