@@ -47,10 +47,9 @@ export const formatVolumenMm3 = (m3: number | undefined | null, decimals = 3): s
  * @returns String formateado, e.g. "15.120 mil m³"
  */
 export const formatVolumenMillares = (m3: number | undefined | null, decimals = 3): string => {
-    if (!m3) return '0.000 dam³';
-    // Dividimos entre 1000 para obtener millares
-    return `${(m3 / 1000).toLocaleString(undefined, {
+    if (!m3) return '0.000 m³';
+    return `${m3.toLocaleString(undefined, {
         minimumFractionDigits: decimals,
         maximumFractionDigits: decimals,
-    })} dam³`;
+    })} m³`;
 };

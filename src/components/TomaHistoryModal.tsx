@@ -244,8 +244,7 @@ export const TomaHistoryModal: React.FC<TomaHistoryModalProps> = ({ isOpen, onCl
 
     const displayHours  = isOnline ? totales.horasContinuas  : offlineHours;
     const displayVolM3  = isOnline ? totales.volumenM3        : offlineVolM3;
-    // Convertir m³ → dam³ (decametros cúbicos, lo que el sistema llama "mm³")
-    const displayVolDam3 = displayVolM3 / 1000;
+    const displayVolDam3 = displayVolM3;
 
     // Historial comprimido (solo online)
     const compressedHistorial = compressEvents(historial);
@@ -418,7 +417,7 @@ export const TomaHistoryModal: React.FC<TomaHistoryModalProps> = ({ isOpen, onCl
                                 {displayVolDam3 > 0
                                     ? displayVolDam3.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
                                     : '—'}
-                                <span className="text-xs text-blue-400/70 font-normal"> dam³</span>
+                                <span className="text-xs text-blue-400/70 font-normal"> m³</span>
                             </div>
                             {!isOnline && (
                                 <span className="text-[9px] text-slate-600 mt-0.5">estimado (sin conexión)</span>
