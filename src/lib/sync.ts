@@ -270,6 +270,16 @@ export const syncPendingRecords = async () => {
     if (!navigator.onLine) return;
 
     try {
+        // Verificar sesión activa antes de sincronizar — sesión expirada = anon = RLS falla
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) {
+            console.warn('syncPendingRecords: sesión expirada, no se puede sincronizar');
+            await db.records.where({ sincronizado: 'false' }).modify({
+                error_sync: 'Sesión expirada — vuelve a iniciar sesión para sincronizar'
+            });
+            return;
+        }
+
         const pending = await db.records.where({ sincronizado: 'false' }).toArray();
         if (pending.length === 0) return;
 
@@ -290,7 +300,7 @@ export const syncPendingRecords = async () => {
             responsable: p.responsable_nombre || 'Operador Móvil',
             turno: parseInt(p.hora_captura.split(':')[0]) < 14 ? 'am' : 'pm',
             notas: p.notas, // Incluir notas (GPS, Arribos, etc.)
-            confirmada: p.confirmada ?? true // Forzar confirmación para bypass de seguridad
+            confirmada: p.confirmada === true ? true : false // Solo true si fue explícitamente autorizado
         }));
 
         const syncSuccessIds: string[] = [];
