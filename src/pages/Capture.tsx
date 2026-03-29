@@ -380,13 +380,14 @@ const Capture = () => {
                     const isPtOpen = ['inicio', 'reabierto', 'continua', 'modificacion'].includes(ptStatus);
                     const isActionClosing = ['suspension', 'cierre'].includes(estadoToma);
                     const isActionOpening = ['inicio', 'reabierto'].includes(estadoToma);
-                    const isActionOpenState = ['modificacion', 'continua', 'suspension', 'cierre'].includes(estadoToma);
+                    // 'continua' requiere que la toma esté abierta (igual que modificacion)
+                    const isActionRequiresOpen = ['modificacion', 'continua', 'suspension', 'cierre'].includes(estadoToma);
 
                     if (isPtOpen && isActionOpening) {
                         toast.error('La toma ya está abierta. Solo puedes modificarla, continuarla o cerrarla.');
                         return;
                     }
-                    if (!isPtOpen && isActionOpenState) {
+                    if (!isPtOpen && isActionRequiresOpen) {
                         toast.error('La toma está cerrada. Debes iniciarla o reabrirla.');
                         return;
                     }

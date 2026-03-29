@@ -311,12 +311,16 @@ export const syncPendingRecords = async () => {
 
         // 1B. Tomas y Laterales (van a mediciones)
         const tomasPending = pending.filter(p => p.tipo === 'toma');
+        // Mapear tipo de punto a tipo_ubicacion (evita que todos queden como 'canal')
+        const puntosMap = new Map<string, string>();
+        (await db.puntos.toArray()).forEach(pt => puntosMap.set(pt.id, pt.type));
+
         const tomasPayload: any[] = tomasPending.map(p => ({
             id: p.id,
             punto_id: p.punto_id,
             valor_q: p.valor_q ?? 0,
             fecha_hora: `${p.fecha_captura}T${p.hora_captura}${offsetString}`,
-            tipo_ubicacion: 'canal',
+            tipo_ubicacion: puntosMap.get(p.punto_id) || 'toma',
             estado_evento: p.estado_operativo || null,
             usuario_id: p.responsable_id || null,
             notas: p.notas
