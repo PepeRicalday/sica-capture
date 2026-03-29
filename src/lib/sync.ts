@@ -296,7 +296,7 @@ export const syncPendingRecords = async () => {
         const syncSuccessIds: string[] = [];
 
         if (escalasPayload.length > 0) {
-            const { error: err } = await supabase.from('lecturas_escalas').upsert(escalasPayload, { onConflict: 'id' });
+            const { error: err } = await supabase.from('lecturas_escalas').upsert(escalasPayload, { onConflict: 'escala_id,fecha,turno' });
             if (err) {
                 console.error('Error insertando escalas:', err.message);
                 // Tag individual local records with error
