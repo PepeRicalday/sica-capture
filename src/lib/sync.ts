@@ -324,13 +324,19 @@ export const syncPendingRecords = async () => {
         // Mapear tipo de punto a tipo_ubicacion (evita que todos queden como 'canal')
         const puntosMap = new Map<string, string>();
         (await db.puntos.toArray()).forEach(pt => puntosMap.set(pt.id, pt.type));
+        // Valores aceptados por measurements_location_type_check: 'toma', 'lateral', 'carcamo', 'canal', 'dam'
+        const TIPO_UBICACION_VALIDOS = new Set(['toma', 'lateral', 'carcamo', 'canal', 'dam']);
+        const normTipoUbicacion = (raw: string | undefined): string => {
+            if (!raw) return 'toma';
+            return TIPO_UBICACION_VALIDOS.has(raw) ? raw : 'toma';
+        };
 
         const tomasPayload: any[] = tomasPending.map(p => ({
             id: p.id,
             punto_id: p.punto_id,
             valor_q: p.valor_q ?? 0,
             fecha_hora: `${p.fecha_captura}T${p.hora_captura}${offsetString}`,
-            tipo_ubicacion: puntosMap.get(p.punto_id) || 'toma',
+            tipo_ubicacion: normTipoUbicacion(puntosMap.get(p.punto_id)),
             estado_evento: p.estado_operativo || null,
             usuario_id: p.responsable_id || null,
             notas: p.notas
