@@ -6,6 +6,7 @@ import {
 import { db, type SicaRecord, type SicaAforoRecord } from '../lib/db';
 import { syncPendingRecords, downloadCatalogs } from '../lib/sync';
 import { getTodayString } from '../lib/dateHelpers';
+import { calculateFlow, validateGateAperture } from '../lib/hydraulicCalculations';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useAuth } from '../context/AuthContext';
 import { toast } from 'sonner';
@@ -91,8 +92,13 @@ const Capture = () => {
     // Hydric Status
     const { activeEvent, maxKmAlcanzado } = useHydricStatus();
 
-    // Selectores Offline
-    const [selectedPoint, setSelectedPoint] = useState<string>('');
+    // Selectores Offline — punto seleccionado independiente por tab
+    const [selectedPoints, setSelectedPoints] = useState<Record<string, string>>({
+        escala: '', toma: '', aforo: '', presas: ''
+    });
+    const selectedPoint = selectedPoints[activeTab] || '';
+    const setSelectedPoint = (id: string) =>
+        setSelectedPoints(prev => ({ ...prev, [activeTab]: id }));
     const puntos = useLiveQuery(() => db.puntos.toArray()) || [];
 
     // Red y Sincronía
@@ -124,6 +130,50 @@ const Capture = () => {
             window.removeEventListener('offline', handleOffline);
         };
     }, []);
+
+    // Rehidratar display al volver a un tab con punto ya seleccionado.
+    // Sin esto, al cambiar de toma→escala→toma el rawValue queda en 0
+    // aunque selectedPoint siga apuntando al punto correcto.
+    useEffect(() => {
+        if (!selectedPoint || puntos.length === 0) return;
+        const pt = puntos.find(p => p.id === selectedPoint);
+        if (!pt) return;
+
+        if (activeTab === 'escala') {
+            const lastLevelCm = pt.nivel_actual ? Math.round(pt.nivel_actual * 100) : 0;
+            const lastAbajoCm = pt.nivel_abajo_m ? Math.round(pt.nivel_abajo_m * 100) : 0;
+            const lastAperturasCm: number[] = Array(pt.pzas_radiales || 0).fill(0);
+            if (pt.radiales_json && Array.isArray(pt.radiales_json)) {
+                pt.radiales_json.forEach((rj: any) => {
+                    if (rj.index !== undefined && rj.apertura_m !== undefined) {
+                        lastAperturasCm[rj.index] = Math.round(rj.apertura_m * 100);
+                    }
+                });
+            }
+            setEscalaData({ arriba: lastLevelCm, abajo: lastAbajoCm, aperturas: lastAperturasCm });
+            setEscalaField('arriba');
+            setActiveGateIndex(0);
+            setRawValue(lastLevelCm);
+        } else if (activeTab === 'toma') {
+            const openStates = ['inicio', 'continua', 'modificacion', 'reabierto'];
+            const isPtOpen = openStates.includes(pt.estado_hoy || '');
+            if (isPtOpen) {
+                const prevQ = Number(pt.caudal_promedio || 0);
+                setRawValue(prevQ > 0
+                    ? (pt.type === 'canal' ? Math.round(prevQ) : Math.round(prevQ * 1000))
+                    : 0
+                );
+                setEstadoToma('modificacion');
+            } else {
+                setRawValue(0);
+                setEstadoToma('inicio');
+            }
+        } else {
+            setRawValue(0);
+        }
+    // Solo se dispara cuando cambia de tab (activeTab), no en cada keystroke
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [activeTab]);
 
     const getCurrentTimeStr24 = () => new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
 
@@ -300,48 +350,33 @@ const Capture = () => {
                     if (!confirmed) return;
                 }
 
-                let q = 0;
                 const realAperturasStr: any[] = [];
                 let maxAperturaStr = 0;
 
-                if (pt?.pzas_radiales && pt?.ancho_radiales && escalaData.aperturas?.length > 0) {
-                    const Cd = 0.6;
-                    const maxAltoCompuerta = pt.alto_radiales || 4.0; // Fallback si no hay alto
-
+                // Validar alturas físicas de compuertas antes de calcular
+                const maxAltoCompuerta = pt?.alto_radiales || 4.0;
+                if (pt?.pzas_radiales && escalaData.aperturas?.length > 0) {
                     for (let i = 0; i < pt.pzas_radiales; i++) {
                         const ap = (escalaData.aperturas[i] || 0) / 100;
-
-                        if (ap > maxAltoCompuerta) {
-                            toast.error(`Bloqueo: La apertura de la radial ${i + 1} (${ap}m) excede su tamaño físico (${maxAltoCompuerta}m).`);
-                            return;
-                        }
-
+                        const err = validateGateAperture(ap, maxAltoCompuerta, i);
+                        if (err) { toast.error(`Bloqueo: ${err}`); return; }
                         realAperturasStr.push({ index: i, apertura_m: ap });
                         if (ap > maxAperturaStr) maxAperturaStr = ap;
-
-                        if (ap > 0) {
-                            const area = pt.ancho_radiales * ap;
-                            // REGLA DE HIDRO-SINCRONÍA: El gasto depende de la CARGA (hArriba - hAbajo)
-                            const carga = Math.max(0, hArriba - hAbajo);
-                            
-                            if (carga > 0.01) { // Mínimo 1cm de diferencial para flujo significativo
-                                if (ap < hArriba) {
-                                    // Flujo por Orificio (Compuerta sumergida o parcial)
-                                    q += Cd * area * Math.sqrt(2 * 9.81 * carga);
-                                } else {
-                                    // Flujo Libre / Vertedor (Compuerta abierta arriba del nivel del agua)
-                                    // En este caso el gasto no aumenta con 'ap', solo con 'hArriba'
-                                    q += 1.84 * pt.ancho_radiales * Math.pow(carga, 1.5);
-                                }
-                            }
-                        }
                     }
-                } else {
-                    // Garganta Larga
-                    const cd = 1.84;
-                    const n = 1.52;
-                    q = hArriba > 0 ? cd * Math.pow(hArriba, n) : 0;
                 }
+
+                const aperturas_m = (pt?.pzas_radiales ? Array.from({ length: pt.pzas_radiales }, (_, i) =>
+                    (escalaData.aperturas[i] || 0) / 100
+                ) : []);
+
+                const { q_total: q } = calculateFlow({
+                    hArriba,
+                    hAbajo,
+                    pzasRadiales: pt?.pzas_radiales,
+                    anchoRadial: pt?.ancho_radiales,
+                    altoRadial: maxAltoCompuerta,
+                    aperturas: aperturas_m,
+                });
 
                 payload.punto_id = selectedPoint;
                 payload.valor_q = hArriba; // nivel principal (arriba)
@@ -365,7 +400,7 @@ const Capture = () => {
                 const numVal = parseFloat(val);
                 const refPt = puntos.find(p => p.id === selectedPoint);
 
-                if (isNaN(numVal) || (numVal <= 0 && ['inicio', 'reabierto', 'continua', 'modificacion'].includes(estadoToma))) {
+                if (isNaN(numVal) || (numVal <= 0 && ['inicio', 'reabierto', 'modificacion'].includes(estadoToma))) {
                     toast.error('Lógica Falla: El gasto no puede ser 0 L/s para una toma activa. Si no hay flujo, reporta cierre.');
                     return;
                 }
@@ -380,7 +415,6 @@ const Capture = () => {
                     const isPtOpen = ['inicio', 'reabierto', 'continua', 'modificacion'].includes(ptStatus);
                     const isActionClosing = ['suspension', 'cierre'].includes(estadoToma);
                     const isActionOpening = ['inicio', 'reabierto'].includes(estadoToma);
-                    // 'continua' requiere que la toma esté abierta (igual que modificacion)
                     const isActionRequiresOpen = ['modificacion', 'continua', 'suspension', 'cierre'].includes(estadoToma);
 
                     if (isPtOpen && isActionOpening) {
@@ -469,12 +503,21 @@ const Capture = () => {
             }
 
             // Actualización Optimista del UI (Cambia el punto a Verde Localmente de inmediato)
+            // También actualiza caudal_promedio para que autoGenerateContinua use el gasto correcto
+            // incluso si la sincronización ocurre antes de que descarguen los catálogos remotos.
             if (activeTab === 'toma' && selectedPoint) {
                 const pt = await db.puntos.get(selectedPoint);
                 if (pt) {
-                    await db.puntos.update(selectedPoint, {
-                        estado_hoy: estadoToma
-                    });
+                    const optimisticUpdate: Partial<typeof pt> = { estado_hoy: estadoToma };
+                    // Para estados activos que registran un gasto real, actualizar caudal_promedio
+                    if (['inicio', 'reabierto', 'modificacion'].includes(estadoToma) && payload.valor_q) {
+                        optimisticUpdate.caudal_promedio = payload.valor_q; // ya en m³/s
+                    }
+                    // Para cierre/suspensión, limpiar el caudal
+                    if (['cierre', 'suspension'].includes(estadoToma)) {
+                        optimisticUpdate.caudal_promedio = 0;
+                    }
+                    await db.puntos.update(selectedPoint, optimisticUpdate);
                 }
             }
 
@@ -566,7 +609,7 @@ const Capture = () => {
                         return (
                             <button
                                 key={tab}
-                                onClick={() => { setActiveTab(tab); setSelectedPoint(''); setRawValue(0); setEscalaData({ arriba: 0, abajo: 0, aperturas: [] }); }}
+                                onClick={() => { setActiveTab(tab); setRawValue(0); setEscalaData({ arriba: 0, abajo: 0, aperturas: [] }); }}
                                 className={`flex-1 py-3 px-1 rounded-lg font-black uppercase tracking-wider transition-all duration-300 ${activeTab === tab
                                     ? 'bg-mobile-accent text-slate-900 shadow-lg shadow-mobile-accent/30 scale-[1.02]'
                                     : 'text-slate-500 hover:text-slate-300'
@@ -617,16 +660,17 @@ const Capture = () => {
                                     const pt = puntos.find(p => p.id === newId);
                                     const openStates = ['inicio', 'continua', 'modificacion', 'reabierto'];
                                     const isPtOpen = openStates.includes(pt?.estado_hoy || '');
-                                    
-                                    if (pt && isPtOpen && pt.caudal_promedio) {
-                                        const prevQ = Number(pt.caudal_promedio);
-                                        if (pt.type === 'canal') {
-                                            setRawValue(Math.round(prevQ));
+
+                                    if (pt && isPtOpen) {
+                                        // Toma abierta: pre-llenar con último gasto para referencia
+                                        const prevQ = Number(pt.caudal_promedio || 0);
+                                        if (prevQ > 0) {
+                                            setRawValue(pt.type === 'canal' ? Math.round(prevQ) : Math.round(prevQ * 1000));
                                         } else {
-                                            setRawValue(Math.round(prevQ * 1000));
+                                            setRawValue(0);
                                         }
-                                        // Default to "continua" if it's already open
-                                        setEstadoToma('continua');
+                                        // Default a modificacion — continua es automática vía sync
+                                        setEstadoToma('modificacion');
                                     } else {
                                         setRawValue(0);
                                         setEstadoToma('inicio');
@@ -666,15 +710,29 @@ const Capture = () => {
                                     .map(p => {
                                         const isOpened = ['inicio', 'reabierto', 'continua', 'modificacion'].includes(p.estado_hoy || '');
                                         const icon = isOpened ? '🟢' : '🔴';
-                                        
+
                                         // Bloqueo visual por Hidro-Sincronía
                                         const isBlocked = activeEvent?.evento_tipo === 'LLENADO' && (p.km || 0) > maxKmAlcanzado;
-                                        
-                                        const modSuffix = p.modulo ? ` [Mod: ${p.modulo}]` : '';
+
+                                        const modSuffix = p.modulo ? ` [${p.modulo}]` : '';
+
+                                        // Badge: gasto actual en L/s
+                                        const caudalLps = isOpened && p.caudal_promedio && p.caudal_promedio > 0
+                                            ? ` · ${Math.round(p.caudal_promedio * 1000)} L/s`
+                                            : '';
+
+                                        // Badge: días abierta desde hora_apertura
+                                        let diasBadge = '';
+                                        if (isOpened && p.hora_apertura) {
+                                            const apertura = new Date(p.hora_apertura);
+                                            const diffMs = Date.now() - apertura.getTime();
+                                            const dias = Math.floor(diffMs / 86400000);
+                                            diasBadge = dias >= 1 ? ` · ${dias}d` : '';
+                                        }
 
                                         return (
                                             <option key={p.id} value={p.id}>
-                                                {icon} km {p.km?.toFixed(3)} - {p.name || (p as any).nombre || 'Sin Nombre'}{modSuffix} {isBlocked ? '(Bloqueado por Hidro-Sincronía)' : ''}
+                                                {icon} km {p.km?.toFixed(3)} - {p.name || (p as any).nombre || 'Sin Nombre'}{modSuffix}{caudalLps}{diasBadge}{isBlocked ? ' ⚠ Bloqueado' : ''}
                                             </option>
                                         );
                                     })
@@ -739,41 +797,55 @@ const Capture = () => {
                     </div>
                 )}
 
-                {/* 2.2 Mini-Widget: Volumen Acumulado de la Zona (Solo Tomas) */}
-                {activeTab === 'toma' && selectedPoint && (
-                    <div className="mb-2 glass-pill p-1.5 px-2 rounded-lg flex items-center justify-between">
-                        <div className="flex flex-col">
-                            <span className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">
-                                Volumen Entregado Hoy - {puntos.find(p => p.id === selectedPoint)?.seccion || 'Zona General'}
-                            </span>
-                            <span className="text-white text-sm font-bold flex items-center mt-0.5">
-                                <span className="inline-block w-2 h-2 rounded-full bg-blue-500 mr-2 animate-pulse"></span>
-                                {(() => {
-                                    const currentPt = puntos.find(p => p.id === selectedPoint);
-                                    if (!currentPt?.seccion_id) return '0.00 Mm³';
+                {/* 2.2 Mini-Widget: Volumen Acumulado de la Zona + Estado de Toma Seleccionada */}
+                {activeTab === 'toma' && selectedPoint && (() => {
+                    const currentPt = puntos.find(p => p.id === selectedPoint);
+                    const isOpened = ['inicio', 'reabierto', 'continua', 'modificacion'].includes(currentPt?.estado_hoy || '');
+                    const caudalLps = currentPt?.caudal_promedio ? Math.round(currentPt.caudal_promedio * 1000) : 0;
+                    const diasAbierta = (() => {
+                        if (!isOpened || !currentPt?.hora_apertura) return 0;
+                        return Math.floor((Date.now() - new Date(currentPt.hora_apertura).getTime()) / 86400000);
+                    })();
+                    const volCatalogo = currentPt?.seccion_id
+                        ? puntos.filter(p => p.seccion_id === currentPt.seccion_id).reduce((acc, p) => acc + (p.volumen_hoy_m3 || 0), 0)
+                        : 0;
 
-                                    // 1. Volumen de catálogo (descargado)
-                                    const volCatalogo = puntos
-                                        .filter(p => p.seccion_id === currentPt.seccion_id)
-                                        .reduce((acc, curr) => acc + (curr.volumen_hoy_m3 || 0), 0);
-
-                                    // 2. Mostrar formateado en Mm³ (millones de m³)
-                                    return `${(volCatalogo / 1000000).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 })} Mm³`;
-                                })()}
-                            </span>
+                    return (
+                        <div className="mb-2 flex flex-col gap-1.5">
+                            {/* Fila superior: estado de la toma seleccionada */}
+                            {isOpened ? (
+                                <div className="glass-pill px-3 py-2 rounded-xl flex items-center justify-between">
+                                    <div className="flex items-center gap-2">
+                                        <span className="inline-block w-2 h-2 rounded-full bg-green-400 animate-pulse flex-shrink-0"></span>
+                                        <div className="flex flex-col">
+                                            <span className="text-green-400 text-[9px] font-black uppercase tracking-widest">Toma Abierta</span>
+                                            <span className="text-white font-mono font-bold text-sm">{caudalLps > 0 ? `${caudalLps} L/s` : '— L/s'}</span>
+                                        </div>
+                                    </div>
+                                    {diasAbierta >= 1 && (
+                                        <span className="text-[10px] bg-cyan-500/20 text-cyan-300 px-2 py-1 rounded-lg font-bold border border-cyan-500/30 font-mono">
+                                            {diasAbierta}d abierta
+                                        </span>
+                                    )}
+                                </div>
+                            ) : (
+                                <div className="glass-pill px-3 py-2 rounded-xl flex items-center gap-2">
+                                    <span className="inline-block w-2 h-2 rounded-full bg-red-400 flex-shrink-0"></span>
+                                    <span className="text-red-400 text-[9px] font-black uppercase tracking-widest">Toma Cerrada</span>
+                                </div>
+                            )}
+                            {/* Fila inferior: volumen de sección */}
+                            <div className="glass-pill p-1.5 px-3 rounded-lg flex items-center justify-between">
+                                <span className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">
+                                    Vol. Hoy · {currentPt?.seccion || 'Zona General'}
+                                </span>
+                                <span className="text-white text-xs font-bold font-mono">
+                                    {(volCatalogo / 1000000).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 })} Mm³
+                                </span>
+                            </div>
                         </div>
-                        {['inicio', 'reabierto', 'continua', 'modificacion'].includes(puntos.find(p => p.id === selectedPoint)?.estado_hoy || '') && (
-                            <span className="text-[10px] bg-green-500/20 text-green-400 px-2 py-0.5 rounded uppercase font-bold border border-green-500/30">
-                                Abierta
-                            </span>
-                        )}
-                        {['suspension', 'cierre', 'cerrado'].includes(puntos.find(p => p.id === selectedPoint)?.estado_hoy || 'cerrado') && (
-                            <span className="text-[10px] bg-red-500/20 text-red-400 px-2 py-0.5 rounded uppercase font-bold border border-red-500/30">
-                                Cerrada
-                            </span>
-                        )}
-                    </div>
-                )}
+                    );
+                })()}
 
                 {activeTab === 'escala' && selectedPoint && puntos.find(p => p.id === selectedPoint)?.escala_confirmada === false && (
                     <div className="mb-2 bg-amber-500/10 text-amber-500 p-2 rounded-lg border border-amber-500/30 flex items-center gap-2 animate-pulse flex-shrink-0">
@@ -861,12 +933,12 @@ const Capture = () => {
                             </label>
                         </div>
                         <div className="flex bg-slate-800 rounded-lg p-1">
-                            {(['inicio', 'modificacion', 'continua', 'suspension', 'reabierto', 'cierre'] as const).map(estado => {
+                            {(['inicio', 'modificacion', 'suspension', 'reabierto', 'cierre'] as const).map(estado => {
                                 const refPt = puntos.find(p => p.id === selectedPoint);
                                 const ptStatus = refPt?.estado_hoy || 'cerrado';
                                 const isPtOpen = ['inicio', 'reabierto', 'continua', 'modificacion'].includes(ptStatus);
 
-                                const isValidForOpen = ['modificacion', 'continua', 'suspension', 'cierre'].includes(estado);
+                                const isValidForOpen = ['modificacion', 'suspension', 'cierre'].includes(estado);
                                 const isValidForClosed = ['inicio', 'reabierto'].includes(estado);
                                 const isAvailable = selectedPoint
                                     ? (isPtOpen ? isValidForOpen : isValidForClosed)
@@ -886,7 +958,7 @@ const Capture = () => {
                                             }`}
                                         disabled={!isAvailable}
                                     >
-                                        {estado === 'modificacion' ? 'Modif.' : estado === 'continua' ? 'Cont.' : estado}
+                                        {estado === 'modificacion' ? 'Modif.' : estado}
                                     </button>
                                 );
                             })}
@@ -983,30 +1055,17 @@ const Capture = () => {
                         {activeTab === 'escala' && (() => {
                             const pt = puntos.find(p => p.id === selectedPoint);
                             const hArriba = escalaData.arriba / 100;
+                            const hAbajo = escalaData.abajo / 100;
                             const realAps = (escalaData.aperturas || []).map(a => a / 100);
 
-                            let q = 0;
-                            let hasRadialesOpen = false;
-
-                            if (pt?.pzas_radiales && pt?.ancho_radiales && realAps.length > 0) {
-                                const Cd = 0.6;
-                                const hAbajo = escalaData.abajo / 100;
-                                const carga = Math.max(0, hArriba - hAbajo);
-
-                                for (let i = 0; i < pt.pzas_radiales; i++) {
-                                    const ap = realAps[i] || 0;
-                                    if (ap > 0 && carga > 0.01) {
-                                        hasRadialesOpen = true;
-                                        if (ap < hArriba) {
-                                            q += Cd * (pt.ancho_radiales * ap) * Math.sqrt(2 * 9.81 * carga);
-                                        } else {
-                                            q += 1.84 * pt.ancho_radiales * Math.pow(carga, 1.5);
-                                        }
-                                    }
-                                }
-                            } else if (!pt?.pzas_radiales && hArriba > 0) {
-                                q = 1.84 * Math.pow(hArriba, 1.52);
-                            }
+                            const { q_total: q, hasRadialesOpen } = calculateFlow({
+                                hArriba,
+                                hAbajo,
+                                pzasRadiales: pt?.pzas_radiales,
+                                anchoRadial: pt?.ancho_radiales,
+                                altoRadial: pt?.alto_radiales,
+                                aperturas: realAps,
+                            });
 
                             return (
                                 <>

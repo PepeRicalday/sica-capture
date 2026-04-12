@@ -1,6 +1,7 @@
 import { supabase } from './supabase';
 import { db, type SicaAforoRecord } from './db';
 import { getTodayString, getDaysAgoString, getTimezoneOffsetString } from './dateHelpers';
+import { calcVolumeM3 } from './volumeCalculations';
 
 // -- 1. DESCARGA DE CATÁLOGOS (DE SUR A NORTE) --
 // Llama a esto cuando el usuario inicie sesión para tener los catálogos en el teléfono
@@ -8,8 +9,6 @@ export const downloadCatalogs = async (forceCatalog = false) => {
     if (!navigator.onLine) return;
 
     try {
-        console.log('Downloading catalogs (forced:', forceCatalog, ')...');
-        
         const lastSyncStr = localStorage.getItem('sica_last_sync');
         const lastSyncTime = lastSyncStr ? parseInt(lastSyncStr) : 0;
         const lastVersion = localStorage.getItem('sica_app_version');
@@ -23,7 +22,6 @@ export const downloadCatalogs = async (forceCatalog = false) => {
                                 (now - lastSyncTime > 12 * 60 * 60 * 1000);
 
         if (lastVersion !== currentVersion) {
-            console.log('App version changed from', lastVersion, 'to', currentVersion, '. Forcing static fetch.');
             localStorage.setItem('sica_app_version', currentVersion);
         }
 
@@ -89,21 +87,59 @@ export const downloadCatalogs = async (forceCatalog = false) => {
             .order('fecha', { ascending: false })
             .order('hora_apertura', { ascending: false });
 
+        // Registros locales de hoy para recalcular volumen con Q variable (tramo a tramo).
+        // Incluye tanto registros ya sincronizados como pendientes — todos tienen fecha_hora y valor_q reales.
+        const localTodayRecords = await db.records
+            .where('tipo').equals('toma')
+            .filter(r => r.fecha_captura === todayStr)
+            .toArray();
+
+        // Agrupar por punto_id para acceso O(1)
+        const localByPunto = new Map<string, typeof localTodayRecords>();
+        localTodayRecords.forEach(r => {
+            if (!localByPunto.has(r.punto_id)) localByPunto.set(r.punto_id, []);
+            localByPunto.get(r.punto_id)!.push(r);
+        });
+
         const mapReportes = new Map<string, any>();
         if (reportesRecientes) {
             reportesRecientes.forEach((r: any) => {
                 if (!mapReportes.has(r.punto_id)) {
                     const isToday = r.fecha === todayStr;
                     const caudalM3s = Number(r.caudal_promedio || 0);
-                    let volumenM3 = isToday ? Number(r.volumen_acumulado || 0) * 1000000 : 0;
-
                     const isStateOpen = ['inicio', 'continua', 'reabierto', 'modificacion'].includes(r.estado || '');
-                    if ((volumenM3 === 0 || !isToday) && caudalM3s > 0 && r.hora_apertura && isStateOpen) {
-                        let apertura = new Date(r.hora_apertura);
-                        if (!isToday) apertura = new Date(`${todayStr}T00:00:00`);
-                        const ahora = new Date();
-                        const segundosTranscurridos = Math.max(0, (ahora.getTime() - apertura.getTime()) / 1000);
+
+                    let volumenM3 = 0;
+
+                    // P2: Usar registros locales de hoy para integrar Q×Δt por tramos.
+                    // Si el técnico modificó el gasto dos veces en el día, cada tramo
+                    // se calcula con su Q real en vez de usar el último Q para todo el período.
+                    const localEvents = localByPunto.get(r.punto_id) || [];
+                    if (isToday && localEvents.length > 0) {
+                        // Construir eventos con fecha_hora desde fecha_captura + hora_captura
+                        const offsetString = getTimezoneOffsetString();
+                        const eventsForCalc = localEvents
+                            .filter(e => !['cierre', 'suspension'].includes(e.estado_operativo || '') || (e.valor_q || 0) === 0)
+                            .map(e => ({
+                                fecha_hora: `${e.fecha_captura}T${e.hora_captura}${offsetString}`,
+                                valor_q: e.valor_q ?? 0,
+                                estado_evento: e.estado_operativo
+                            }));
+                        volumenM3 = calcVolumeM3(eventsForCalc);
+                    } else if (isStateOpen && caudalM3s > 0 && r.hora_apertura) {
+                        // Fallback: sin registros locales de hoy, estimar desde apertura
+                        // con el último caudal conocido (capeado a 24h)
+                        const apertura = isToday
+                            ? new Date(r.hora_apertura)
+                            : new Date(`${todayStr}T00:00:00`);
+                        const segundosTranscurridos = Math.min(
+                            Math.max(0, (Date.now() - apertura.getTime()) / 1000),
+                            86400
+                        );
                         volumenM3 = caudalM3s * segundosTranscurridos;
+                    } else if (isToday) {
+                        // Reporte de hoy con volumen_acumulado del servidor
+                        volumenM3 = Number(r.volumen_acumulado || 0) * 1000000;
                     }
 
                     mapReportes.set(r.punto_id, {
@@ -134,7 +170,6 @@ export const downloadCatalogs = async (forceCatalog = false) => {
         localDexieEscalas.forEach(p => localEscalasFallback.set(p.id, p));
 
         if (shouldFetchStatic) {
-            console.log('Fetching static catalogs...');
             const { data: e } = await supabase.from('escalas').select('id, nombre, latitud, longitud, km, nivel_min_operativo, nivel_max_operativo, ancho, alto, pzas_radiales').eq('activa', true);
             const { data: t } = await supabase.from('puntos_entrega').select('id, nombre, tipo, seccion_id, km, coords_x, coords_y, capacidad_max_lps, modulos ( codigo_corto, nombre ), secciones ( nombre )');
             const { data: a } = await supabase.from('aforos_control').select('id, nombre_punto, latitud, longitud, foto_url, caracteristicas_hidraulicas');
@@ -147,7 +182,6 @@ export const downloadCatalogs = async (forceCatalog = false) => {
             presas = pr;
             perfiles = pf;
         } else {
-            console.log('Using local static catalogs, merging with dynamic state.');
             // Re-mapear desde Dexie para mezclar con el estado dinámico nuevo
             const localPuntos = await db.puntos.toArray();
             // Separamos por tipo para procesar el merge de forma idéntica
@@ -205,6 +239,13 @@ export const downloadCatalogs = async (forceCatalog = false) => {
                 const modulo = p.modulos?.codigo_corto || p.modulos?.nombre || p.modulo || 'General';
                 const seccion = p.secciones?.nombre || p.secciones?.nombre || p.seccion || 'S/S';
                 
+                // reporte === undefined → punto no apareció en la consulta (puede ser toma antigua o fuera del rango de 3 días).
+                //   En este caso preservamos el estado local de Dexie para no perder una toma activa.
+                // reporte !== undefined pero sin estado → BD dice 'cerrado'.
+                const estadoFinal = reporte !== undefined
+                    ? (reporte.estado || 'cerrado')
+                    : (p.estado_hoy || 'cerrado');
+
                 return {
                     id: p.id,
                     name: p.nombre || p.name,
@@ -213,10 +254,10 @@ export const downloadCatalogs = async (forceCatalog = false) => {
                     seccion,
                     seccion_id: p.seccion_id,
                     km: parseFloat(p.km || 0),
-                    estado_hoy: reporte?.estado || (reporte === undefined ? p.estado_hoy : 'cerrado'),
-                    volumen_hoy_m3: parseFloat(reporte?.volumen_total_m3 || (reporte === undefined ? p.volumen_hoy_m3 : 0)),
+                    estado_hoy: estadoFinal,
+                    volumen_hoy_m3: parseFloat(reporte?.volumen_total_m3 ?? (p.volumen_hoy_m3 ?? 0)),
                     hora_apertura: reporte?.hora_apertura || p.hora_apertura,
-                    caudal_promedio: parseFloat(reporte?.caudal_promedio_m3s || (reporte === undefined ? p.caudal_promedio : 0)),
+                    caudal_promedio: parseFloat(reporte?.caudal_promedio_m3s ?? (p.caudal_promedio ?? 0)),
                     capacidad_max_lps: p.capacidad_max_lps ? Number(p.capacidad_max_lps) : undefined,
                     lat: p.coords_y || p.lat || 0,
                     lng: p.coords_x || p.lng || 0
@@ -257,12 +298,161 @@ export const downloadCatalogs = async (forceCatalog = false) => {
         }
 
         if (shouldFetchStatic) localStorage.setItem('sica_last_sync', now.toString());
-        console.log('Sync complete. Static fetched:', shouldFetchStatic);
     } catch (error) {
         console.error('Failed to download catalogs:', error);
         throw error;
     }
 };
+
+// -- 2A. AUTO-CONTINUIDAD (Generación automática de registros de tomas activas) --
+// Para cada toma abierta, genera registros 'continua' para TODOS los días sin
+// cobertura desde la última captura hasta hoy (backfill). Garantiza continuidad
+// hídrica en reportes de consumo aunque el técnico no toque la toma días consecutivos.
+//
+// Cadena de continuidad:
+//   Día 1: inicio  50 L/s  (técnico)
+//   Día 2: continua 50 L/s (auto)
+//   Día 3: continua 50 L/s (auto)
+//   Día 4: modificacion 60 L/s (técnico)
+//   Día 5: continua 60 L/s (auto)  ← hereda el último gasto conocido
+//   ...hasta cierre
+
+// Lock para evitar race condition si syncPendingRecords() se llama concurrentemente
+// (evento 'online' + post-save simultáneos)
+let _autoGenerateLock: Promise<number> | null = null;
+
+export const autoGenerateContinua = async (userId?: string, userName?: string): Promise<number> => {
+    // Si ya hay una ejecución en curso, esperar su resultado en vez de ejecutar en paralelo
+    if (_autoGenerateLock) return _autoGenerateLock;
+
+    _autoGenerateLock = (async () => {
+        try {
+            const today = getTodayString();
+            const now = new Date();
+            const horaHoy = now.toTimeString().slice(0, 8);
+
+            // Tomas y laterales con estado abierto y caudal válido
+            const allPuntos = await db.puntos.toArray();
+            const openTomas = allPuntos.filter(p =>
+                p.type !== 'escala' && p.type !== 'aforo' && p.type !== 'presa' &&
+                ['inicio', 'continua', 'reabierto', 'modificacion'].includes(p.estado_hoy || '') &&
+                Number(p.caudal_promedio || 0) > 0
+            );
+            if (openTomas.length === 0) return 0;
+
+            const continuas: any[] = [];
+
+            for (const pt of openTomas) {
+                // Obtener registros locales de esta toma (sincronizados y pendientes)
+                const existing = await db.records
+                    .where('punto_id').equals(pt.id)
+                    .filter(r => r.tipo === 'toma')
+                    .toArray();
+
+                const existingDates = new Set(existing.map(r => r.fecha_captura));
+
+                // Inicio del backfill: día siguiente al registro más reciente.
+                // Si hora_apertura es ISO timestamp de días atrás, parse solo la fecha
+                // para evitar generar cientos de registros históricos incorrectos.
+                // Cap máximo: 60 días hacia atrás.
+                let startDate = today;
+                if (existing.length > 0) {
+                    const maxDate = existing.reduce(
+                        (max, r) => (r.fecha_captura > max ? r.fecha_captura : max), ''
+                    );
+                    const d = new Date(maxDate + 'T12:00:00');
+                    d.setDate(d.getDate() + 1);
+                    startDate = d.toISOString().split('T')[0];
+                } else if (pt.hora_apertura) {
+                    // Extraer solo la parte de fecha del ISO timestamp (evita offset timezone)
+                    const aperturaDate = pt.hora_apertura.split('T')[0];
+                    const d = new Date(aperturaDate + 'T12:00:00');
+                    d.setDate(d.getDate() + 1);
+                    startDate = d.toISOString().split('T')[0];
+                }
+
+                // Cap: no generar más de 60 días de backfill por toma
+                const capDate = new Date(today + 'T12:00:00');
+                capDate.setDate(capDate.getDate() - 60);
+                const capDateStr = capDate.toISOString().split('T')[0];
+                if (startDate < capDateStr) startDate = capDateStr;
+
+                // Generar un registro por cada día faltante (startDate → hoy)
+                const cursor = new Date(startDate + 'T12:00:00');
+                const todayDate = new Date(today + 'T12:00:00');
+
+                while (cursor <= todayDate) {
+                    const dateStr = cursor.toISOString().split('T')[0];
+                    if (!existingDates.has(dateStr)) {
+                        continuas.push({
+                            id: crypto.randomUUID(),
+                            tipo: 'toma' as const,
+                            punto_id: pt.id,
+                            valor_q: Number(pt.caudal_promedio), // m³/s
+                            estado_operativo: 'continua' as const,
+                            fecha_captura: dateStr,
+                            hora_captura: dateStr === today ? horaHoy : '23:59:00',
+                            sincronizado: 'false' as const,
+                            responsable_id: userId,
+                            responsable_nombre: userName || 'Sistema',
+                            notas: '[AUTO] Continuidad sin modificación'
+                        });
+                    }
+                    cursor.setDate(cursor.getDate() + 1);
+                }
+            }
+
+            if (continuas.length > 0) {
+                // Transacción para garantizar atomicidad — si falla, no quedan registros parciales
+                await db.transaction('rw', [db.records], async () => {
+                    await db.records.bulkAdd(continuas);
+                });
+            }
+            return continuas.length;
+        } finally {
+            _autoGenerateLock = null;
+        }
+    })();
+
+    return _autoGenerateLock;
+};
+
+// -- CLASIFICACIÓN DE ERRORES DE SYNC --
+// Distingue errores transitorios (red, timeout) de estructurales (constraints, FK).
+// Los transitorios se reintentan siempre. Los estructurales se descartan tras MAX_RETRIES.
+
+const MAX_RETRIES_STRUCTURAL = 5; // Intentos máximos para errores estructurales
+const CHRONIC_HOURS = 24;         // Horas sin sync exitoso para considerar "crónico"
+
+const STRUCTURAL_ERROR_PATTERNS = [
+    'violates foreign key',
+    'violates check constraint',
+    'violates not-null constraint',
+    'duplicate key value',
+    'invalid input syntax',
+    'value too long',
+    'permission denied',
+    'row-level security',
+    'new row violates',
+    'ESTRUCTURAL',
+];
+
+function isStructuralError(msg: string): boolean {
+    const lower = msg.toLowerCase();
+    return STRUCTURAL_ERROR_PATTERNS.some(p => lower.includes(p.toLowerCase()));
+}
+
+function isChronicError(record: { error_sync?: string; retry_count?: number; first_failed_at?: string }): boolean {
+    if (!record.error_sync) return false;
+    // Crónico si: es estructural Y lleva más de CHRONIC_HOURS o más de MAX_RETRIES intentos
+    const retries = record.retry_count ?? 0;
+    if (retries >= MAX_RETRIES_STRUCTURAL) return true;
+    if (record.first_failed_at) {
+        const hours = (Date.now() - new Date(record.first_failed_at).getTime()) / 3_600_000;
+        if (hours >= CHRONIC_HOURS && isStructuralError(record.error_sync)) return true;
+    }
+    return false;
+}
 
 // -- 2. SUBIDA DE REGISTROS (DE NORTE A SUR) --
 // Llama a esto cuando vuelva la conexión (Listener)
@@ -270,20 +460,36 @@ export const syncPendingRecords = async () => {
     if (!navigator.onLine) return;
 
     try {
-        // Verificar sesión activa antes de sincronizar — sesión expirada = anon = RLS falla
+        // Verificar sesión activa antes de sincronizar — sin sesión, esperar re-login
         const { data: { session } } = await supabase.auth.getSession();
-        if (!session) {
-            console.warn('syncPendingRecords: sesión expirada, no se puede sincronizar');
-            await db.records.where({ sincronizado: 'false' }).modify({
-                error_sync: 'Sesión expirada — vuelve a iniciar sesión para sincronizar'
+        if (!session) return;
+
+        // Generar registros de continuidad automática antes de subir
+        await autoGenerateContinua(session.user.id, session.user.email ?? undefined);
+
+        const allPending = await db.records.where({ sincronizado: 'false' }).toArray();
+        if (allPending.length === 0) return;
+
+        // Separar registros reintenables de crónicos (errores estructurales sin solución automática)
+        const chronicIds: string[] = [];
+        const pending = allPending.filter(r => {
+            if (isChronicError(r)) {
+                chronicIds.push(r.id);
+                return false;
+            }
+            return true;
+        });
+
+        // Marcar crónicos con prefijo para que PendingRecordsModal los destaque
+        if (chronicIds.length > 0) {
+            await db.records.where('id').anyOf(chronicIds).modify(r => {
+                if (r.error_sync && !r.error_sync.startsWith('[CRÓNICO]')) {
+                    r.error_sync = `[CRÓNICO] ${r.error_sync}`;
+                }
             });
-            return;
         }
 
-        const pending = await db.records.where({ sincronizado: 'false' }).toArray();
         if (pending.length === 0) return;
-
-        console.log(`Syncing ${pending.length} records...`);
 
         // 1. Escalas (van a lecturas_escalas)
         const escalasPending = pending.filter(p => p.tipo === 'escala');
@@ -309,8 +515,12 @@ export const syncPendingRecords = async () => {
             const { error: err } = await supabase.from('lecturas_escalas').upsert(escalasPayload, { onConflict: 'escala_id,fecha,turno' });
             if (err) {
                 console.error('Error insertando escalas:', err.message);
-                // Tag individual local records with error
-                await db.records.where('id').anyOf(escalasPending.map(p => p.id)).modify({ error_sync: err.message });
+                const now = new Date().toISOString();
+                await db.records.where('id').anyOf(escalasPending.map(p => p.id)).modify(r => {
+                    r.error_sync = err.message;
+                    r.retry_count = (r.retry_count ?? 0) + 1;
+                    if (!r.first_failed_at) r.first_failed_at = now;
+                });
             } else {
                 syncSuccessIds.push(...escalasPending.map(p => p.id as string));
             }
@@ -346,7 +556,12 @@ export const syncPendingRecords = async () => {
             const { error: err } = await supabase.from('mediciones').upsert(tomasPayload, { onConflict: 'id' });
             if (err) {
                 console.error('Error insertando tomas:', err.message);
-                await db.records.where('id').anyOf(tomasPending.map(p => p.id)).modify({ error_sync: err.message });
+                const now = new Date().toISOString();
+                await db.records.where('id').anyOf(tomasPending.map(p => p.id)).modify(r => {
+                    r.error_sync = err.message;
+                    r.retry_count = (r.retry_count ?? 0) + 1;
+                    if (!r.first_failed_at) r.first_failed_at = now;
+                });
             } else {
                 syncSuccessIds.push(...tomasPending.map(p => p.id as string));
             }
@@ -381,7 +596,12 @@ export const syncPendingRecords = async () => {
             const { error: err } = await supabase.from('aforos').upsert(aforosPayload, { onConflict: 'id' });
             if (err) {
                 console.error('Error insertando aforos:', err.message);
-                await db.records.where('id').anyOf(aforosPending.map(p => p.id)).modify({ error_sync: err.message });
+                const now = new Date().toISOString();
+                await db.records.where('id').anyOf(aforosPending.map(p => p.id)).modify(r => {
+                    r.error_sync = err.message;
+                    r.retry_count = (r.retry_count ?? 0) + 1;
+                    if (!r.first_failed_at) r.first_failed_at = now;
+                });
             } else {
                 syncSuccessIds.push(...aforosPending.map(p => p.id));
             }
@@ -401,7 +621,12 @@ export const syncPendingRecords = async () => {
             const { error: err } = await supabase.from('movimientos_presas').upsert(presasPayload, { onConflict: 'id' });
             if (err) {
                 console.error('Error insertando movimientos_presas:', err.message);
-                await db.records.where('id').anyOf(presasPending.map(p => p.id)).modify({ error_sync: err.message });
+                const now = new Date().toISOString();
+                await db.records.where('id').anyOf(presasPending.map(p => p.id)).modify(r => {
+                    r.error_sync = err.message;
+                    r.retry_count = (r.retry_count ?? 0) + 1;
+                    if (!r.first_failed_at) r.first_failed_at = now;
+                });
             } else {
                 syncSuccessIds.push(...presasPending.map(p => p.id as string));
             }
@@ -410,9 +635,6 @@ export const syncPendingRecords = async () => {
         // Marcar como sincronizados solo los registros exitosos
         if (syncSuccessIds.length > 0) {
             await db.records.where('id').anyOf(syncSuccessIds).modify({ sincronizado: 'true', error_sync: undefined });
-            console.log(`Sync complete. Successfully synced ${syncSuccessIds.length}/${pending.length} records.`);
-        } else {
-            console.log('Sync attempted but no records were successfully transmitted.');
         }
 
         // Refrescar catálogo SIEMPRE después del intento (con o sin éxito):

@@ -83,7 +83,6 @@ function AppContent() {
     if (currentId !== lastSessionId.current) {
       lastSessionId.current = currentId;
       if (currentId) {
-        console.log('[SICA] Sesión establecida. Sincronizando catálogos...');
         downloadCatalogs(true);
       }
     }
@@ -104,7 +103,6 @@ function AppContent() {
       navigator.serviceWorker.addEventListener('controllerchange', () => {
         if (refreshing) return;
         refreshing = true;
-        console.log('[SICA PWA] Nuevo Service Worker activo. Recargando...');
         window.location.reload();
       });
     }
@@ -119,7 +117,6 @@ function AppContent() {
     // C-4: Realtime — refresh catalogs when another operator syncs measurements
     const channel = supabase.channel('capture_realtime')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'mediciones' }, () => {
-        console.log('📡 Medición detectada. Refrescando catálogos...');
         downloadCatalogs();
       })
       .subscribe();
@@ -127,7 +124,6 @@ function AppContent() {
     // C-5: Refresh when app returns to foreground (critical for mobile PWA)
     const handleVisibility = () => {
       if (document.visibilityState === 'visible') {
-        console.log('👁️ App visible. Sincronizando...');
         syncPendingRecords();
         downloadCatalogs();
       }

@@ -6,6 +6,7 @@ import type { OfflinePoint, SicaRecord } from '../lib/db';
 import clsx from 'clsx';
 import { formatCaudalLps } from '../lib/formatters';
 import { useAuth } from '../context/AuthContext';
+import { calcVolumeM3 } from '../lib/volumeCalculations';
 
 interface TomaHistoryModalProps {
     isOpen: boolean;
@@ -53,30 +54,6 @@ function compressEvents(events: any[]): any[] {
     return out;
 }
 
-/**
- * Calcula el volumen total acumulado (m³) usando Q × Δt sobre eventos ordenados.
- * Si el ciclo sigue abierto usa `now` como fin.
- */
-function calcVolumeM3(events: any[]): number {
-    if (events.length === 0) return 0;
-    const sorted = [...events].sort(
-        (a, b) => new Date(a.fecha_hora).getTime() - new Date(b.fecha_hora).getTime()
-    );
-    const lastEv = sorted[sorted.length - 1];
-    const isOpen = lastEv.estado_evento !== 'cierre' && lastEv.estado_evento !== 'suspension';
-    const endMs = isOpen ? Date.now() : new Date(lastEv.fecha_hora).getTime();
-
-    let vol = 0;
-    for (let i = 0; i < sorted.length; i++) {
-        const q = Number(sorted[i].valor_q) || 0;
-        if (q <= 0) continue;
-        const t0 = new Date(sorted[i].fecha_hora).getTime();
-        const t1 = i + 1 < sorted.length ? new Date(sorted[i + 1].fecha_hora).getTime() : endMs;
-        const dtSec = Math.max(0, (t1 - t0) / 1000);
-        vol += q * dtSec; // m³
-    }
-    return vol;
-}
 
 // ── Component ─────────────────────────────────────────────────────────────────
 

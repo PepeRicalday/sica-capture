@@ -60,8 +60,10 @@ export interface SicaRecord {
     fecha_captura: string; // ISO string o date string
     hora_captura: string;
     sincronizado: 'true' | 'false'; // IndexedDB booleans workaround
-    error_sync?: string; // Nuevo: Para rastrear por qué falló la subida (Ej. RLS, Validación)
-    notas?: string; // Nuevo: Observaciones o metadata (como GPS para confirmaciones de arribo)
+    error_sync?: string;       // Por qué falló la subida (Ej. RLS, Validación)
+    retry_count?: number;      // Intentos fallidos acumulados
+    first_failed_at?: string;  // ISO timestamp del primer fallo (para detectar errores crónicos)
+    notas?: string;            // Observaciones o metadata (como GPS para confirmaciones de arribo)
 
     // Nuevas métricas para Reporte de Escalas (Represos)
     gasto_calculado_m3s?: number;

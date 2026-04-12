@@ -69,16 +69,27 @@ export const AforoForm = ({ selectedPoint, isOnline, onSaveSuccess, editRecord, 
             // Pre-fill from catalog if characteristics exist
             db.puntos.get(selectedPoint).then(async pt => {
                 if (pt) {
-                    // Try to fetch channel profile from Supabase using KM
+                    // Try to fetch channel profile — local Dexie first, then Supabase if online
                     if (pt.km !== undefined) {
                         setIsLoadingProfile(true);
-                        const { data, error } = await supabase.rpc('get_perfil_hidraulico', { p_km: pt.km });
-                        if (!error && data && data.length > 0) {
-                            const profile = data[0];
-                            setChannelProfile(profile);
-                            setPlantilla(profile.plantilla_m);
-                            setTalud(profile.talud_z);
-                            toast.success(`Datos de diseño cargados de Perfil Hidráulico (KM ${pt.km})`);
+                        const localProfiles = await db.perfil_hidraulico.toArray();
+                        const localSection = localProfiles.find(
+                            p => pt.km! >= p.km_inicio && pt.km! <= p.km_fin
+                        );
+                        if (localSection) {
+                            setChannelProfile(localSection);
+                            setPlantilla(localSection.plantilla_m);
+                            setTalud(localSection.talud_z);
+                            toast.success(`Perfil Hidráulico KM ${pt.km} cargado offline`);
+                        } else if (navigator.onLine) {
+                            const { data, error } = await supabase.rpc('get_perfil_hidraulico', { p_km: pt.km });
+                            if (!error && data && data.length > 0) {
+                                const profile = data[0];
+                                setChannelProfile(profile);
+                                setPlantilla(profile.plantilla_m);
+                                setTalud(profile.talud_z);
+                                toast.success(`Datos de diseño cargados de Perfil Hidráulico (KM ${pt.km})`);
+                            }
                         }
                         setIsLoadingProfile(false);
                     }
