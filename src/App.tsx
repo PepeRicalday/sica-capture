@@ -1,11 +1,13 @@
 
-import { useEffect, useRef } from 'react';
+import { lazy, Suspense, useEffect, useRef } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import Layout from './components/Layout';
-import Capture from './pages/Capture';
-import Monitor from './pages/Monitor';
-import Hidrometria from './pages/Hidrometria';
+import Capture from './pages/Capture';  // estático — ruta operativa principal
 import Login from './pages/Login';
+
+// Lazy: páginas secundarias — se descargan solo cuando el operador las navega
+const Monitor    = lazy(() => import('./pages/Monitor'));
+const Hidrometria = lazy(() => import('./pages/Hidrometria'));
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { downloadCatalogs, syncPendingRecords } from './lib/sync';
 import { supabase } from './lib/supabase';
@@ -137,11 +139,25 @@ function AppContent() {
     };
   }, []);
 
+  const LazyFallback = (
+    <div className="flex items-center justify-center h-screen bg-mobile-dark text-mobile-accent">
+      <div className="animate-pulse font-bold text-sm uppercase tracking-widest">Cargando...</div>
+    </div>
+  );
+
   return (
     <Routes>
       <Route path="/login" element={<Login />} />
-      <Route path="/monitor" element={<ProtectedRoute><Monitor /></ProtectedRoute>} />
-      <Route path="/hidrometria" element={<ProtectedRoute><Hidrometria /></ProtectedRoute>} />
+      <Route path="/monitor" element={
+        <ProtectedRoute>
+          <Suspense fallback={LazyFallback}><Monitor /></Suspense>
+        </ProtectedRoute>
+      } />
+      <Route path="/hidrometria" element={
+        <ProtectedRoute>
+          <Suspense fallback={LazyFallback}><Hidrometria /></Suspense>
+        </ProtectedRoute>
+      } />
       <Route path="/captura" element={<ProtectedRoute><Capture /></ProtectedRoute>} />
       <Route path="/nuke" element={<NukePage />} />
       <Route path="/" element={<Navigate to="/monitor" replace />} />

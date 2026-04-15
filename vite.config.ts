@@ -31,6 +31,7 @@ export default defineConfig({
         ]
       },
       workbox: {
+        // woff2 únicamente — los navegadores modernos no necesitan woff legacy
         globPatterns: ['**/*.{js,css,html,png,svg,woff2}'],
         maximumFileSizeToCacheInBytes: 10 * 1024 * 1024,
         // CRÍTICO: skipWaiting fuerza al nuevo SW a tomar el control inmediatamente
@@ -46,6 +47,17 @@ export default defineConfig({
     })
   ],
   build: {
-    chunkSizeWarningLimit: 1000
+    chunkSizeWarningLimit: 600,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          // Vendors pesados — cargados solo cuando la ruta los necesita
+          'vendor-supabase': ['@supabase/supabase-js'],
+          'vendor-leaflet':  ['leaflet', 'react-leaflet'],
+          'vendor-recharts': ['recharts'],
+          'vendor-dexie':    ['dexie', 'dexie-react-hooks'],
+        },
+      },
+    },
   }
 })
