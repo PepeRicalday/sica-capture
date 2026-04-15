@@ -6,7 +6,7 @@ import {
 import { db, type SicaRecord, type SicaAforoRecord } from '../lib/db';
 import { syncPendingRecords, downloadCatalogs } from '../lib/sync';
 import { getTodayString } from '../lib/dateHelpers';
-import { calculateFlow, validateGateAperture } from '../lib/hydraulicCalculations';
+import { calculateFlow, validateGateAperture, getFactorCorreccion } from '../lib/hydraulicCalculations';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useAuth } from '../context/AuthContext';
 import { toast } from 'sonner';
@@ -376,6 +376,7 @@ const Capture = () => {
                     anchoRadial: pt?.ancho_radiales,
                     altoRadial: maxAltoCompuerta,
                     aperturas: aperturas_m,
+                    factorCorreccion: getFactorCorreccion(pt?.name, pt?.km),
                 });
 
                 payload.punto_id = selectedPoint;
@@ -1065,6 +1066,7 @@ const Capture = () => {
                                 anchoRadial: pt?.ancho_radiales,
                                 altoRadial: pt?.alto_radiales,
                                 aperturas: realAps,
+                                factorCorreccion: getFactorCorreccion(pt?.name, pt?.km),
                             });
 
                             return (
