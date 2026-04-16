@@ -993,6 +993,14 @@ const Capture = () => {
                                 setEditingAforo(undefined);
                                 setActiveTab('escala');
                             }}
+                            onPointDetected={(puntoId, _nombre) => {
+                                // Seleccionar automáticamente el punto detectado en la imagen
+                                setSelectedPoints(prev => ({ ...prev, aforo: puntoId }));
+                            }}
+                            onDateDetected={(fecha) => {
+                                // Ajustar la fecha de captura al día señalado en el formato
+                                setManualDate(fecha);
+                            }}
                         />
                     </div>
                 )}

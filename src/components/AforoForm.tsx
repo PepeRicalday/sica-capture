@@ -17,9 +17,12 @@ interface AforoFormProps {
     editRecord?: SicaAforoRecord;
     manualDate?: string;
     manualTime?: string;
+    // Callbacks para que la imagen extraída actualice punto y fecha en Capture.tsx
+    onPointDetected?: (puntoId: string, nombreDetectado: string) => void;
+    onDateDetected?:  (fecha: string) => void;
 }
 
-export const AforoForm = ({ selectedPoint, isOnline, onSaveSuccess, editRecord, manualDate, manualTime }: AforoFormProps) => {
+export const AforoForm = ({ selectedPoint, isOnline, onSaveSuccess, editRecord, manualDate, manualTime, onPointDetected, onDateDetected }: AforoFormProps) => {
     const { profile } = useAuth();
 
     // 1. Estados Simples Genéricos de Aforo
@@ -106,39 +109,115 @@ export const AforoForm = ({ selectedPoint, isOnline, onSaveSuccess, editRecord, 
     }, [editRecord, selectedPoint]);
 
     // Handler: pre-llenar formulario desde datos extraídos de imagen
-    const handleImageExtracted = (data: AforoExtraido) => {
+    const handleImageExtracted = async (data: AforoExtraido) => {
+        // ── 1. ENCABEZADO ────────────────────────────────────────────────────
         if (data.hora_inicio) setHoraInicial(data.hora_inicio);
-        if (data.hora_fin) setHoraFinal(data.hora_fin);
+        if (data.hora_fin)    setHoraFinal(data.hora_fin);
         if (data.escala_inicial != null) setEscalaInicial(data.escala_inicial);
-        if (data.escala_final != null) setEscalaFinal(data.escala_final);
-        if (data.espejo_m != null) setEspejo(data.espejo_m);
+        if (data.escala_final   != null) setEscalaFinal(data.escala_final);
+
+        // ── 2. GEOMETRÍA DE SECCIÓN ───────────────────────────────────────────
+        if (data.espejo_m    != null) setEspejo(data.espejo_m);
         if (data.plantilla_m != null) setPlantilla(data.plantilla_m);
-        if (data.tirante_m != null) setTirante(data.tirante_m);
-        if (data.molinete_modelo) setMolineteModelo(data.molinete_modelo);
-        if (data.molinete_serie) setMolineteSerie(data.molinete_serie);
+        if (data.tirante_m   != null) setTirante(data.tirante_m);
+
+        // ── 3. MOLINETE ───────────────────────────────────────────────────────
+        if (data.molinete_modelo)  setMolineteModelo(data.molinete_modelo);
+        if (data.molinete_numero)  setMolineteSerie(data.molinete_numero);   // reutiliza campo serie para número
+        else if (data.molinete_serie) setMolineteSerie(data.molinete_serie);
         if (data.aforador) setAforador(data.aforador);
 
+        // ── 4. FECHA DETECTADA → notificar Capture.tsx ────────────────────────
+        if (data.fecha && onDateDetected) {
+            onDateDetected(data.fecha);
+            toast.info(`Fecha detectada: ${data.fecha}`);
+        }
+
+        // ── 5. PUNTO DETECTADO → buscar en catálogo por km ───────────────────
+        if (data.punto_control && onPointDetected) {
+            // Parsear "K 1+000" → km 1.000, "K 79+025" → km 79.025
+            const parseKm = (texto: string): number | null => {
+                const m = texto.replace(/\s/g, '').toUpperCase().match(/K(\d+)\+(\d+)/);
+                if (!m) return null;
+                return parseInt(m[1]) + parseInt(m[2]) / 1000;
+            };
+            const kmDetectado = parseKm(data.punto_control);
+
+            try {
+                const todosPuntos = await db.puntos.toArray();
+                let mejorPunto: typeof todosPuntos[0] | undefined;
+                let mejorDist = 0.6;  // tolerancia máxima ±0.6 km
+
+                for (const p of todosPuntos) {
+                    if (p.km == null) continue;
+                    const dist = Math.abs(p.km - (kmDetectado ?? -9999));
+                    if (dist < mejorDist) { mejorDist = dist; mejorPunto = p; }
+                }
+
+                // Fallback: coincidencia por nombre si no hay match por km
+                if (!mejorPunto) {
+                    const norm = (s: string) => s.replace(/\s/g, '').toUpperCase();
+                    mejorPunto = todosPuntos.find(p =>
+                        norm(p.name || '').includes(norm(data.punto_control!)) ||
+                        norm(data.punto_control!).includes(norm(p.name || ''))
+                    );
+                }
+
+                if (mejorPunto) {
+                    onPointDetected(mejorPunto.id, data.punto_control);
+                    toast.success(`Punto detectado: ${data.punto_control} → ${mejorPunto.name}`);
+                } else {
+                    toast.warning(`Punto "${data.punto_control}" no encontrado en catálogo — selecciona manualmente`);
+                }
+            } catch {
+                toast.info(`Estación detectada: ${data.punto_control} — selecciona el punto manualmente`);
+            }
+        }
+
+        // ── 6. DOBELAS → nueva estructura con trazabilidad completa ──────────
         if (data.dobelas && data.dobelas.length > 0) {
-            const convertidas: AforoDobela[] = data.dobelas.map(d => ({
-                base_m: d.base_m || 0,
-                tirante_m: d.tirante_m || 0,
-                velocidades_revoluciones: [
-                    d.revoluciones || 0,
-                    d.revoluciones || 0,
-                    d.revoluciones || 0
-                ],
-                velocidades_segundos: (d.lecturas || [])
-                    .slice(0, 3)
-                    .map(l => l.tiempo_s || 0)
-            }));
+            const coef = data.coef_molinete ?? 0.70;
+            const convertidas: AforoDobela[] = data.dobelas.map(d => {
+                const nRev = d.n_revoluciones ?? 0;
+
+                // Mapear lecturas al nuevo formato AforoLectura
+                const lecturas = (d.lecturas ?? []).slice(0, 3).map(l => ({
+                    lectura_raw:   l.lectura_raw ?? String(l.tiempo_s ?? 0),
+                    tiempo_s:      l.tiempo_s ?? 0,
+                    tiempo_s_alt:  l.tiempo_s_alt ?? null,
+                    velocidad_ms:  l.velocidad_ms ?? (
+                        l.tiempo_s > 0 ? +(coef * nRev / l.tiempo_s).toFixed(4) : 0
+                    ),
+                }));
+
+                // Velocidad media de la dobela
+                const velMedia = d.velocidad_media_ms ??
+                    (lecturas.length > 0
+                        ? +(lecturas.reduce((s, l) => s + l.velocidad_ms, 0) / lecturas.length).toFixed(4)
+                        : 0);
+
+                const area = d.area_m2 ?? +(d.base_m * d.tirante_m).toFixed(4);
+                const gasto = d.gasto_m3s ?? +(area * velMedia).toFixed(4);
+
+                return {
+                    base_m:    d.base_m || 0,
+                    tirante_m: d.tirante_m || 0,
+                    // Nueva estructura
+                    n_revoluciones:     nRev,
+                    lecturas,
+                    area_m2:            area,
+                    velocidad_media_ms: velMedia,
+                    gasto_m3s:          gasto,
+                    // Legacy — para compatibilidad con cálculo existente
+                    velocidades_revoluciones: lecturas.map(() => nRev),
+                    velocidades_segundos:     lecturas.map(l => l.tiempo_s),
+                };
+            });
+
             setDobelas(convertidas);
             setNumDobelasInput(convertidas.length);
             setActiveDobelaIdx(0);
-            toast.info(`${convertidas.length} dobelas importadas desde imagen`);
-        }
-
-        if (data.punto_control) {
-            toast.info(`Estación detectada: ${data.punto_control} — selecciona el punto manualmente`);
+            toast.success(`${convertidas.length} dobelas importadas — Q total estimado: ${data.gasto_total_m3s?.toFixed(3) ?? '—'} m³/s`);
         }
     };
 
@@ -202,8 +281,10 @@ export const AforoForm = ({ selectedPoint, isOnline, onSaveSuccess, editRecord, 
             let lecturasValidas = 0;
 
             for (let i = 0; i < 3; i++) {
-                if (d.velocidades_segundos[i] > 0) {
-                    const n = d.velocidades_revoluciones[i] / d.velocidades_segundos[i];
+                const segs = (d.velocidades_segundos ?? [])[i];
+                const revs = (d.velocidades_revoluciones ?? [])[i];
+                if (segs != null && segs > 0 && revs != null) {
+                    const n = revs / segs;
                     const v = (MOLINETE_A * n) + MOLINETE_B;
                     sumaVelocidades += v;
                     lecturasValidas++;
@@ -258,8 +339,8 @@ export const AforoForm = ({ selectedPoint, isOnline, onSaveSuccess, editRecord, 
 
     const updateMolinete = (index: number, lecIndex: number, rev: number, seg: number) => {
         const newDobelas = [...dobelas];
-        const newRevs = [...newDobelas[index].velocidades_revoluciones];
-        const newSegs = [...newDobelas[index].velocidades_segundos];
+        const newRevs = [...(newDobelas[index].velocidades_revoluciones ?? [])];
+        const newSegs = [...(newDobelas[index].velocidades_segundos ?? [])];
 
         newRevs[lecIndex] = isNaN(rev) ? 0 : rev;
         newSegs[lecIndex] = isNaN(seg) ? 0 : seg;
@@ -600,16 +681,16 @@ export const AforoForm = ({ selectedPoint, isOnline, onSaveSuccess, editRecord, 
                                         <div className="relative">
                                             <input
                                                 type="number" title="Revoluciones" placeholder="Rev"
-                                                value={dobelas[activeDobelaIdx].velocidades_revoluciones[lecIdx] || ''}
-                                                onChange={e => updateMolinete(activeDobelaIdx, lecIdx, parseFloat(e.target.value), dobelas[activeDobelaIdx].velocidades_segundos[lecIdx])}
+                                                value={(dobelas[activeDobelaIdx].velocidades_revoluciones ?? [])[lecIdx] || ''}
+                                                onChange={e => updateMolinete(activeDobelaIdx, lecIdx, parseFloat(e.target.value), (dobelas[activeDobelaIdx].velocidades_segundos ?? [])[lecIdx])}
                                                 className="w-full bg-slate-950 border border-slate-800 text-sm text-indigo-300 font-mono rounded px-1.5 py-1 text-center focus:border-indigo-500 outline-none"
                                             />
                                         </div>
                                         <div className="relative">
                                             <input
                                                 type="number" title="Segundos" placeholder="Seg"
-                                                value={dobelas[activeDobelaIdx].velocidades_segundos[lecIdx] || ''}
-                                                onChange={e => updateMolinete(activeDobelaIdx, lecIdx, dobelas[activeDobelaIdx].velocidades_revoluciones[lecIdx], parseFloat(e.target.value))}
+                                                value={(dobelas[activeDobelaIdx].velocidades_segundos ?? [])[lecIdx] || ''}
+                                                onChange={e => updateMolinete(activeDobelaIdx, lecIdx, (dobelas[activeDobelaIdx].velocidades_revoluciones ?? [])[lecIdx], parseFloat(e.target.value))}
                                                 className="w-full bg-slate-950 border border-slate-800 text-sm text-blue-300 font-mono rounded px-1.5 py-1 text-center focus:border-blue-500 outline-none"
                                             />
                                         </div>

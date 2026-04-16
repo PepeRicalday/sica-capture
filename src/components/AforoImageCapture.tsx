@@ -4,26 +4,45 @@ import { toast } from 'sonner';
 import { supabase } from '../lib/supabase';
 
 export interface AforoExtraido {
-    punto_control?: string;
-    fecha?: string;
-    hora_inicio?: string;
-    hora_fin?: string;
-    escala_inicial?: number;
-    escala_final?: number;
-    molinete_modelo?: string;
-    molinete_serie?: string;
-    aforador?: string;
-    tirante_m?: number;
-    plantilla_m?: number;
-    espejo_m?: number;
-    area_total_m2?: number;
-    gasto_total_m3s?: number;
-    velocidad_media_ms?: number;
+    // Encabezado
+    punto_control?:       string;   // "K 1+000" — se mapea a punto_id del catálogo
+    fecha?:               string;   // "YYYY-MM-DD"
+    hora_inicio?:         string;
+    hora_fin?:            string;
+    escala_inicial?:      number;
+    escala_final?:        number;
+    // Molinete
+    molinete_modelo?:     string;
+    molinete_numero?:     string;   // Número de serie completo: "73201"
+    molinete_serie?:      string;   // Legacy
+    aforador?:            string;
+    coef_molinete?:       number;   // k en V = k×(N/t) — típicamente 0.70
+    // Geometría de sección
+    tirante_m?:           number;
+    plantilla_m?:         number;
+    espejo_m?:            number;
+    profundidad_total_m?: number;
+    borde_libre_m?:       number;
+    // Totales
+    area_total_m2?:       number;
+    gasto_total_m3s?:     number;
+    velocidad_promedio_ms?: number;
+    velocidad_media_ms?:  number;   // Legacy alias
+    // Dobelas con trazabilidad completa
     dobelas?: Array<{
-        base_m: number;
-        tirante_m: number;
-        revoluciones: number;
-        lecturas: Array<{ tiempo_s: number }>;
+        numero:           number;
+        base_m:           number;
+        tirante_m:        number;
+        n_revoluciones:   number;
+        area_m2?:         number;
+        velocidad_media_ms?: number;
+        gasto_m3s?:       number;
+        lecturas: Array<{
+            lectura_raw:   string;   // "46/40", "45", "44" — texto exacto del campo
+            tiempo_s:      number;
+            tiempo_s_alt?: number | null;
+            velocidad_ms:  number;
+        }>;
     }>;
 }
 

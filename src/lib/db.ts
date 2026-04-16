@@ -70,11 +70,28 @@ export interface SicaRecord {
     radiales_json?: any[]; // Arreglo detallado de cada compuerta radial
 }
 
+/** Lectura individual de molinete dentro de una dobela */
+export interface AforoLectura {
+    lectura_raw:   string;          // Texto exacto del campo: "46/40", "45", "44"
+    tiempo_s:      number;          // Segundos usados para cálculo (primer valor si "X/Y")
+    tiempo_s_alt?: number | null;   // Segundo tiempo si notación "X/Y"
+    velocidad_ms:  number;          // V = coef × (n_rev / tiempo_s)
+}
+
 export interface AforoDobela {
-    base_m: number;
+    // Geometría
+    base_m:    number;
     tirante_m: number;
-    velocidades_revoluciones: number[];
-    velocidades_segundos: number[];
+    // Molinete (estructura nueva con trazabilidad completa)
+    n_revoluciones?: number;        // Revoluciones fijas para esta dobela (30, 40, 45…)
+    lecturas?:       AforoLectura[];// 3 lecturas individuales con raw notation
+    // Calculados por dobela (persistidos para reproducir cédula exacta)
+    area_m2?:           number;
+    velocidad_media_ms?: number;
+    gasto_m3s?:          number;
+    // Legacy — mantiene compatibilidad con registros anteriores
+    velocidades_revoluciones?: number[];
+    velocidades_segundos?:     number[];
 }
 
 export interface SicaAforoRecord extends SicaRecord {
@@ -94,10 +111,15 @@ export interface SicaAforoRecord extends SicaRecord {
     velocidad_media_ms?: number;
     froude?: number;
     // Campos extendidos del formato de aforo por molinete
-    molinete_modelo?: string;  // Ej. "ROSSBACH_PRICE"
-    molinete_serie?: string;   // Ej. "7320"
-    aforador?: string;         // Nombre del ingeniero aforador
-    tirante_m?: number;        // Tirante y medido en campo
+    molinete_modelo?:  string;  // Ej. "ROSSBACH_PRICE"
+    molinete_serie?:   string;  // Ej. "7320" (legacy)
+    molinete_numero?:  string;  // Número completo: "73201"
+    coef_molinete?:    number;  // Factor k en V = k×(N/t) — default 0.70
+    aforador?:         string;  // Nombre del ingeniero aforador
+    tirante_m?:        number;  // Tirante y medido en campo
+    profundidad_total_m?: number;  // H (de fondo a corona)
+    borde_libre_m?:    number;  // H - y
+    velocidad_promedio_ms?: number; // Promedio de medias de todas las dobelas
 }
 
 export interface PerfilHidraulico {
