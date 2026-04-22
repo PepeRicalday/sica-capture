@@ -37,27 +37,28 @@ export const HYDRAULIC_CONSTANTS = {
 
 /**
  * Factores de corrección M1 por punto de control.
- * Calibrados empíricamente para el Canal Conchos en régimen de remanso ascendente.
- * El factor corrige el gasto calculado por orificio estándar para reflejar el
- * comportamiento real de descarga bajo condiciones de contrapresión M1.
+ * Calibrados con datos de campo 22/04/2026 mediante balance hídrico:
+ *   Q_entrada(K0) = 25.498 m³/s · Q_salida(K104) = 9.181 m³/s
+ *   Dotaciones zona: Z1=2.000 · Z2=3.700 · Z3=4.235 · Z4=3.950 (total 13.885)
+ *   Pérdidas estimadas: 2.432 m³/s / 104 km = 0.0234 m³/s·km⁻¹
  *
- * Factor > 1.0: tramos cercanos a la presa (mayor carga hidráulica disponible)
- * Factor < 1.0: tramos finales (mayor contrapresión aguas abajo, menor ΔH efectivo)
+ * Metodología: M1_nuevo = M1_anterior × (Q_objetivo_masa / Q_fórmula_anterior)
+ * K-79+025 usa Opción A (carga → h_arriba cuando Δh ≤ 0) — ver calculateFlow().
  */
 export const FACTORES_CORRECCION_M1: Record<string, number> = {
-    'K-23':      1.7536,
-    'K-29':      1.7091,
-    'K-34':      1.6725,
-    'K-44':      1.5985,
-    'K-54':      1.4641,
-    'K-62':      1.3575,
-    'K-64':      1.3305,
-    'K-68':      1.1277,
-    'K-79+025':  0.9846,
-    'K-87+549':  0.8748,
-    'K-94+057':  0.7905,
-    'K-94+200':  0.7897,
-    'K-104':     0.7714,
+    'K-23':      2.3726,   // cal. 22/04/2026 — era 1.7536
+    'K-29':      1.4416,   // cal. 22/04/2026 — era 1.7091
+    'K-34':      1.6407,   // cal. 22/04/2026 — era 1.6725
+    'K-44':      1.2156,   // cal. 22/04/2026 — era 1.5985
+    'K-54':      1.2616,   // cal. 22/04/2026 — era 1.4641
+    'K-62':      1.1294,   // cal. 22/04/2026 — era 1.3575
+    'K-64':      1.3305,   // sin datos 22/04 — sin cambio
+    'K-68':      1.0456,   // cal. 22/04/2026 — era 1.1277
+    'K-79+025':  2.8169,   // cal. 22/04/2026 Opción A — era 0.9846
+    'K-87+549':  1.3635,   // cal. 22/04/2026 — era 0.8748
+    'K-94+057':  1.2861,   // cal. 22/04/2026 — era 0.7905
+    'K-94+200':  1.2851,   // cal. 22/04/2026 — era 0.7897
+    'K-104':     0.7714,   // sin cambio — balance ✅
 };
 
 // Posiciones kilométricas nominales de cada punto de control (para búsqueda por km más cercano)
@@ -157,16 +158,22 @@ export function calculateFlow(config: FlowConfig): FlowResult {
             const ap = aperturas[i] || 0;
             let q_gate = 0;
 
-            if (ap > 0 && carga > MIN_CARGA) {
+            if (ap > 0 && hArriba > MIN_CARGA) {
                 hasRadialesOpen = true;
                 const area = anchoRadial * ap;
 
+                // Opción A (cal. 22/04/2026): cuando Δh ≤ 0 (remanso extremo, h_abajo ≥ h_arriba)
+                // se usa h_arriba como carga absoluta en lugar del diferencial.
+                // Aplica a K-79+025 y cualquier punto con contrapresión aguas abajo que
+                // iguale o supere el nivel aguas arriba.
+                const cargaEfectiva = carga > MIN_CARGA ? carga : hArriba;
+
                 if (ap < hArriba) {
                     // Orificio: compuerta sumergida o parcialmente abierta
-                    q_gate = Cd * area * Math.sqrt(2 * g * carga) * fcm1;
+                    q_gate = Cd * area * Math.sqrt(2 * g * cargaEfectiva) * fcm1;
                 } else {
                     // Vertedor libre: compuerta alzada por encima del nivel del agua
-                    q_gate = Cv * anchoRadial * Math.pow(carga, 1.5) * fcm1;
+                    q_gate = Cv * anchoRadial * Math.pow(cargaEfectiva, 1.5) * fcm1;
                 }
             }
 
