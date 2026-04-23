@@ -377,6 +377,7 @@ const Capture = () => {
                     altoRadial: maxAltoCompuerta,
                     aperturas: aperturas_m,
                     factorCorreccion: getFactorCorreccion(pt?.name, pt?.km),
+                    esGargantaLarga: !pt?.pzas_radiales && !!(pt?.ancho_radiales && pt.ancho_radiales > 0),
                 });
 
                 payload.punto_id = selectedPoint;
@@ -1075,6 +1076,7 @@ const Capture = () => {
                                 altoRadial: pt?.alto_radiales,
                                 aperturas: realAps,
                                 factorCorreccion: getFactorCorreccion(pt?.name, pt?.km),
+                                esGargantaLarga: !pt?.pzas_radiales && !!(pt?.ancho_radiales && pt.ancho_radiales > 0),
                             });
 
                             return (

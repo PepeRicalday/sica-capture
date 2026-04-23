@@ -128,6 +128,7 @@ export interface FlowConfig {
     altoRadial?: number;       // Altura máxima física de la compuerta (m)
     aperturas: number[];       // Apertura por compuerta (m), longitud = pzasRadiales
     factorCorreccion?: number; // Factor de corrección M1 empírico por punto de control (default 1.0)
+    esGargantaLarga?: boolean; // true → usar fórmula Cd·H^n (p.ej. K-94+200). false/absent → escala de referencia pura (K-64), Q=0
 }
 
 export interface FlowResult {
@@ -141,7 +142,7 @@ export interface FlowResult {
  * Acepta tanto configuraciones con compuertas radiales como garganta larga.
  */
 export function calculateFlow(config: FlowConfig): FlowResult {
-    const { hArriba, hAbajo, pzasRadiales, anchoRadial, aperturas, factorCorreccion } = config;
+    const { hArriba, hAbajo, pzasRadiales, anchoRadial, aperturas, factorCorreccion, esGargantaLarga } = config;
     const { Cd, Cv, g, Cd_gl, n_gl, MIN_CARGA } = HYDRAULIC_CONSTANTS;
 
     // Factor de corrección M1 empírico — solo se aplica a compuertas radiales.
@@ -180,12 +181,13 @@ export function calculateFlow(config: FlowConfig): FlowResult {
             gatesFlow.push(q_gate);
             q_total += q_gate;
         }
-    } else {
-        // Garganta larga (sin radiales) — factor M1 no aplica
+    } else if (esGargantaLarga) {
+        // Garganta larga explícita (sin radiales, con fórmula Cd·H^n) — factor M1 no aplica
         if (hArriba > 0) {
             q_total = Cd_gl * Math.pow(hArriba, n_gl);
         }
     }
+    // Si no hay radiales y no es garganta larga → escala de referencia pura (p.ej. K-64): Q = 0
 
     return { q_total, hasRadialesOpen, gatesFlow };
 }
