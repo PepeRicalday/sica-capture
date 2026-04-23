@@ -46,19 +46,19 @@ export const HYDRAULIC_CONSTANTS = {
  * K-79+025 usa Opción A (carga → h_arriba cuando Δh ≤ 0) — ver calculateFlow().
  */
 export const FACTORES_CORRECCION_M1: Record<string, number> = {
-    'K-23':      2.3726,   // cal. 22/04/2026 — era 1.7536
-    'K-29':      1.4416,   // cal. 22/04/2026 — era 1.7091
-    'K-34':      1.6407,   // cal. 22/04/2026 — era 1.6725
-    'K-44':      1.2156,   // cal. 22/04/2026 — era 1.5985
-    'K-54':      1.2616,   // cal. 22/04/2026 — era 1.4641
-    'K-62':      1.1294,   // cal. 22/04/2026 — era 1.3575
-    'K-64':      1.3305,   // sin datos 22/04 — sin cambio
-    'K-68':      1.0456,   // cal. 22/04/2026 — era 1.1277
-    'K-79+025':  2.8169,   // cal. 22/04/2026 Opción A — era 0.9846
-    'K-87+549':  1.3635,   // cal. 22/04/2026 — era 0.8748
-    'K-94+057':  1.2861,   // cal. 22/04/2026 — era 0.7905
-    'K-94+200':  1.2851,   // cal. 22/04/2026 — era 0.7897
-    'K-104':     0.7714,   // sin cambio — balance ✅
+    'K-23':      2.0978,   // cal. 23/04/2026 — era 2.3726
+    'K-29':      1.3589,   // cal. 23/04/2026 — era 1.4416
+    'K-34':      1.3821,   // cal. 23/04/2026 — era 1.6407
+    'K-44':      0.9838,   // cal. 23/04/2026 — era 1.2156
+    'K-54':      1.0823,   // cal. 23/04/2026 — era 1.2616
+    'K-62':      1.1294,   // sin datos 23/04 — sin cambio
+    'K-64':      1.3305,   // sin datos 23/04 — sin cambio
+    'K-68':      1.1112,   // cal. 23/04/2026 — era 1.0456
+    'K-79+025':  2.8549,   // cal. 23/04/2026 — era 2.8169
+    'K-87+549':  1.2530,   // cal. 23/04/2026 — era 1.3635
+    'K-94+057':  1.1883,   // cal. 23/04/2026 — era 1.2861
+    'K-94+200':  1.2851,   // sin datos 23/04 — sin cambio
+    'K-104':     0.7714,   // ancla salida — sin cambio
 };
 
 // Posiciones kilométricas nominales de cada punto de control (para búsqueda por km más cercano)
