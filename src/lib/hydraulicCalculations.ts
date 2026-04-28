@@ -46,18 +46,19 @@ export const HYDRAULIC_CONSTANTS = {
  * K-79+025 usa Opción A (carga → h_arriba cuando Δh ≤ 0) — ver calculateFlow().
  */
 export const FACTORES_CORRECCION_M1: Record<string, number> = {
-    'K-23':      2.0978,   // cal. 23/04/2026 — era 2.3726
-    'K-29':      1.3589,   // cal. 23/04/2026 — era 1.4416
-    'K-34':      1.3821,   // cal. 23/04/2026 — era 1.6407
-    'K-44':      0.9838,   // cal. 23/04/2026 — era 1.2156
-    'K-54':      1.0823,   // cal. 23/04/2026 — era 1.2616
-    'K-62':      1.1294,   // sin datos 23/04 — sin cambio
-    'K-64':      1.3305,   // sin datos 23/04 — sin cambio
-    'K-68':      1.1112,   // cal. 23/04/2026 — era 1.0456
-    'K-79+025':  2.8549,   // cal. 23/04/2026 — era 2.8169
-    'K-87+549':  1.2530,   // cal. 23/04/2026 — era 1.3635
-    'K-94+057':  1.1883,   // cal. 23/04/2026 — era 1.2861
-    'K-94+200':  1.2851,   // sin datos 23/04 — sin cambio
+    'K-0+000':   0.8923,   // cal. aforo 27/04/2026 — primera calibración (era 1.0000)
+    'K-23':      1.9031,   // recal. 27/04/2026 — era 2.0978 (ancla K-0 corregida)
+    'K-29':      1.2379,   // recal. 27/04/2026 — era 1.3589
+    'K-34':      1.2637,   // recal. 27/04/2026 — era 1.3821
+    'K-44':      0.9067,   // recal. 27/04/2026 — era 0.9838
+    'K-54':      1.0066,   // recal. 27/04/2026 — era 1.0823
+    'K-62':      1.0537,   // recal. 27/04/2026 — era 1.1294
+    'K-64':      1.3305,   // escala referencia — sin cambio
+    'K-68':      1.0398,   // recal. 27/04/2026 — era 1.1112
+    'K-79+025':  1.5824,   // recal. 27/04/2026 — era 1.6643
+    'K-87+549':  1.2089,   // recal. 27/04/2026 — era 1.2530
+    'K-94+057':  1.1612,   // recal. 27/04/2026 — era 1.1883
+    'K-94+200':  1.2851,   // escala referencia — sin cambio
     'K-104':     0.7714,   // ancla salida — sin cambio
 };
 
