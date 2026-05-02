@@ -1,5 +1,5 @@
 import { supabase } from './supabase';
-import { db, type SicaAforoRecord } from './db';
+import { db, type SicaAforoRecord, type ZonaCatalog, type ModuloBalance, type ModuloZona } from './db';
 import { getTodayString, getDaysAgoString, getTimezoneOffsetString } from './dateHelpers';
 import { calcVolumeM3 } from './volumeCalculations';
 
@@ -296,6 +296,28 @@ export const downloadCatalogs = async (forceCatalog = false) => {
                 }
             });
         }
+
+        // ── Zonas, relación módulo-zona y balance (catálogos livianos — siempre) ──
+        const [{ data: zonasCatalog }, { data: moduloZonasData }, { data: balanceData }] = await Promise.all([
+            supabase.from('zonas_canal').select('id, nombre, codigo, km_inicio, km_fin, escala_entrada_id, escala_salida_id, color').eq('activa', true).order('km_inicio'),
+            supabase.from('modulo_zonas').select('modulo_id, zona_id, es_primaria'),
+            supabase.from('balance_volumen_modulo').select('*'),
+        ]);
+
+        await db.transaction('rw', [db.zonas, db.modulo_zonas, db.modulos_balance], async () => {
+            if (zonasCatalog && zonasCatalog.length > 0) {
+                await db.zonas.clear();
+                await db.zonas.bulkPut(zonasCatalog as ZonaCatalog[]);
+            }
+            if (moduloZonasData && moduloZonasData.length > 0) {
+                await db.modulo_zonas.clear();
+                await db.modulo_zonas.bulkPut(moduloZonasData as ModuloZona[]);
+            }
+            if (balanceData && balanceData.length > 0) {
+                await db.modulos_balance.clear();
+                await db.modulos_balance.bulkPut(balanceData as ModuloBalance[]);
+            }
+        });
 
         if (shouldFetchStatic) localStorage.setItem('sica_last_sync', now.toString());
     } catch (error) {
@@ -607,7 +629,42 @@ export const syncPendingRecords = async () => {
             }
         }
 
-        // 1D. Movimientos de Presa (van a movimientos_presas)
+        // 1D. Entregas por Módulo (van a entregas_modulo)
+        const entregasPending = pending.filter(p => p.tipo === 'entrega');
+        const entregasPayload = entregasPending.map(p => ({
+            id:                 p.id,
+            fecha:              p.fecha_captura,
+            modulo_id:          p.modulo_id,
+            zona_id:            p.zona_id || null,
+            ciclo_id:           p.ciclo_id || null,
+            hora_inicio:        p.hora_inicio_entrega || null,
+            hora_fin:           p.hora_fin_entrega || null,
+            gasto_lps:          p.valor_q ?? 0,            // valor_q reutilizado = gasto en L/s
+            volumen_m3:         p.volumen_m3 ?? 0,
+            tipo_entrega:       p.tipo_entrega ?? 'base',
+            motivo_adicional:   p.motivo_adicional || null,
+            capturador_id:      p.responsable_id || null,
+            notas:              p.notas || null,
+        }));
+
+        if (entregasPayload.length > 0) {
+            const { error: err } = await supabase
+                .from('entregas_modulo')
+                .upsert(entregasPayload, { onConflict: 'fecha,modulo_id,tipo_entrega' });
+            if (err) {
+                console.error('Error insertando entregas_modulo:', err.message);
+                const now = new Date().toISOString();
+                await db.records.where('id').anyOf(entregasPending.map(p => p.id)).modify(r => {
+                    r.error_sync = err.message;
+                    r.retry_count = (r.retry_count ?? 0) + 1;
+                    if (!r.first_failed_at) r.first_failed_at = now;
+                });
+            } else {
+                syncSuccessIds.push(...entregasPending.map(p => p.id as string));
+            }
+        }
+
+        // 1E. Movimientos de Presa (van a movimientos_presas)
         const presasPending = pending.filter(p => p.tipo === 'presa');
         const presasPayload = presasPending.map(p => ({
             id: p.id,

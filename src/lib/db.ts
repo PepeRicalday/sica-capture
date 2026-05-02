@@ -41,7 +41,7 @@ export interface OfflinePoint {
 // 2. Registro a Sincronizar (Mochila)
 export interface SicaRecord {
     id: string; // V2 Migration: Using UUIDs locally to prevent sync collisions
-    tipo: 'escala' | 'toma' | 'aforo' | 'presa';
+    tipo: 'escala' | 'toma' | 'aforo' | 'presa' | 'entrega';
 
     // Auditoría
     responsable_id?: string;
@@ -68,6 +68,17 @@ export interface SicaRecord {
     // Nuevas métricas para Reporte de Escalas (Represos)
     gasto_calculado_m3s?: number;
     radiales_json?: any[]; // Arreglo detallado de cada compuerta radial
+
+    // Campos exclusivos de tipo 'entrega'
+    modulo_id?: string;
+    zona_id?: string;
+    ciclo_id?: string;
+    tipo_entrega?: 'base' | 'adicional';
+    hora_inicio_entrega?: string;   // HH:MM:SS
+    hora_fin_entrega?: string;      // HH:MM:SS
+    horas_operacion?: number;
+    volumen_m3?: number;            // gasto_m3s × horas × 3600
+    motivo_adicional?: string;      // requerido cuando tipo_entrega = 'adicional'
 }
 
 /** Lectura individual de molinete dentro de una dobela */
@@ -141,20 +152,79 @@ export interface PerfilHidraulico {
     fin_lng?: number;
 }
 
+// Catálogo de zonas del canal (descargado de zonas_canal)
+export interface ZonaCatalog {
+    id: string;
+    nombre: string;
+    codigo: string;         // 'Z1' | 'Z2' | 'Z3' | 'Z4'
+    km_inicio: number;
+    km_fin: number;
+    escala_entrada_id?: string;
+    escala_salida_id?: string;
+    color?: string;
+}
+
+// Relación módulo ↔ zona (muchos a muchos — modulo_zonas)
+export interface ModuloZona {
+    modulo_id: string;
+    zona_id: string;
+    es_primaria: boolean;
+}
+
+// Balance por módulo-zona (descargado de balance_volumen_modulo)
+// Un módulo multizona (ej. M2) genera una fila por zona.
+// En zonas secundarias vol_base_m3, vol_base_disponible_m3 y pct_base_consumido son null.
+export interface ModuloBalance {
+    modulo_id: string;
+    modulo_nombre: string;
+    codigo_corto?: string;
+    zona_id?: string;
+    zona_codigo?: string;
+    zona_nombre?: string;
+    es_primaria?: boolean;
+    ciclo_id?: string;
+    vol_base_m3: number | null;
+    vol_base_consumido_m3: number;
+    vol_adicional_consumido_m3: number;
+    vol_total_consumido_m3: number;
+    vol_base_disponible_m3: number | null;
+    pct_base_consumido: number | null;
+    ultimo_adicional_fecha?: string;
+    estado_volumen: 'normal' | 'alerta_base' | 'base_agotado' | 'adicional_activo';
+}
+
 export class SicaCaptureDB extends Dexie {
     records!: Table<SicaRecord>;
     puntos!: Table<OfflinePoint>;
     perfil_hidraulico!: Table<PerfilHidraulico>;
+    zonas!: Table<ZonaCatalog>;
+    modulos_balance!: Table<ModuloBalance>;
+    modulo_zonas!: Table<ModuloZona>;
 
     constructor() {
         super('sica_capture_db_v2');
-        // v2: Catálogos, v3: Tomas, v5: Aforos Canal Principal, v6: Offline UUIDs, v7: Hidrometria metrics, v8: Canal Profiles
+        // v2: Catálogos, v3: Tomas, v5: Aforos Canal Principal, v6: Offline UUIDs,
+        // v7: Hidrometria metrics, v8: Canal Profiles, v9: Zonas + Entregas Módulo
+        // v10: modulo_zonas (M2M) + PK compuesta en modulos_balance para multizona
         this.version(8).stores({
             records: 'id, sincronizado, tipo, punto_id',
             puntos: 'id, type',
             perfil_hidraulico: 'id, km_inicio, km_fin'
-        }).upgrade(() => {
-            // Migration logic if needed
+        });
+        this.version(9).stores({
+            records: 'id, sincronizado, tipo, punto_id',
+            puntos: 'id, type',
+            perfil_hidraulico: 'id, km_inicio, km_fin',
+            zonas: 'id, codigo',
+            modulos_balance: 'modulo_id, zona_id'
+        });
+        this.version(10).stores({
+            records: 'id, sincronizado, tipo, punto_id',
+            puntos: 'id, type',
+            perfil_hidraulico: 'id, km_inicio, km_fin',
+            zonas: 'id, codigo',
+            modulos_balance: '[modulo_id+zona_id], modulo_id, zona_id',
+            modulo_zonas: '[modulo_id+zona_id], modulo_id, zona_id'
         });
     }
 }
