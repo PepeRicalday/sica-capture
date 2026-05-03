@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { v4 as uuidv4 } from 'uuid';
 import { Save, Droplets, TrendingUp, AlertTriangle, CheckCircle2 } from 'lucide-react';
-import { db, type OfflinePoint } from '../lib/db';
+import { db, type OfflinePoint, type ZonaCatalog, type ModuloBalance, type ModuloZona } from '../lib/db';
 import { supabase } from '../lib/supabase';
 import { getTodayString } from '../lib/dateHelpers';
 import { useAuth } from '../context/AuthContext';
@@ -46,15 +46,89 @@ interface EntregaFormProps {
     onSaved?: () => void;
 }
 
+// Tipo liviano para los módulos que necesita el selector
+interface ModuloItem {
+    id: string;
+    nombre: string;
+    codigo_corto: string | null;
+}
+
 export function EntregaForm({ onSaved }: EntregaFormProps) {
     const { profile } = useAuth();
     const isSRL = profile?.rol === 'SRL';
     const userModuloId = profile?.modulo_id ?? null;
 
-    // Catálogos desde Dexie
-    const zonas        = useLiveQuery(() => db.zonas.toArray().then(arr => arr.sort((a, b) => a.km_inicio - b.km_inicio)), []) ?? [];
-    const todoBalance  = useLiveQuery(() => db.modulos_balance.toArray(), []) ?? [];
-    const moduloZonas  = useLiveQuery(() => db.modulo_zonas.toArray(), []) ?? [];
+    // ── Catálogos: Supabase como fuente primaria, Dexie como fallback offline ──
+    const [zonas,       setZonas]       = useState<ZonaCatalog[]>([]);
+    const [moduloZonas, setModuloZonas] = useState<ModuloZona[]>([]);
+    const [modulos,     setModulos]     = useState<ModuloItem[]>([]);
+    const [todoBalance, setTodoBalance] = useState<ModuloBalance[]>([]);
+    const [loadingCat,  setLoadingCat]  = useState(true);
+
+    useEffect(() => {
+        let cancelled = false;
+        const load = async () => {
+            setLoadingCat(true);
+            try {
+                const [resZonas, resMZ, resMod, resBal] = await Promise.all([
+                    supabase.from('zonas_canal')
+                        .select('id, nombre, codigo, km_inicio, km_fin, escala_entrada_id, escala_salida_id, color')
+                        .eq('activa', true).order('km_inicio'),
+                    supabase.from('modulo_zonas')
+                        .select('modulo_id, zona_id, es_primaria'),
+                    supabase.from('modulos')
+                        .select('id, nombre, codigo_corto')
+                        .order('codigo_corto'),
+                    supabase.from('balance_volumen_modulo').select('*'),
+                ]);
+                if (cancelled) return;
+
+                const zonasData  = (resZonas.data  ?? []) as ZonaCatalog[];
+                const mzData     = (resMZ.data     ?? []) as ModuloZona[];
+                const modData    = (resMod.data     ?? []) as ModuloItem[];
+                const balData    = (resBal.data     ?? []) as ModuloBalance[];
+
+                // Si Supabase devuelve datos, úsalos y guarda en Dexie
+                if (zonasData.length > 0) {
+                    setZonas(zonasData);
+                    db.zonas.bulkPut(zonasData).catch(() => {});
+                } else {
+                    // Fallback Dexie offline
+                    const local = await db.zonas.toArray();
+                    setZonas(local.sort((a, b) => a.km_inicio - b.km_inicio));
+                }
+                if (mzData.length > 0) {
+                    setModuloZonas(mzData);
+                    db.modulo_zonas.bulkPut(mzData).catch(() => {});
+                } else {
+                    setModuloZonas(await db.modulo_zonas.toArray());
+                }
+                setModulos(modData);
+                if (balData.length > 0) {
+                    setTodoBalance(balData);
+                    db.modulos_balance.bulkPut(balData).catch(() => {});
+                } else {
+                    setTodoBalance(await db.modulos_balance.toArray());
+                }
+            } catch {
+                // Sin red: usar Dexie
+                const [z, mz, b] = await Promise.all([
+                    db.zonas.toArray(),
+                    db.modulo_zonas.toArray(),
+                    db.modulos_balance.toArray(),
+                ]);
+                if (!cancelled) {
+                    setZonas(z.sort((a, b) => a.km_inicio - b.km_inicio));
+                    setModuloZonas(mz);
+                    setTodoBalance(b);
+                }
+            } finally {
+                if (!cancelled) setLoadingCat(false);
+            }
+        };
+        load();
+        return () => { cancelled = true; };
+    }, []);
 
     // Formulario
     const [selectedZonaId,   setSelectedZonaId]   = useState('');
@@ -77,36 +151,29 @@ export function EntregaForm({ onSaved }: EntregaFormProps) {
 
     // Pre-selección ACU: fija el módulo; la zona se auto-selecciona solo si es única
     useEffect(() => {
-        if (!isSRL && userModuloId) {
+        if (!isSRL && userModuloId && moduloZonas.length > 0) {
             setSelectedModuloId(userModuloId);
             const zonasDelModulo = moduloZonas.filter(mz => mz.modulo_id === userModuloId);
             if (zonasDelModulo.length === 1) {
                 setSelectedZonaId(zonasDelModulo[0].zona_id);
             }
-            // Módulo multizona: el operador elige la zona manualmente
         }
     }, [isSRL, userModuloId, moduloZonas]);
 
-    // Módulos del selector — únicos por modulo_id dentro de la zona, vía modulo_zonas
+    // Módulos del selector — desde tabla modulos filtrada por modulo_zonas de la zona activa
     const modulosZona = useMemo(() => {
+        // IDs de módulos en la zona seleccionada (o todos si no hay zona)
         const idsEnZona = selectedZonaId
             ? new Set(moduloZonas.filter(mz => mz.zona_id === selectedZonaId).map(mz => mz.modulo_id))
             : new Set(moduloZonas.map(mz => mz.modulo_id));
 
-        // Una entrada por módulo: preferir la fila que coincida con zona seleccionada
-        const porModulo = new Map<string, typeof todoBalance[0]>();
-        todoBalance.forEach(b => {
-            if (!idsEnZona.has(b.modulo_id)) return;
-            if (!isSRL && userModuloId && b.modulo_id !== userModuloId) return;
-            const existing = porModulo.get(b.modulo_id);
-            if (!existing) {
-                porModulo.set(b.modulo_id, b);
-            } else if (selectedZonaId && b.zona_id === selectedZonaId) {
-                porModulo.set(b.modulo_id, b); // priorizar fila de la zona activa
-            }
+        return modulos.filter(m => {
+            if (!isSRL && userModuloId && m.id !== userModuloId) return false;
+            // Si hay zona seleccionada, solo mostrar módulos de esa zona;
+            // si modulo_zonas está vacío (sin ciclo/seed), mostrar todos los módulos
+            return moduloZonas.length === 0 || idsEnZona.has(m.id);
         });
-        return Array.from(porModulo.values());
-    }, [selectedZonaId, todoBalance, moduloZonas, isSRL, userModuloId]);
+    }, [selectedZonaId, modulos, moduloZonas, isSRL, userModuloId]);
 
     // Balance del módulo — busca (modulo_id, zona_id) exacto; fallback a zona primaria
     const balanceModulo = useMemo(() => {
@@ -239,10 +306,10 @@ export function EntregaForm({ onSaved }: EntregaFormProps) {
                         title="Zona del canal"
                         value={selectedZonaId}
                         onChange={e => { setSelectedZonaId(e.target.value); setSelectedModuloId(''); }}
-                        disabled={!isSRL && moduloZonas.filter(mz => mz.modulo_id === userModuloId).length <= 1}
+                        disabled={loadingCat || (!isSRL && moduloZonas.filter(mz => mz.modulo_id === userModuloId).length <= 1)}
                         className="w-full bg-slate-800 border border-slate-700 text-white rounded-lg px-3 py-2 text-sm disabled:opacity-50"
                     >
-                        <option value="">— Todas —</option>
+                        <option value="">{loadingCat ? 'Cargando…' : '— Todas —'}</option>
                         {zonas.map(z => (
                             <option key={z.id} value={z.id}>{z.codigo} — km {z.km_inicio}–{z.km_fin}</option>
                         ))}
@@ -261,10 +328,10 @@ export function EntregaForm({ onSaved }: EntregaFormProps) {
                         disabled={!isSRL && !!userModuloId}
                         className="w-full bg-slate-800 border border-slate-700 text-white rounded-lg px-3 py-2 text-sm disabled:opacity-50"
                     >
-                        <option value="">— Seleccionar —</option>
+                        <option value="">{loadingCat ? 'Cargando…' : '— Seleccionar —'}</option>
                         {modulosZona.map(m => (
-                            <option key={m.modulo_id} value={m.modulo_id}>
-                                {m.codigo_corto ? `[${m.codigo_corto}] ` : ''}{m.modulo_nombre}
+                            <option key={m.id} value={m.id}>
+                                {m.codigo_corto ? `[${m.codigo_corto}] ` : ''}{m.nombre}
                             </option>
                         ))}
                     </select>
