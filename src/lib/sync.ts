@@ -597,19 +597,21 @@ export const syncPendingRecords = async () => {
             }
         }
 
-        // RECUPERACIÓN 2: resetear registros crónicos bloqueados por RLS
-        // La política RLS de entregas_modulo fue corregida (perfiles→perfiles_usuario).
-        // Los registros rechazados por "row-level security" pueden reintentarse ahora.
-        const stuckRls = await db.records
-            .filter(r =>
-                r.tipo === 'entrega' &&
-                !!r.error_sync &&
-                r.error_sync.toLowerCase().includes('row-level security') &&
-                r.sincronizado === 'false'
-            )
+        // RECUPERACIÓN 2: resetear registros crónicos de entregas_modulo
+        // Los errores de RLS y FK fueron corregidos (perfiles→perfiles_usuario).
+        // Cualquier error previo de "row-level security" o "foreign key" en entregas
+        // es recuperable — se resetean para que reintenten con el esquema corregido.
+        const stuckEntregas = await db.records
+            .filter(r => {
+                if (r.tipo !== 'entrega' || !r.error_sync || r.sincronizado !== 'false') return false;
+                const err = r.error_sync.toLowerCase();
+                return err.includes('row-level security') ||
+                       err.includes('foreign key') ||
+                       err.includes('[crónico]');
+            })
             .toArray();
-        if (stuckRls.length > 0) {
-            await db.records.where('id').anyOf(stuckRls.map(r => r.id)).modify(r => {
+        if (stuckEntregas.length > 0) {
+            await db.records.where('id').anyOf(stuckEntregas.map(r => r.id)).modify(r => {
                 r.error_sync      = undefined;
                 r.retry_count     = 0;
                 r.first_failed_at = undefined;
