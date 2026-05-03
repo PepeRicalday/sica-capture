@@ -12,6 +12,7 @@ import { useAuth } from '../context/AuthContext';
 import { toast } from 'sonner';
 import { v4 as uuidv4 } from 'uuid';
 import { AforoForm } from '../components/AforoForm';
+import { EntregaForm } from '../components/EntregaForm';
 import { PendingRecordsModal } from '../components/PendingRecordsModal';
 import { AforoHistoryModal } from '../components/AforoHistoryModal';
 import { EscalaHistoryModal } from '../components/EscalaHistoryModal';
@@ -54,7 +55,7 @@ const LiveClock = () => {
 const Capture = () => {
     const { profile } = useAuth();
     // Formularios Dinámicos
-    const [activeTab, setActiveTab] = useState<'escala' | 'toma' | 'aforo' | 'presas'>('escala');
+    const [activeTab, setActiveTab] = useState<'escala' | 'toma' | 'aforo' | 'presas' | 'entrega'>('escala');
     const [estadoToma, setEstadoToma] = useState<'inicio' | 'modificacion' | 'suspension' | 'reabierto' | 'cierre' | 'continua'>('inicio');
     const [manualDate, setManualDate] = useState<string>(getTodayString());
     const [manualTime, setManualTime] = useState<string>('');
@@ -603,11 +604,15 @@ const Capture = () => {
 
                 {/* 1. Selector de Tipo (Rediseñado Gerencial: Alto Contraste Solar) */}
                 <div className="flex bg-slate-900/90 rounded-xl p-1 mb-4 flex-shrink-0 text-[10px] sm:text-xs shadow-inner ring-1 ring-slate-800">
-                    {(['escala', 'toma', 'aforo', 'presas'] as const).map(tab => {
+                    {(['escala', 'toma', 'aforo', 'presas', 'entrega'] as const).map(tab => {
                         // MEJ-4: Ocultar o deshabilitar tabs no relevantes
                         const isRelevant = !(activeEvent?.evento_tipo === 'LLENADO' && tab === 'aforo');
                         if (!isRelevant) return null;
 
+                        const labels: Record<string, string> = {
+                            escala: 'Niveles', toma: 'Distribución',
+                            aforo: 'Aforos', presas: 'Presas', entrega: 'Entrega'
+                        };
                         return (
                             <button
                                 key={tab}
@@ -617,14 +622,21 @@ const Capture = () => {
                                     : 'text-slate-500 hover:text-slate-300'
                                     }`}
                             >
-                                {tab === 'escala' ? 'Niveles' : tab === 'toma' ? 'Distribución' : tab === 'aforo' ? 'Aforos' : 'Presas'}
+                                {labels[tab]}
                             </button>
                         );
                     })}
                 </div>
 
-                {/* 2. Selector de Punto */}
-                <div className="mb-2 relative flex-shrink-0">
+                {/* SI ES ENTREGA -> RENDERIZAR COMPONENTE PROPIO Y SALTAR EL RESTO */}
+                {activeTab === 'entrega' && (
+                    <div className="flex-1 overflow-y-auto mt-1 pr-0.5">
+                        <EntregaForm onSaved={() => { /* sin reset adicional */ }} />
+                    </div>
+                )}
+
+                {/* 2. Selector de Punto (no aplica a tab entrega) */}
+                <div className={`mb-2 relative flex-shrink-0 ${activeTab === 'entrega' ? 'hidden' : ''}`}>
                     <label className="block text-slate-400 text-[10px] mb-0.5 uppercase tracking-wider font-semibold">
                         SELECCIONAR UBICACIÓN
                     </label>
@@ -1006,8 +1018,8 @@ const Capture = () => {
                     </div>
                 )}
 
-                {/* 3. Main Display Numérico (SOLO SI NO ES AFORO) */}
-                {activeTab !== 'aforo' && (
+                {/* 3. Main Display Numérico (SOLO SI NO ES AFORO NI ENTREGA) */}
+                {activeTab !== 'aforo' && activeTab !== 'entrega' && (
                     <div className="flex-1 flex flex-col justify-end mt-4">
                         {activeTab === 'escala' ? (
                             <div className="flex bg-slate-800 rounded-lg p-1 mb-2">
