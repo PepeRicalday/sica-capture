@@ -226,6 +226,15 @@ export class SicaCaptureDB extends Dexie {
             modulos_balance: '[modulo_id+zona_id], modulo_id, zona_id',
             modulo_zonas: '[modulo_id+zona_id], modulo_id, zona_id'
         });
+        // v11: agrega índice km_inicio en zonas para ordenar sin sort en memoria
+        this.version(11).stores({
+            records: 'id, sincronizado, tipo, punto_id',
+            puntos: 'id, type',
+            perfil_hidraulico: 'id, km_inicio, km_fin',
+            zonas: 'id, codigo, km_inicio',
+            modulos_balance: '[modulo_id+zona_id], modulo_id, zona_id',
+            modulo_zonas: '[modulo_id+zona_id], modulo_id, zona_id'
+        });
     }
 }
 

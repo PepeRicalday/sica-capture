@@ -52,7 +52,7 @@ export function EntregaForm({ onSaved }: EntregaFormProps) {
     const userModuloId = profile?.modulo_id ?? null;
 
     // Catálogos desde Dexie
-    const zonas        = useLiveQuery(() => db.zonas.orderBy('km_inicio').toArray(), []) ?? [];
+    const zonas        = useLiveQuery(() => db.zonas.toArray().then(arr => arr.sort((a, b) => a.km_inicio - b.km_inicio)), []) ?? [];
     const todoBalance  = useLiveQuery(() => db.modulos_balance.toArray(), []) ?? [];
     const moduloZonas  = useLiveQuery(() => db.modulo_zonas.toArray(), []) ?? [];
 
