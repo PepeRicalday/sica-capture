@@ -297,32 +297,39 @@ export const downloadCatalogs = async (forceCatalog = false) => {
             });
         }
 
-        // ── Zonas, relación módulo-zona y balance (catálogos livianos — siempre) ──
-        const [{ data: zonasCatalog }, { data: moduloZonasData }, { data: balanceData }] = await Promise.all([
-            supabase.from('zonas_canal').select('id, nombre, codigo, km_inicio, km_fin, escala_entrada_id, escala_salida_id, color').eq('activa', true).order('km_inicio'),
-            supabase.from('modulo_zonas').select('modulo_id, zona_id, es_primaria'),
-            supabase.from('balance_volumen_modulo').select('*'),
-        ]);
-
-        await db.transaction('rw', [db.zonas, db.modulo_zonas, db.modulos_balance], async () => {
-            if (zonasCatalog && zonasCatalog.length > 0) {
-                await db.zonas.clear();
-                await db.zonas.bulkPut(zonasCatalog as ZonaCatalog[]);
-            }
-            if (moduloZonasData && moduloZonasData.length > 0) {
-                await db.modulo_zonas.clear();
-                await db.modulo_zonas.bulkPut(moduloZonasData as ModuloZona[]);
-            }
-            if (balanceData && balanceData.length > 0) {
-                await db.modulos_balance.clear();
-                await db.modulos_balance.bulkPut(balanceData as ModuloBalance[]);
-            }
-        });
-
         if (shouldFetchStatic) localStorage.setItem('sica_last_sync', now.toString());
+
+        // ── Zonas, módulo-zona y balance — catálogos livianos, aislados ──
+        // Bloque separado: si falla (tabla nueva no existe aún, RLS, etc.) no afecta puntos.
+        try {
+            const [{ data: zonasCatalog }, { data: moduloZonasData }, { data: balanceData }] = await Promise.all([
+                supabase.from('zonas_canal').select('id, nombre, codigo, km_inicio, km_fin, escala_entrada_id, escala_salida_id, color').eq('activa', true).order('km_inicio'),
+                supabase.from('modulo_zonas').select('modulo_id, zona_id, es_primaria'),
+                supabase.from('balance_volumen_modulo').select('*'),
+            ]);
+
+            await db.transaction('rw', [db.zonas, db.modulo_zonas, db.modulos_balance], async () => {
+                if (zonasCatalog && zonasCatalog.length > 0) {
+                    await db.zonas.clear();
+                    await db.zonas.bulkPut(zonasCatalog as ZonaCatalog[]);
+                }
+                if (moduloZonasData && moduloZonasData.length > 0) {
+                    await db.modulo_zonas.clear();
+                    await db.modulo_zonas.bulkPut(moduloZonasData as ModuloZona[]);
+                }
+                if (balanceData && balanceData.length > 0) {
+                    await db.modulos_balance.clear();
+                    await db.modulos_balance.bulkPut(balanceData as ModuloBalance[]);
+                }
+            });
+        } catch (zonaErr) {
+            console.warn('Zonas/balance catalog download failed (non-critical):', zonaErr);
+        }
+
     } catch (error) {
         console.error('Failed to download catalogs:', error);
-        throw error;
+        // No re-throw: downloadCatalogs se llama fire-and-forget desde App.tsx y eventos online.
+        // Re-lanzar causaría unhandled rejection y dejaría puntos vacíos en UI.
     }
 };
 
