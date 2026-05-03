@@ -83,6 +83,13 @@ export function EntregaForm({ onSaved }: EntregaFormProps) {
                 ]);
                 if (cancelled) return;
 
+                if (resZonas.error) console.error('[EntregaForm] zonas_canal:', resZonas.error);
+                if (resMZ.error)    console.error('[EntregaForm] modulo_zonas:', resMZ.error);
+                if (resMod.error)   console.error('[EntregaForm] modulos:', resMod.error);
+                if (resBal.error)   console.error('[EntregaForm] balance_volumen_modulo:', resBal.error);
+
+                console.log('[EntregaForm] zonas rows:', resZonas.data?.length, '| modulos rows:', resMod.data?.length);
+
                 const zonasData  = (resZonas.data  ?? []) as ZonaCatalog[];
                 const mzData     = (resMZ.data     ?? []) as ModuloZona[];
                 const modData    = (resMod.data     ?? []) as ModuloItem[];
