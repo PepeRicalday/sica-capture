@@ -303,7 +303,7 @@ export const downloadCatalogs = async (forceCatalog = false) => {
         // Bloque separado: si falla (tabla nueva no existe aún, RLS, etc.) no afecta puntos.
         try {
             const [{ data: zonasCatalog }, { data: moduloZonasData }, { data: balanceData }] = await Promise.all([
-                supabase.from('zonas_canal').select('id, nombre, codigo, km_inicio, km_fin, escala_entrada_id, escala_salida_id, color').eq('activa', true).order('km_inicio'),
+                supabase.from('zonas_canal').select('id, nombre, codigo, km_inicio, km_fin, escala_entrada_id, escala_salida_id, color').order('km_inicio'),
                 supabase.from('modulo_zonas').select('modulo_id, zona_id, es_primaria'),
                 supabase.from('balance_volumen_modulo').select('*'),
             ]);

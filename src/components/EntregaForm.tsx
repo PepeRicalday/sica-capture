@@ -73,7 +73,7 @@ export function EntregaForm({ onSaved }: EntregaFormProps) {
                 const [resZonas, resMZ, resMod, resBal] = await Promise.all([
                     supabase.from('zonas_canal')
                         .select('id, nombre, codigo, km_inicio, km_fin, escala_entrada_id, escala_salida_id, color')
-                        .eq('activa', true).order('km_inicio'),
+                        .order('km_inicio'),
                     supabase.from('modulo_zonas')
                         .select('modulo_id, zona_id, es_primaria'),
                     supabase.from('modulos')
