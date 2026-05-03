@@ -431,6 +431,75 @@ export const autoGenerateContinua = async (userId?: string, userName?: string): 
                 }
             }
 
+            // ── Entregas: continuidad automática por módulo-zona-tipo ──────────
+            // Misma lógica que tomas: el flujo de entrega queda abierto hasta
+            // que el operador registre un 'cierre' o 'modificacion' explícito.
+            const allEntregas = await db.records
+                .where('tipo').equals('entrega')
+                .toArray();
+
+            // Agrupar por clave compuesta para procesar cada corriente por separado
+            const entregaGroups = new Map<string, typeof allEntregas>();
+            for (const e of allEntregas) {
+                const key = `${e.modulo_id ?? ''}|${e.zona_id ?? ''}|${e.tipo_entrega ?? 'base'}`;
+                if (!entregaGroups.has(key)) entregaGroups.set(key, []);
+                entregaGroups.get(key)!.push(e);
+            }
+
+            for (const [, registros] of entregaGroups) {
+                // Ordenar ascendente para que el último elemento sea el más reciente
+                registros.sort((a, b) => {
+                    const dc = a.fecha_captura.localeCompare(b.fecha_captura);
+                    return dc !== 0 ? dc : a.hora_captura.localeCompare(b.hora_captura);
+                });
+                const ultimo = registros[registros.length - 1];
+
+                // Entrega cerrada o sin gasto: no continuar
+                if (ultimo.estado_operativo === 'cierre' || (ultimo.valor_q ?? 0) <= 0) continue;
+                // Ya tiene registro de hoy: no necesita continua
+                if (ultimo.fecha_captura >= today) continue;
+
+                const existingDatesE = new Set(registros.map(r => r.fecha_captura));
+
+                // Cap: no generar más de 60 días de backfill
+                const capE = new Date(today + 'T12:00:00');
+                capE.setDate(capE.getDate() - 60);
+                const capEStr = capE.toISOString().split('T')[0];
+                const startE = ultimo.fecha_captura < capEStr ? capEStr : ultimo.fecha_captura;
+
+                const cursorE = new Date(startE + 'T12:00:00');
+                cursorE.setDate(cursorE.getDate() + 1);
+                const todayDateE = new Date(today + 'T12:00:00');
+
+                while (cursorE <= todayDateE) {
+                    const dateStr = cursorE.toISOString().split('T')[0];
+                    if (!existingDatesE.has(dateStr)) {
+                        continuas.push({
+                            id:                   crypto.randomUUID(),
+                            tipo:                 'entrega' as const,
+                            punto_id:             ultimo.modulo_id ?? ultimo.punto_id,
+                            modulo_id:            ultimo.modulo_id,
+                            zona_id:              ultimo.zona_id,
+                            ciclo_id:             ultimo.ciclo_id,
+                            tipo_entrega:         ultimo.tipo_entrega,
+                            valor_q:              ultimo.valor_q,
+                            hora_inicio_entrega:  ultimo.hora_inicio_entrega,
+                            hora_fin_entrega:     ultimo.hora_fin_entrega,
+                            horas_operacion:      ultimo.horas_operacion,
+                            volumen_m3:           ultimo.volumen_m3,
+                            estado_operativo:     'continua' as const,
+                            fecha_captura:        dateStr,
+                            hora_captura:         dateStr === today ? horaHoy : '23:59:00',
+                            sincronizado:         'false' as const,
+                            responsable_id:       userId,
+                            responsable_nombre:   userName || 'Sistema',
+                            notas:                '[AUTO] Continuidad entrega sin modificación',
+                        });
+                    }
+                    cursorE.setDate(cursorE.getDate() + 1);
+                }
+            }
+
             if (continuas.length > 0) {
                 // Transacción para garantizar atomicidad — si falla, no quedan registros parciales
                 await db.transaction('rw', [db.records], async () => {
@@ -646,9 +715,10 @@ export const syncPendingRecords = async () => {
             ciclo_id:           p.ciclo_id || null,
             hora_inicio:        p.hora_inicio_entrega || null,
             hora_fin:           p.hora_fin_entrega || null,
-            gasto_lps:          p.valor_q ?? 0,            // valor_q reutilizado = gasto en L/s
+            gasto_lps:          p.valor_q ?? 0,
             volumen_m3:         p.volumen_m3 ?? 0,
             tipo_entrega:       p.tipo_entrega ?? 'base',
+            estado_operativo:   p.estado_operativo ?? 'inicio',
             motivo_adicional:   p.motivo_adicional || null,
             capturador_id:      p.responsable_id || null,
             notas:              p.notas || null,

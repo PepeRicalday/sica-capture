@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { v4 as uuidv4 } from 'uuid';
 import { Save, Droplets, TrendingUp, AlertTriangle, CheckCircle2 } from 'lucide-react';
-import { db, type OfflinePoint, type ZonaCatalog, type ModuloBalance, type ModuloZona } from '../lib/db';
+import { db, type OfflinePoint, type ZonaCatalog, type ModuloBalance, type ModuloZona, type SicaRecord } from '../lib/db';
 import { supabase } from '../lib/supabase';
 import { getTodayString } from '../lib/dateHelpers';
 import { useAuth } from '../context/AuthContext';
@@ -220,7 +220,7 @@ export function EntregaForm({ onSaved }: EntregaFormProps) {
         [gastoLps, horas]
     );
 
-    // Registro existente hoy (para mostrar advertencia de sobreescritura)
+    // Registro existente hoy (para advertencia de sobreescritura)
     const registroHoy = useLiveQuery(
         async () => {
             if (!selectedModuloId) return null;
@@ -235,6 +235,65 @@ export function EntregaForm({ onSaved }: EntregaFormProps) {
         },
         [selectedModuloId, fecha, tipoEntrega]
     );
+
+    // Última entrega activa (puede ser de días anteriores — continuidad)
+    // undefined = cargando | null = no hay entrega activa | SicaRecord = activa
+    const ultimaEntrega = useLiveQuery(
+        async (): Promise<SicaRecord | null> => {
+            if (!selectedModuloId) return null;
+            const registros = await db.records
+                .filter(r =>
+                    r.tipo === 'entrega' &&
+                    r.modulo_id === selectedModuloId &&
+                    r.tipo_entrega === tipoEntrega
+                )
+                .toArray();
+            if (registros.length === 0) return null;
+            registros.sort((a, b) => {
+                const dc = b.fecha_captura.localeCompare(a.fecha_captura);
+                return dc !== 0 ? dc : b.hora_captura.localeCompare(a.hora_captura);
+            });
+            const ultimo = registros[0];
+            if (ultimo.estado_operativo === 'cierre' || (ultimo.valor_q ?? 0) <= 0) return null;
+            return ultimo;
+        },
+        [selectedModuloId, tipoEntrega]
+    ) as SicaRecord | null | undefined;
+
+    // Cierre explícito de entrega activa
+    const handleCierre = async () => {
+        if (!ultimaEntrega?.modulo_id) return;
+        setIsSaving(true);
+        try {
+            await db.records.put({
+                id:                   uuidv4(),
+                tipo:                 'entrega' as const,
+                punto_id:             ultimaEntrega.modulo_id,
+                modulo_id:            ultimaEntrega.modulo_id,
+                zona_id:              ultimaEntrega.zona_id,
+                ciclo_id:             cicloActivoId || ultimaEntrega.ciclo_id || undefined,
+                tipo_entrega:         ultimaEntrega.tipo_entrega ?? 'base',
+                valor_q:              0,
+                hora_inicio_entrega:  ultimaEntrega.hora_inicio_entrega,
+                hora_fin_entrega:     ultimaEntrega.hora_fin_entrega,
+                horas_operacion:      0,
+                volumen_m3:           0,
+                estado_operativo:     'cierre' as const,
+                fecha_captura:        getTodayString(),
+                hora_captura:         new Date().toTimeString().slice(0, 8),
+                responsable_id:       profile?.id,
+                responsable_nombre:   profile?.nombre || 'Operador',
+                sincronizado:         'false' as const,
+                notas:                'Cierre manual de entrega',
+            });
+            toast.success('Entrega cerrada — se sincronizará al conectar');
+            onSaved?.();
+        } catch {
+            toast.error('Error al registrar cierre');
+        } finally {
+            setIsSaving(false);
+        }
+    };
 
     const handleSave = async () => {
         if (!selectedModuloId) {
@@ -254,6 +313,9 @@ export function EntregaForm({ onSaved }: EntregaFormProps) {
             return;
         }
 
+        // Determinar estado: 'inicio' si no hay entrega activa, 'modificacion' si la hay
+        const estadoOp: SicaRecord['estado_operativo'] = ultimaEntrega ? 'modificacion' : 'inicio';
+
         setIsSaving(true);
         try {
             const record = {
@@ -271,6 +333,7 @@ export function EntregaForm({ onSaved }: EntregaFormProps) {
                 hora_fin_entrega:     `${horaFin}:00`,
                 horas_operacion:      horas,
                 volumen_m3:           volumen,
+                estado_operativo:     estadoOp,
                 motivo_adicional:     tipoEntrega === 'adicional' ? motivo.trim() : undefined,
                 notas:                notas.trim() || undefined,
                 responsable_id:       profile?.id,
@@ -280,9 +343,9 @@ export function EntregaForm({ onSaved }: EntregaFormProps) {
 
             await db.records.put(record);
             toast.success(
-                registroHoy
-                    ? 'Entrega actualizada (pendiente de sync)'
-                    : `Entrega ${tipoEntrega} registrada`
+                ultimaEntrega
+                    ? 'Entrega modificada — continúa con el nuevo gasto'
+                    : `Entrega ${tipoEntrega} iniciada — continúa automáticamente`
             );
             setGastoLps('');
             setMotivo('');
@@ -344,6 +407,41 @@ export function EntregaForm({ onSaved }: EntregaFormProps) {
                     </select>
                 </div>
             </div>
+
+            {/* ── Estado de entrega activa ─────────────────────────────────── */}
+            {ultimaEntrega && (
+                <div className="flex items-center justify-between px-4 py-3 bg-emerald-900/20 border border-emerald-700/40 rounded-xl">
+                    <div className="min-w-0">
+                        <p className="text-[10px] font-black uppercase tracking-widest text-emerald-500 mb-0.5">
+                            Entrega activa — continúa automáticamente
+                        </p>
+                        <p className="text-white font-bold text-sm">
+                            {(ultimaEntrega.valor_q ?? 0).toLocaleString('es-MX')} L/s
+                            <span className="ml-2 text-slate-400 font-normal text-[11px]">
+                                {ultimaEntrega.hora_inicio_entrega?.slice(0, 5)}–{ultimaEntrega.hora_fin_entrega?.slice(0, 5)}
+                            </span>
+                        </p>
+                        <p className="text-[10px] text-slate-500 mt-0.5">
+                            Último registro: {ultimaEntrega.fecha_captura} · Para modificar, captura abajo
+                        </p>
+                    </div>
+                    <button
+                        type="button"
+                        onClick={handleCierre}
+                        disabled={isSaving}
+                        className="ml-3 flex-shrink-0 px-3 py-2 text-[11px] font-black uppercase tracking-wider bg-rose-900/40 border border-rose-700/50 text-rose-300 rounded-lg disabled:opacity-40"
+                    >
+                        Cerrar
+                    </button>
+                </div>
+            )}
+
+            {selectedModuloId && !loadingCat && ultimaEntrega === null && (
+                <div className="flex items-center gap-2 px-3 py-2 bg-slate-800/30 border border-slate-700/30 rounded-lg">
+                    <div className="w-2 h-2 rounded-full bg-slate-600 flex-shrink-0" />
+                    <p className="text-[11px] text-slate-500">Sin entrega activa — iniciar nueva entrega</p>
+                </div>
+            )}
 
             {/* Indicador zona secundaria para M2 */}
             {esZonaSecundaria && (
@@ -545,7 +643,11 @@ export function EntregaForm({ onSaved }: EntregaFormProps) {
                 }`}
             >
                 <Save size={16} />
-                {isSaving ? 'Guardando...' : `Guardar entrega ${tipoEntrega}`}
+                {isSaving
+                    ? 'Guardando...'
+                    : ultimaEntrega
+                        ? `Modificar entrega ${tipoEntrega}`
+                        : `Iniciar entrega ${tipoEntrega}`}
             </button>
 
             {/* ── Balance del módulo ── */}
