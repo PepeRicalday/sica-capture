@@ -487,6 +487,7 @@ export const autoGenerateContinua = async (userId?: string, userName?: string): 
                             hora_fin_entrega:     ultimo.hora_fin_entrega,
                             horas_operacion:      ultimo.horas_operacion,
                             volumen_m3:           ultimo.volumen_m3,
+                            motivo_adicional:     ultimo.motivo_adicional,
                             estado_operativo:     'continua' as const,
                             fecha_captura:        dateStr,
                             hora_captura:         dateStr === today ? horaHoy : '23:59:00',
@@ -564,6 +565,38 @@ export const syncPendingRecords = async () => {
 
         // Generar registros de continuidad automática antes de subir
         await autoGenerateContinua(session.user.id, session.user.email ?? undefined);
+
+        // RECUPERACIÓN: limpiar error en adicional-continua atascados por falta de motivo_adicional
+        // (bug previo: autoGenerateContinua no copiaba motivo_adicional → violates check constraint)
+        const stuckAdicional = await db.records
+            .filter(r =>
+                r.tipo === 'entrega' &&
+                r.tipo_entrega === 'adicional' &&
+                !r.motivo_adicional &&
+                !!r.error_sync &&
+                r.sincronizado === 'false'
+            )
+            .toArray();
+        if (stuckAdicional.length > 0) {
+            // Para cada uno, buscar el motivo del registro original del mismo modulo
+            for (const stuck of stuckAdicional) {
+                if (!stuck.modulo_id) continue;
+                const original = await db.records
+                    .filter(r =>
+                        r.tipo === 'entrega' &&
+                        r.modulo_id === stuck.modulo_id &&
+                        r.tipo_entrega === 'adicional' &&
+                        !!r.motivo_adicional
+                    )
+                    .first();
+                await db.records.update(stuck.id, {
+                    motivo_adicional: original?.motivo_adicional ?? 'Continuación automática',
+                    error_sync:       undefined,
+                    retry_count:      0,
+                    first_failed_at:  undefined,
+                });
+            }
+        }
 
         const allPending = await db.records.where({ sincronizado: 'false' }).toArray();
         if (allPending.length === 0) return;
@@ -707,22 +740,46 @@ export const syncPendingRecords = async () => {
 
         // 1D. Entregas por Módulo (van a entregas_modulo)
         const entregasPending = pending.filter(p => p.tipo === 'entrega');
-        const entregasPayload = entregasPending.map(p => ({
-            id:                 p.id,
-            fecha:              p.fecha_captura,
-            modulo_id:          p.modulo_id,
-            zona_id:            p.zona_id || null,
-            ciclo_id:           p.ciclo_id || null,
-            hora_inicio:        p.hora_inicio_entrega || null,
-            hora_fin:           p.hora_fin_entrega || null,
-            gasto_lps:          p.valor_q ?? 0,
-            volumen_m3:         p.volumen_m3 ?? 0,
-            tipo_entrega:       p.tipo_entrega ?? 'base',
-            estado_operativo:   p.estado_operativo ?? 'inicio',
-            motivo_adicional:   p.motivo_adicional || null,
-            capturador_id:      p.responsable_id || null,
-            notas:              p.notas || null,
-        }));
+
+        // Pre-cargar motivos para adicionales que les falte (registros continua generados antes del fix)
+        const motivosByModulo = new Map<string, string>();
+        for (const p of entregasPending) {
+            if (p.tipo_entrega === 'adicional' && !p.motivo_adicional && p.modulo_id) {
+                if (!motivosByModulo.has(p.modulo_id)) {
+                    const original = await db.records
+                        .filter(r =>
+                            r.tipo === 'entrega' &&
+                            r.modulo_id === p.modulo_id &&
+                            r.tipo_entrega === 'adicional' &&
+                            !!r.motivo_adicional
+                        )
+                        .first();
+                    motivosByModulo.set(p.modulo_id, original?.motivo_adicional ?? 'Continuación automática');
+                }
+            }
+        }
+
+        const entregasPayload = entregasPending.map(p => {
+            const motivoFallback = (p.tipo_entrega === 'adicional' && !p.motivo_adicional && p.modulo_id)
+                ? (motivosByModulo.get(p.modulo_id) ?? 'Continuación automática')
+                : null;
+            return {
+                id:                 p.id,
+                fecha:              p.fecha_captura,
+                modulo_id:          p.modulo_id,
+                zona_id:            p.zona_id || null,
+                ciclo_id:           p.ciclo_id || null,
+                hora_inicio:        p.hora_inicio_entrega || null,
+                hora_fin:           p.hora_fin_entrega || null,
+                gasto_lps:          p.valor_q ?? 0,
+                volumen_m3:         p.volumen_m3 ?? 0,
+                tipo_entrega:       p.tipo_entrega ?? 'base',
+                estado_operativo:   p.estado_operativo ?? 'inicio',
+                motivo_adicional:   p.motivo_adicional || motivoFallback,
+                capturador_id:      p.responsable_id || null,
+                notas:              p.notas || null,
+            };
+        });
 
         if (entregasPayload.length > 0) {
             const { error: err } = await supabase
