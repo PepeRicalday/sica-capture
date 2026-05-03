@@ -566,7 +566,7 @@ export const syncPendingRecords = async () => {
         // Generar registros de continuidad automática antes de subir
         await autoGenerateContinua(session.user.id, session.user.email ?? undefined);
 
-        // RECUPERACIÓN: limpiar error en adicional-continua atascados por falta de motivo_adicional
+        // RECUPERACIÓN 1: limpiar error en adicional-continua sin motivo_adicional
         // (bug previo: autoGenerateContinua no copiaba motivo_adicional → violates check constraint)
         const stuckAdicional = await db.records
             .filter(r =>
@@ -578,7 +578,6 @@ export const syncPendingRecords = async () => {
             )
             .toArray();
         if (stuckAdicional.length > 0) {
-            // Para cada uno, buscar el motivo del registro original del mismo modulo
             for (const stuck of stuckAdicional) {
                 if (!stuck.modulo_id) continue;
                 const original = await db.records
@@ -596,6 +595,25 @@ export const syncPendingRecords = async () => {
                     first_failed_at:  undefined,
                 });
             }
+        }
+
+        // RECUPERACIÓN 2: resetear registros crónicos bloqueados por RLS
+        // La política RLS de entregas_modulo fue corregida (perfiles→perfiles_usuario).
+        // Los registros rechazados por "row-level security" pueden reintentarse ahora.
+        const stuckRls = await db.records
+            .filter(r =>
+                r.tipo === 'entrega' &&
+                !!r.error_sync &&
+                r.error_sync.toLowerCase().includes('row-level security') &&
+                r.sincronizado === 'false'
+            )
+            .toArray();
+        if (stuckRls.length > 0) {
+            await db.records.where('id').anyOf(stuckRls.map(r => r.id)).modify(r => {
+                r.error_sync      = undefined;
+                r.retry_count     = 0;
+                r.first_failed_at = undefined;
+            });
         }
 
         const allPending = await db.records.where({ sincronizado: 'false' }).toArray();
