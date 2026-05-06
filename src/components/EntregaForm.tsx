@@ -312,11 +312,15 @@ export function EntregaForm({ onSaved }: EntregaFormProps) {
             toast.error('El motivo es obligatorio para una entrega adicional.');
             return;
         }
-        const esMultiZona = moduloZonas.filter(mz => mz.modulo_id === selectedModuloId).length > 1;
+        const zonasDelModuloActual = moduloZonas.filter(mz => mz.modulo_id === selectedModuloId);
+        const esMultiZona = zonasDelModuloActual.length > 1;
         if (esMultiZona && !selectedZonaId) {
             toast.error('Selecciona la zona antes de guardar (módulo multizona).');
             return;
         }
+        // Para módulos de zona única, auto-asignar su zona aunque SRL no la seleccionó
+        const efectivaZonaId = selectedZonaId ||
+            (zonasDelModuloActual.length === 1 ? zonasDelModuloActual[0].zona_id : undefined);
 
         // Determinar estado: 'inicio' si no hay entrega activa, 'modificacion' si la hay
         const estadoOp: SicaRecord['estado_operativo'] = ultimaEntrega ? 'modificacion' : 'inicio';
@@ -341,7 +345,7 @@ export function EntregaForm({ onSaved }: EntregaFormProps) {
                 tipo:                 'entrega' as const,
                 punto_id:             selectedModuloId,
                 modulo_id:            selectedModuloId,
-                zona_id:              selectedZonaId || undefined,
+                zona_id:              efectivaZonaId || undefined,
                 ciclo_id:             cicloActivoId || undefined,
                 fecha_captura:        fecha,
                 hora_captura:         new Date().toTimeString().slice(0, 8),
