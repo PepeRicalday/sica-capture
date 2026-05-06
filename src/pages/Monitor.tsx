@@ -57,7 +57,21 @@ const Monitor = () => {
     const [currentTime, setCurrentTime] = useState<Date>(() => new Date());
     const [isOnline, setIsOnline] = useState(navigator.onLine);
     const [balanceCanal, setBalanceCanal] = useState({ entrada000: 0, salida104: 0 });
+    const [entregasHoy, setEntregasHoy] = useState<{ gasto_m3s: number | null; modulo_id: string; tipo_entrega: string; volumen_m3: number; codigo_corto?: string }[]>([]);
     const [ultimasMediciones, setUltimasMediciones] = useState<Record<string, { fechaHora: string; aperturaTotal: number }>>({});
+
+    // Fallback local: registros de entrega de hoy en Dexie (no sincronizados aún)
+    const entregasLocalesHoy = useLiveQuery(async () => {
+        const today = getTodayString();
+        return db.records
+            .filter(r =>
+                r.tipo === 'entrega' &&
+                r.fecha_captura === today &&
+                r.estado_operativo !== 'cierre' &&
+                (r.valor_q ?? 0) > 0
+            )
+            .toArray();
+    }, []) ?? [];
 
     // IDs de presas registradas localmente (para buscar movimientos_presas)
     const presaIds = useMemo(() => puntos.filter(p => p.type === 'presa').map(p => p.id), [puntos]);
@@ -149,6 +163,42 @@ const Monitor = () => {
                     ? latest104Aforo.gasto_calculado_m3s
                     : theoreticalFlow104
             });
+
+            // Fetch entregas_modulo: today first, fall back to yesterday if today is empty
+            // (continua records for today are generated at sync time; if sync hasn't run yet
+            //  for today, yesterday's active delivery is a valid current-rate estimate)
+            const yesterday = new Date();
+            yesterday.setDate(yesterday.getDate() - 1);
+            const yesterdayStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Chihuahua' }).format(yesterday);
+
+            const { data: entregasData } = await supabase
+                .from('entregas_modulo')
+                .select('gasto_m3s, modulo_id, tipo_entrega, volumen_m3, fecha, estado_operativo')
+                .gte('fecha', yesterdayStr)
+                .or('estado_operativo.is.null,estado_operativo.neq.cierre')
+                .order('fecha', { ascending: false });
+
+            if (entregasData && entregasData.length > 0) {
+                // Deduplicate: keep most recent per modulo+tipo (query is ordered desc → first = newest)
+                const latestMap = new Map<string, any>();
+                for (const e of entregasData) {
+                    const key = `${e.modulo_id}_${e.tipo_entrega}`;
+                    if (!latestMap.has(key)) latestMap.set(key, e);
+                }
+                const entregasForBalance = Array.from(latestMap.values());
+
+                const mIds = [...new Set(entregasForBalance.map((e: any) => e.modulo_id as string))];
+                const { data: mods } = await supabase.from('modulos').select('id, codigo_corto').in('id', mIds);
+                const mMap = new Map((mods || []).map((m: any) => [m.id as string, (m.codigo_corto || m.id) as string]));
+                setEntregasHoy(entregasForBalance.map((e: any) => ({
+                    ...e,
+                    gasto_m3s: parseFloat(e.gasto_m3s) || 0,   // NUMERIC comes as string from PostgREST
+                    volumen_m3: parseFloat(e.volumen_m3) || 0,
+                    codigo_corto: mMap.get(e.modulo_id) || e.modulo_id,
+                })));
+            } else {
+                setEntregasHoy([]);
+            }
         } catch (error) {
             console.error("Error fetching data for balance", error);
         }
@@ -181,14 +231,16 @@ const Monitor = () => {
     // Si hay varias, tomamos la de K-0 o K-23 como representativa de la central
     const escalaPrincipal = escalas.find(e => e.km === 23.3) || escalas[0];
 
-    // 2. Calcular volumen total por módulo
-    const volPorModulo = tomas.reduce((acc, current) => {
-        const mod = current.modulo || 'Sin Módulo';
-        const vol = current.volumen_hoy_m3 || 0;
-        if (!acc[mod]) acc[mod] = 0;
-        acc[mod] += vol;
-        return acc;
-    }, {} as Record<string, number>);
+    // 2. Calcular volumen total por módulo (tomas directas + entregas_modulo)
+    const volPorModulo: Record<string, number> = {};
+    for (const p of tomas) {
+        const mod = p.modulo || 'Sin Módulo';
+        volPorModulo[mod] = (volPorModulo[mod] || 0) + (p.volumen_hoy_m3 || 0);
+    }
+    for (const e of entregasHoy) {
+        const mod = e.codigo_corto || e.modulo_id || 'Sin Módulo';
+        volPorModulo[mod] = (volPorModulo[mod] || 0) + (e.volumen_m3 || 0);
+    }
 
     // Puntos actualmente abiertos y con coordenadas válidas para dibujar en mapa
     const puntosActivosMapa = tomas.filter(p =>
@@ -230,8 +282,20 @@ const Monitor = () => {
         return () => { cancelled = true; clearInterval(interval); };
     }, [activePuntoIds, isOnline]);
 
-    // 3. Calcular Gasto Instantáneo Total Extraído (m3/s)
-    const entregadoModulosM3s = tomas.filter(p => ['inicio', 'reabierto', 'continua', 'modificacion'].includes(p.estado_hoy || '')).reduce((acc, p) => acc + (p.caudal_promedio || 0), 0);
+    // 3. Calcular Gasto Total Extraído: tomas activas + entregas_modulo registradas hoy
+    const tomasActivasM3s = tomas.filter(p => ['inicio', 'reabierto', 'continua', 'modificacion'].includes(p.estado_hoy || '')).reduce((acc, p) => acc + (p.caudal_promedio || 0), 0);
+
+    // Flujo módulos: Supabase primero; si no hay datos de red usa Dexie local (pre-sync)
+    const gastoModulosM3s = entregasHoy.length > 0
+        ? entregasHoy.reduce((acc, e) => acc + (e.gasto_m3s || 0), 0)
+        : entregasLocalesHoy.reduce((acc, r) => acc + ((r.valor_q ?? 0) / 1000), 0);
+
+    const entregadoModulosM3s = tomasActivasM3s + gastoModulosM3s;
+
+    // Volumen acumulado hoy (informativo en balance — no cambia el cálculo de flujo)
+    const volumenEntregadoHoyM3 = entregasHoy.length > 0
+        ? entregasHoy.reduce((acc, e) => acc + (e.volumen_m3 || 0), 0)
+        : entregasLocalesHoy.reduce((acc, r) => acc + (r.volumen_m3 ?? 0), 0);
 
     // 4. Balance: Diferencia No Contabilizada = Entrada - Entregado - Salida
     const diferenciaGasto = balanceCanal.entrada000 - entregadoModulosM3s - balanceCanal.salida104;
@@ -285,7 +349,14 @@ const Monitor = () => {
                             <span className="text-sm font-mono text-white font-bold">{balanceCanal.entrada000.toFixed(3)} <span className="text-[9px] text-slate-500">m³/s</span></span>
                         </div>
                         <div className="flex justify-between items-center mb-2 pb-2 border-b border-slate-700/50">
-                            <span className="text-xs text-slate-400 font-bold uppercase"><span className="text-amber-400">↘️ EXTRACCIÓN</span> MÓDULOS</span>
+                            <div>
+                                <span className="text-xs text-slate-400 font-bold uppercase"><span className="text-amber-400">↘️ ENTREGADO</span> MÓDULOS</span>
+                                {volumenEntregadoHoyM3 > 0 && (
+                                    <p className="text-[9px] text-amber-300/80 font-mono mt-0.5">
+                                        {(volumenEntregadoHoyM3 / 1e6).toFixed(4)} Mm³ acum. hoy
+                                    </p>
+                                )}
+                            </div>
                             <span className="text-sm font-mono text-white font-bold">{entregadoModulosM3s.toFixed(3)} <span className="text-[9px] text-slate-500">m³/s</span></span>
                         </div>
                         <div className="flex justify-between items-center mb-3">
@@ -293,15 +364,23 @@ const Monitor = () => {
                             <span className="text-sm font-mono text-white font-bold">{balanceCanal.salida104.toFixed(3)} <span className="text-[9px] text-slate-500">m³/s</span></span>
                         </div>
 
-                        <div className={`p-2 rounded-lg flex justify-between items-center border ${Math.abs(diferenciaGasto) > (balanceCanal.entrada000 * 0.1) ? 'bg-red-500/10 border-red-500/30' : 'bg-slate-900 border-slate-700'}`}>
-                            <div className="flex items-center gap-1.5">
-                                <Calculator size={14} className={Math.abs(diferenciaGasto) > (balanceCanal.entrada000 * 0.1) ? 'text-red-400' : 'text-slate-400'} />
-                                <span className={`text-[10px] font-bold tracking-wider ${Math.abs(diferenciaGasto) > (balanceCanal.entrada000 * 0.1) ? 'text-red-300' : 'text-slate-400'}`}>DIFERENCIA (PÉRDIDA)</span>
-                            </div>
-                            <span className={`text-base font-mono font-bold ${Math.abs(diferenciaGasto) > (balanceCanal.entrada000 * 0.1) ? 'text-red-400' : 'text-white'}`}>
-                                {diferenciaGasto.toFixed(3)} <span className="text-[10px] opacity-70">m³/s</span>
-                            </span>
-                        </div>
+                        {(() => {
+                            const esPerdida = Math.abs(diferenciaGasto) > (balanceCanal.entrada000 * 0.1);
+                            const hayExtraccion = entregadoModulosM3s > 0;
+                            return (
+                                <div className={`p-2 rounded-lg flex justify-between items-center border ${esPerdida && !hayExtraccion ? 'bg-red-500/10 border-red-500/30' : 'bg-slate-900 border-slate-700'}`}>
+                                    <div className="flex items-center gap-1.5">
+                                        <Calculator size={14} className={esPerdida && !hayExtraccion ? 'text-red-400' : 'text-slate-400'} />
+                                        <span className={`text-[10px] font-bold tracking-wider ${esPerdida && !hayExtraccion ? 'text-red-300' : 'text-slate-400'}`}>
+                                            {hayExtraccion ? 'DIFERENCIA HIDRÁULICA' : 'DIFERENCIA (PÉRDIDA)'}
+                                        </span>
+                                    </div>
+                                    <span className={`text-base font-mono font-bold ${esPerdida && !hayExtraccion ? 'text-red-400' : 'text-white'}`}>
+                                        {diferenciaGasto.toFixed(3)} <span className="text-[10px] opacity-70">m³/s</span>
+                                    </span>
+                                </div>
+                            );
+                        })()}
                     </div>
                 </div>
 
