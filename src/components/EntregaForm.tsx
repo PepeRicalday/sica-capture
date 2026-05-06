@@ -318,8 +318,21 @@ export function EntregaForm({ onSaved }: EntregaFormProps) {
 
         setIsSaving(true);
         try {
+            // Consulta fresca a Dexie para evitar el ID stale de useLiveQuery cuando
+            // el usuario cambia tipoEntrega y guarda antes de que el query reactivo se actualice.
+            // Sin esto: al cambiar BASE→ADICIONAL y guardar rápido, registroHoy devuelve
+            // el ID del registro BASE y db.records.put() lo sobreescribe con tipo_entrega='adicional'.
+            const registroHoyFresh = await db.records
+                .filter(r =>
+                    r.tipo === 'entrega' &&
+                    r.modulo_id === selectedModuloId &&
+                    r.fecha_captura === fecha &&
+                    r.tipo_entrega === tipoEntrega
+                )
+                .first();
+
             const record = {
-                id:                   registroHoy?.id ?? uuidv4(),
+                id:                   registroHoyFresh?.id ?? uuidv4(),
                 tipo:                 'entrega' as const,
                 punto_id:             selectedModuloId,
                 modulo_id:            selectedModuloId,
@@ -622,7 +635,7 @@ export function EntregaForm({ onSaved }: EntregaFormProps) {
             </div>
 
             {/* ── Registro existente hoy ── */}
-            {registroHoy && (
+            {registroHoy && registroHoy.tipo_entrega === tipoEntrega && (
                 <div className="flex items-center gap-2 px-3 py-2 bg-slate-800/60 border border-slate-700 rounded-lg">
                     <AlertTriangle size={12} className="text-amber-400 flex-shrink-0" />
                     <p className="text-[11px] text-amber-300">
