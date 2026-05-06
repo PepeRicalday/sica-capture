@@ -82,7 +82,7 @@ const Monitor = () => {
         });
         const seen = new Set<string>();
         return registros.filter(r => {
-            const key = `${r.modulo_id}_${r.tipo_entrega ?? 'base'}`;
+            const key = `${r.modulo_id}_${r.zona_id ?? ''}_${r.tipo_entrega ?? 'base'}`;
             if (seen.has(key)) return false;
             seen.add(key);
             return true;
@@ -189,16 +189,18 @@ const Monitor = () => {
 
             const { data: entregasData } = await supabase
                 .from('entregas_modulo')
-                .select('gasto_m3s, modulo_id, tipo_entrega, volumen_m3, fecha')
+                .select('gasto_m3s, modulo_id, zona_id, tipo_entrega, volumen_m3, fecha')
                 .gte('fecha', yesterdayStr)
                 .gt('gasto_m3s', 0)
                 .order('fecha', { ascending: false });
 
             if (entregasData && entregasData.length > 0) {
-                // Deduplicate: keep most recent per modulo+tipo (query is ordered desc → first = newest)
+                // Deduplica: más reciente por modulo+zona+tipo.
+                // CLAVE zona_id obligatoria: MOD-002 en Z2 (1.660) y Z3 (0.500)
+                // son registros distintos — sin zona_id el de Z3 se descartaría.
                 const latestMap = new Map<string, any>();
                 for (const e of entregasData) {
-                    const key = `${e.modulo_id}_${e.tipo_entrega}`;
+                    const key = `${e.modulo_id}_${e.zona_id ?? ''}_${e.tipo_entrega}`;
                     if (!latestMap.has(key)) latestMap.set(key, e);
                 }
                 const entregasForBalance = Array.from(latestMap.values());
