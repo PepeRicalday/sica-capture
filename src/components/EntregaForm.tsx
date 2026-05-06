@@ -312,6 +312,11 @@ export function EntregaForm({ onSaved }: EntregaFormProps) {
             toast.error('El motivo es obligatorio para una entrega adicional.');
             return;
         }
+        const esMultiZona = moduloZonas.filter(mz => mz.modulo_id === selectedModuloId).length > 1;
+        if (esMultiZona && !selectedZonaId) {
+            toast.error('Selecciona la zona antes de guardar (módulo multizona).');
+            return;
+        }
 
         // Determinar estado: 'inicio' si no hay entrega activa, 'modificacion' si la hay
         const estadoOp: SicaRecord['estado_operativo'] = ultimaEntrega ? 'modificacion' : 'inicio';

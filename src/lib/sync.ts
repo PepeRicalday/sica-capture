@@ -804,7 +804,7 @@ export const syncPendingRecords = async () => {
         if (entregasPayload.length > 0) {
             const { error: err } = await supabase
                 .from('entregas_modulo')
-                .upsert(entregasPayload, { onConflict: 'fecha,modulo_id,tipo_entrega' });
+                .upsert(entregasPayload, { onConflict: 'fecha,modulo_id,zona_id,tipo_entrega' });
             if (err) {
                 console.error('Error insertando entregas_modulo:', err.message);
                 const now = new Date().toISOString();
