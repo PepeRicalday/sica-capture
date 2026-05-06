@@ -260,6 +260,17 @@ export function EntregaForm({ onSaved }: EntregaFormProps) {
         [selectedModuloId, tipoEntrega]
     ) as SicaRecord | null | undefined;
 
+    // Pre-llenar formulario desde entrega activa al cambiar módulo o tipo
+    useEffect(() => {
+        if (!ultimaEntrega) return;
+        if (ultimaEntrega.tipo_entrega !== tipoEntrega) return;
+        setGastoLps(String(ultimaEntrega.valor_q ?? ''));
+        if (ultimaEntrega.hora_inicio_entrega) setHoraInicio(ultimaEntrega.hora_inicio_entrega.slice(0, 5));
+        if (ultimaEntrega.hora_fin_entrega)    setHoraFin(ultimaEntrega.hora_fin_entrega.slice(0, 5));
+        if (tipoEntrega === 'adicional' && ultimaEntrega.motivo_adicional) setMotivo(ultimaEntrega.motivo_adicional);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [ultimaEntrega, tipoEntrega]);
+
     // Cierre explícito de entrega activa
     const handleCierre = async () => {
         if (!ultimaEntrega?.modulo_id) return;
