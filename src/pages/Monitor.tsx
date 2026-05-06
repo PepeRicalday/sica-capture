@@ -8,7 +8,7 @@ import { Droplet, Activity, WifiOff, Scale, Calculator, AlertCircle } from 'luci
 import { supabase } from '../lib/supabase';
 import StatusBanner from '../components/StatusBanner';
 import { useHydricStatus } from '../context/HydricStatusContext';
-import { getTodayString } from '../lib/dateHelpers';
+import { getTodayString, getDaysAgoString } from '../lib/dateHelpers';
 
 const MapBounds = ({ bounds }: { bounds: [number, number][] }) => {
     const map = useMap();
@@ -60,17 +60,33 @@ const Monitor = () => {
     const [entregasHoy, setEntregasHoy] = useState<{ gasto_m3s: number | null; modulo_id: string; tipo_entrega: string; volumen_m3: number; codigo_corto?: string }[]>([]);
     const [ultimasMediciones, setUltimasMediciones] = useState<Record<string, { fechaHora: string; aperturaTotal: number }>>({});
 
-    // Fallback local: registros de entrega de hoy en Dexie (no sincronizados aún)
+    // Fallback local: registros de entrega activos (hoy o ayer) en Dexie
+    // Incluye ayer porque continua para hoy no se genera hasta que corre sync.
+    // Deduplica igual que Supabase: el más reciente por modulo+tipo_entrega.
     const entregasLocalesHoy = useLiveQuery(async () => {
         const today = getTodayString();
-        return db.records
+        const yesterday = getDaysAgoString(1);
+        const registros = await db.records
             .filter(r =>
                 r.tipo === 'entrega' &&
-                r.fecha_captura === today &&
+                r.fecha_captura >= yesterday &&
+                r.fecha_captura <= today &&
                 r.estado_operativo !== 'cierre' &&
                 (r.valor_q ?? 0) > 0
             )
             .toArray();
+        // Ordenar descendente y quedarse con el más reciente por modulo+tipo
+        registros.sort((a, b) => {
+            const dc = b.fecha_captura.localeCompare(a.fecha_captura);
+            return dc !== 0 ? dc : b.hora_captura.localeCompare(a.hora_captura);
+        });
+        const seen = new Set<string>();
+        return registros.filter(r => {
+            const key = `${r.modulo_id}_${r.tipo_entrega ?? 'base'}`;
+            if (seen.has(key)) return false;
+            seen.add(key);
+            return true;
+        });
     }, []) ?? [];
 
     // IDs de presas registradas localmente (para buscar movimientos_presas)
@@ -173,9 +189,9 @@ const Monitor = () => {
 
             const { data: entregasData } = await supabase
                 .from('entregas_modulo')
-                .select('gasto_m3s, modulo_id, tipo_entrega, volumen_m3, fecha, estado_operativo')
+                .select('gasto_m3s, modulo_id, tipo_entrega, volumen_m3, fecha')
                 .gte('fecha', yesterdayStr)
-                .or('estado_operativo.is.null,estado_operativo.neq.cierre')
+                .gt('gasto_m3s', 0)
                 .order('fecha', { ascending: false });
 
             if (entregasData && entregasData.length > 0) {
