@@ -631,7 +631,7 @@ const Capture = () => {
                 {/* SI ES ENTREGA -> RENDERIZAR COMPONENTE PROPIO Y SALTAR EL RESTO */}
                 {activeTab === 'entrega' && (
                     <div className="flex-1 overflow-y-auto mt-1 pr-0.5">
-                        <EntregaForm onSaved={() => { /* sin reset adicional */ }} />
+                        <EntregaForm onSaved={() => { if (navigator.onLine) syncPendingRecords(); }} />
                     </div>
                 )}
 
