@@ -47,20 +47,41 @@ export const HYDRAULIC_CONSTANTS = {
  */
 export const FACTORES_CORRECCION_M1: Record<string, number> = {
     'K-0+000':   1.1570,   // cal. aforo 07/05/2026 Q=29.436 m³/s (era 0.8923)
-    'K-23':      1.9031,   // recal. 27/04/2026 — era 2.0978 (ancla K-0 corregida)
-    'K-29':      1.2379,   // recal. 27/04/2026 — era 1.3589
-    'K-34':      1.5199,   // recal. 27/04/2026 v2 — era 1.2637; balance segmento K-29
-    'K-44':      1.0119,   // recal. 27/04/2026 v2 — era 0.9067; balance segmento K-29
+    'K-23':      1.9031,   // CONGELADO — sifón: fórmula radial no aplica, no calibrar por balance
+    'K-29':      1.4370,   // recal. 07/05/2026 bal. Z1 — era 1.2379
+    'K-34':      1.5510,   // recal. 07/05/2026 bal. Z1 — era 1.5199
+    'K-44':      1.0810,   // recal. 07/05/2026 bal. Z1 — era 1.0119
     'K-54':      1.0066,   // recal. 27/04/2026 — era 1.0823
     'K-62':      1.0537,   // recal. 27/04/2026 — era 1.1294
     'K-64':      1.3305,   // escala referencia — sin cambio
     'K-68':      1.0398,   // recal. 27/04/2026 — era 1.1112
-    'K-79+025':  1.5824,   // recal. 27/04/2026 — era 1.6643
-    'K-87+549':  1.2089,   // recal. 27/04/2026 — era 1.2530
-    'K-94+057':  1.1612,   // recal. 27/04/2026 — era 1.1883
+    'K-79+025':  1.9960,   // recal. 07/05/2026 bal. Z4 — era 1.5824
+    'K-87+549':  1.4250,   // recal. 07/05/2026 bal. Z4 — era 1.2089
+    'K-94+057':  1.4280,   // recal. 07/05/2026 bal. Z4 — era 1.1612
     'K-94+200':  1.2851,   // escala referencia — sin cambio
     'K-104':     0.7714,   // ancla salida — sin cambio
 };
+
+/**
+ * Sifones — Q no se calcula por fórmula radial sino por propagación desde K-0+000.
+ * Q_sifon = Q_K0 - delta_q  (delta_q = entregas acumuladas aguas arriba del sifón)
+ * Cal. 07/05/2026 bal. Z1: entregas K-0+000 → K-23 = 0.650 m³/s
+ */
+export const SIFON_DELTA_Q: Record<string, number> = {
+    'K-23': 0.650,
+};
+
+/** Devuelve Q propagado desde K-0+000 para una escala tipo sifón. */
+export function propagarQSifon(nombre: string, q_k0: number): number {
+    const clave = Object.keys(SIFON_DELTA_Q).find(k => nombre?.toUpperCase().includes(k));
+    if (clave === undefined) return 0;
+    return Math.max(0, q_k0 - SIFON_DELTA_Q[clave]);
+}
+
+/** True si la escala es un sifón (Q por propagación, no por fórmula). */
+export function esSifon(nombre: string): boolean {
+    return Object.keys(SIFON_DELTA_Q).some(k => nombre?.toUpperCase().includes(k));
+}
 
 // Posiciones kilométricas nominales de cada punto de control (para búsqueda por km más cercano)
 const _KM_BY_NAME: Record<string, number> = {
