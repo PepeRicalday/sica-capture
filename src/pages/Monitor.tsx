@@ -9,6 +9,7 @@ import { supabase } from '../lib/supabase';
 import StatusBanner from '../components/StatusBanner';
 import { useHydricStatus } from '../context/HydricStatusContext';
 import { getTodayString, getDaysAgoString } from '../lib/dateHelpers';
+import { calculateFlow, getFactorCorreccion } from '../lib/hydraulicCalculations';
 
 const MapBounds = ({ bounds }: { bounds: [number, number][] }) => {
     const map = useMap();
@@ -127,14 +128,14 @@ const Monitor = () => {
                 ];
                 const { data: scales } = await supabase
                     .from('escalas')
-                    .select('id, km')
+                    .select('id, nombre, km, pzas_radiales, ancho')
                     .in('km', kmsNeeded);
 
                 if (scales && scales.length > 0) {
                     const scaleIds = scales.map(s => s.id);
                     const { data: readings } = await supabase
                         .from('lecturas_escalas')
-                        .select('escala_id, gasto_calculado_m3s, fecha, hora_lectura')
+                        .select('escala_id, gasto_calculado_m3s, nivel_m, nivel_abajo_m, radiales_json, fecha, hora_lectura')
                         .in('escala_id', scaleIds)
                         .gte('fecha', sevenDaysAgoStr)
                         .order('fecha', { ascending: false })
@@ -143,13 +144,35 @@ const Monitor = () => {
                     const id000 = scales.find(s => s.km === 0)?.id;
                     const id104 = scales.find(s => s.km === 104)?.id;
 
+                    const recalcQ = (r: any, escala: any): number => {
+                        if (!r || !escala) return 0;
+                        const aperturas = Array.isArray(r.radiales_json)
+                            ? Array.from({ length: escala.pzas_radiales || 0 }, (_: any, i: number) => {
+                                const g = r.radiales_json.find((x: any) => x.index === i);
+                                return g ? (g.apertura_m || 0) : 0;
+                            })
+                            : [];
+                        const fc = getFactorCorreccion(escala.nombre, escala.km);
+                        const res = calculateFlow({
+                            hArriba: r.nivel_m || 0,
+                            hAbajo: r.nivel_abajo_m || 0,
+                            pzasRadiales: escala.pzas_radiales || 0,
+                            anchoRadial: escala.ancho || 0,
+                            aperturas,
+                            factorCorreccion: fc,
+                        });
+                        return res.q_total > 0 ? res.q_total : (r.gasto_calculado_m3s || 0);
+                    };
+
                     if (needs000 && id000) {
-                        const r = readings?.find(r => r.escala_id === id000 && r.gasto_calculado_m3s && r.gasto_calculado_m3s > 0);
-                        if (r) theoreticalFlow000 = r.gasto_calculado_m3s || 0;
+                        const r = readings?.find(r => r.escala_id === id000 && r.nivel_m && r.nivel_m > 0);
+                        const esc = scales.find(s => s.id === id000);
+                        if (r) theoreticalFlow000 = recalcQ(r, esc);
                     }
                     if (needs104 && id104) {
-                        const r = readings?.find(r => r.escala_id === id104 && r.gasto_calculado_m3s && r.gasto_calculado_m3s > 0);
-                        if (r) theoreticalFlow104 = r.gasto_calculado_m3s || 0;
+                        const r = readings?.find(r => r.escala_id === id104 && r.nivel_m && r.nivel_m > 0);
+                        const esc = scales.find(s => s.id === id104);
+                        if (r) theoreticalFlow104 = recalcQ(r, esc);
                     }
                 }
             }
