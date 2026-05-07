@@ -46,7 +46,7 @@ export const HYDRAULIC_CONSTANTS = {
  * K-79+025 usa Opción A (carga → h_arriba cuando Δh ≤ 0) — ver calculateFlow().
  */
 export const FACTORES_CORRECCION_M1: Record<string, number> = {
-    'K-0+000':   0.8923,   // cal. aforo 27/04/2026 — primera calibración (era 1.0000)
+    'K-0+000':   1.1570,   // cal. aforo 07/05/2026 Q=29.436 m³/s (era 0.8923)
     'K-23':      1.9031,   // recal. 27/04/2026 — era 2.0978 (ancla K-0 corregida)
     'K-29':      1.2379,   // recal. 27/04/2026 — era 1.3589
     'K-34':      1.5199,   // recal. 27/04/2026 v2 — era 1.2637; balance segmento K-29
