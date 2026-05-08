@@ -224,16 +224,20 @@ export function EntregaForm({ onSaved }: EntregaFormProps) {
     const registroHoy = useLiveQuery(
         async () => {
             if (!selectedModuloId) return null;
+            const zonasDelMod = moduloZonas.filter(mz => mz.modulo_id === selectedModuloId);
+            const efectivaZona = selectedZonaId ||
+                (zonasDelMod.length === 1 ? zonasDelMod[0].zona_id : undefined);
             return db.records
                 .filter(r =>
                     r.tipo === 'entrega' &&
                     r.modulo_id === selectedModuloId &&
                     r.fecha_captura === fecha &&
-                    r.tipo_entrega === tipoEntrega
+                    r.tipo_entrega === tipoEntrega &&
+                    (efectivaZona === undefined || r.zona_id === efectivaZona)
                 )
                 .first();
         },
-        [selectedModuloId, fecha, tipoEntrega]
+        [selectedModuloId, fecha, tipoEntrega, selectedZonaId, moduloZonas]
     );
 
     // Última entrega activa (puede ser de días anteriores — continuidad)
@@ -262,16 +266,25 @@ export function EntregaForm({ onSaved }: EntregaFormProps) {
         [selectedModuloId, tipoEntrega, selectedZonaId]
     ) as SicaRecord | null | undefined;
 
-    // Pre-llenar formulario desde entrega activa al cambiar módulo o tipo
+    // Pre-llenar formulario desde entrega activa al cambiar módulo/zona/tipo.
+    // Si no hay entrega activa, resetear campos para que no queden valores de otro contexto.
     useEffect(() => {
-        if (!ultimaEntrega) return;
+        if (ultimaEntrega === undefined) return; // cargando — no tocar
+        if (!ultimaEntrega) {
+            setGastoLps('');
+            setMotivo('');
+            setNotas('');
+            setHoraInicio('06:00');
+            setHoraFin('18:00');
+            return;
+        }
         if (ultimaEntrega.tipo_entrega !== tipoEntrega) return;
         setGastoLps(String(ultimaEntrega.valor_q ?? ''));
         if (ultimaEntrega.hora_inicio_entrega) setHoraInicio(ultimaEntrega.hora_inicio_entrega.slice(0, 5));
         if (ultimaEntrega.hora_fin_entrega)    setHoraFin(ultimaEntrega.hora_fin_entrega.slice(0, 5));
         if (tipoEntrega === 'adicional' && ultimaEntrega.motivo_adicional) setMotivo(ultimaEntrega.motivo_adicional);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [ultimaEntrega, tipoEntrega]);
+    }, [ultimaEntrega, tipoEntrega, selectedModuloId, selectedZonaId]);
 
     // Cierre explícito de entrega activa
     const handleCierre = async () => {
