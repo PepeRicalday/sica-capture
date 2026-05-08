@@ -245,7 +245,9 @@ export function EntregaForm({ onSaved }: EntregaFormProps) {
                 .filter(r =>
                     r.tipo === 'entrega' &&
                     r.modulo_id === selectedModuloId &&
-                    r.tipo_entrega === tipoEntrega
+                    r.tipo_entrega === tipoEntrega &&
+                    // Multizona: aislar continuidad por zona — M2/Z2 y M2/Z3 son independientes
+                    (!selectedZonaId || r.zona_id === selectedZonaId)
                 )
                 .toArray();
             if (registros.length === 0) return null;
@@ -257,7 +259,7 @@ export function EntregaForm({ onSaved }: EntregaFormProps) {
             if (ultimo.estado_operativo === 'cierre' || (ultimo.valor_q ?? 0) <= 0) return null;
             return ultimo;
         },
-        [selectedModuloId, tipoEntrega]
+        [selectedModuloId, tipoEntrega, selectedZonaId]
     ) as SicaRecord | null | undefined;
 
     // Pre-llenar formulario desde entrega activa al cambiar módulo o tipo
@@ -342,12 +344,15 @@ export function EntregaForm({ onSaved }: EntregaFormProps) {
             // el usuario cambia tipoEntrega y guarda antes de que el query reactivo se actualice.
             // Sin esto: al cambiar BASE→ADICIONAL y guardar rápido, registroHoy devuelve
             // el ID del registro BASE y db.records.put() lo sobreescribe con tipo_entrega='adicional'.
+            // Multizona: incluir zona_id en la clave de upsert para que M2/Z2 y M2/Z3
+            // sean registros independientes y no se sobreescriban entre sí.
             const registroHoyFresh = await db.records
                 .filter(r =>
                     r.tipo === 'entrega' &&
                     r.modulo_id === selectedModuloId &&
                     r.fecha_captura === fecha &&
-                    r.tipo_entrega === tipoEntrega
+                    r.tipo_entrega === tipoEntrega &&
+                    (efectivaZonaId === undefined || r.zona_id === efectivaZonaId)
                 )
                 .first();
 
