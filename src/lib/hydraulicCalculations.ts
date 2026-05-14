@@ -46,7 +46,7 @@ export const HYDRAULIC_CONSTANTS = {
  * K-79+025 usa Opción A (carga → h_arriba cuando Δh ≤ 0) — ver calculateFlow().
  */
 export const FACTORES_CORRECCION_M1: Record<string, number> = {
-    'K-0+000':   1.1570,   // cal. aforo 07/05/2026 Q=29.436 m³/s (era 0.8923)
+    'K-0+000':   1.2547,   // cal. aforo 14/05/2026 Q=31.377 m³/s (era 1.1570)
     'K-23':      1.9031,   // CONGELADO — sifón: fórmula radial no aplica, no calibrar por balance
     'K-29':      1.4370,   // recal. 07/05/2026 bal. Z1 — era 1.2379
     'K-34':      1.5510,   // recal. 07/05/2026 bal. Z1 — era 1.5199
