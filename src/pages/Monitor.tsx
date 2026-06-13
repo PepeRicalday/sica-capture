@@ -135,11 +135,10 @@ const Monitor = () => {
                     const scaleIds = scales.map(s => s.id);
                     const { data: readings } = await supabase
                         .from('lecturas_escalas')
-                        .select('escala_id, gasto_calculado_m3s, nivel_m, nivel_abajo_m, radiales_json, fecha, hora_lectura')
+                        .select('escala_id, gasto_calculado_m3s, nivel_m, nivel_abajo_m, radiales_json, fecha, hora_lectura, creado_en')
                         .in('escala_id', scaleIds)
                         .gte('fecha', sevenDaysAgoStr)
-                        .order('fecha', { ascending: false })
-                        .order('hora_lectura', { ascending: false });
+                        .order('creado_en', { ascending: false });
 
                     const id000 = scales.find(s => s.km === 0)?.id;
                     const id104 = scales.find(s => s.km === 104)?.id;
@@ -261,7 +260,28 @@ const Monitor = () => {
     useEffect(() => {
         fetchBalanceData();
         const aforoInterval = setInterval(fetchBalanceData, 60000);
-        return () => clearInterval(aforoInterval);
+
+        // Realtime: re-fetch cuando llega nueva lectura en K-0+000 o K-104
+        const channel = supabase
+            .channel('monitor-balance-escalas')
+            .on('postgres_changes', {
+                event: '*',
+                schema: 'public',
+                table: 'lecturas_escalas',
+                filter: 'escala_id=eq.ESC-000',
+            }, () => fetchBalanceData())
+            .on('postgres_changes', {
+                event: '*',
+                schema: 'public',
+                table: 'lecturas_escalas',
+                filter: 'escala_id=eq.ESC-104',
+            }, () => fetchBalanceData())
+            .subscribe();
+
+        return () => {
+            clearInterval(aforoInterval);
+            supabase.removeChannel(channel);
+        };
     }, [fetchBalanceData]);
 
     // 1. Filtrar solo tomas (ignorar escalas para el cálculo de volumen)
