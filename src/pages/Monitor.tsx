@@ -138,7 +138,7 @@ const Monitor = () => {
                         .select('escala_id, gasto_calculado_m3s, nivel_m, nivel_abajo_m, radiales_json, fecha, hora_lectura, creado_en')
                         .in('escala_id', scaleIds)
                         .gte('fecha', sevenDaysAgoStr)
-                        .order('creado_en', { ascending: false });
+                        .order('creado_en', { ascending: false }); // creado_en = orden real, inmune a fechas manuales
 
                     const id000 = scales.find(s => s.km === 0)?.id;
                     const id104 = scales.find(s => s.km === 104)?.id;

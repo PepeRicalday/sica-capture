@@ -39,20 +39,19 @@ export const downloadCatalogs = async (forceCatalog = false) => {
         // 1. DYNAMIC DATA (Always fetch)
 
         // A. Fetch latest readings to check for confirmation AND pre-fill values
-        // Incluye nivel_abajo_m y radiales_json (no existen en tabla escalas estática).
-        // Se traen TODAS las lecturas de los últimos 7 días (no solo 1 por escala)
-        // porque el registro más reciente puede tener esos campos en null si el
-        // operador solo capturó nivel_arriba. Se busca el último valor no-nulo
-        // de cada campo de forma independiente.
+        // Incluye nivel_abajo_m, radiales_json y creado_en.
+        // Orden por creado_en DESC (tiempo real de inserción) — garantiza que fechas
+        // manuales fuera de orden no inviertan la secuencia. Los campos nivel_abajo_m
+        // y radiales_json se buscan en el registro más reciente que los contenga,
+        // con restricción: solo desde la misma fecha que latest para evitar que un
+        // H↓ de días anteriores se combine con un H↑ de hoy (desincronización silenciosa).
         const { data: lastReadings } = await supabase
             .from('lecturas_escalas')
-            .select('escala_id, confirmada, nivel_m, nivel_abajo_m, apertura_radiales_m, radiales_json, fecha, hora_lectura')
+            .select('escala_id, confirmada, nivel_m, nivel_abajo_m, apertura_radiales_m, radiales_json, fecha, hora_lectura, creado_en')
             .gte('fecha', sevenDaysAgoStr)
-            .order('fecha', { ascending: false })
-            .order('hora_lectura', { ascending: false });
+            .order('creado_en', { ascending: false });
 
-        // readingsMap: escala_id → array de lecturas ordenadas desc
-        // Permite buscar el último valor no-nulo por campo
+        // readingsMap: escala_id → array de lecturas ordenadas por creado_en desc
         const readingsMap = new Map<string, any[]>();
         (lastReadings || []).forEach(lr => {
             if (!readingsMap.has(lr.escala_id)) readingsMap.set(lr.escala_id, []);
@@ -198,12 +197,20 @@ export const downloadCatalogs = async (forceCatalog = false) => {
                 const readings  = readingsMap.get(p.id) || [];  // array ordenado desc
                 const fallback  = localEscalasFallback.get(p.id);
 
-                // Para cada campo: tomar el primer registro (más reciente) que lo tenga no-nulo.
-                // Así si hoy solo se capturó nivel_arriba, nivel_abajo sigue desde la última lectura
-                // que sí lo incluía (puede ser de hace 3-4 días).
-                const latest    = readings[0];   // lectura más reciente (nivel_m, confirmada, ts)
-                const rAbajo    = readings.find((r: any) => r.nivel_abajo_m    != null);
-                const rApertura = readings.find((r: any) =>
+                // latest: lectura más reciente por creado_en (orden real de inserción).
+                const latest = readings[0];
+                // Para H↓ y apertura: primero buscar en la misma fecha que latest
+                // (mismo turno de medición). Solo si no existe en esa fecha, buscar
+                // en los 7 días anteriores — evita combinar H↑ de hoy con H↓ de ayer.
+                const latestFecha = latest?.fecha ?? null;
+                const readingsSameFecha = latestFecha
+                    ? readings.filter((r: any) => r.fecha === latestFecha)
+                    : readings;
+                const rAbajo = readingsSameFecha.find((r: any) => r.nivel_abajo_m != null)
+                    ?? readings.find((r: any) => r.nivel_abajo_m != null);
+                const rApertura = readingsSameFecha.find((r: any) =>
+                    r.apertura_radiales_m != null || (r.radiales_json != null && Array.isArray(r.radiales_json) && r.radiales_json.length > 0)
+                ) ?? readings.find((r: any) =>
                     r.apertura_radiales_m != null || (r.radiales_json != null && Array.isArray(r.radiales_json) && r.radiales_json.length > 0)
                 );
 
