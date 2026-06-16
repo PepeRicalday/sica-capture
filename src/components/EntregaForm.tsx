@@ -1,12 +1,13 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { v4 as uuidv4 } from 'uuid';
-import { Save, Droplets, TrendingUp, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { Save, Droplets, TrendingUp, AlertTriangle, CheckCircle2, X } from 'lucide-react';
 import { db, type OfflinePoint, type ZonaCatalog, type ModuloBalance, type ModuloZona, type SicaRecord } from '../lib/db';
 import { supabase } from '../lib/supabase';
 import { getTodayString } from '../lib/dateHelpers';
 import { useAuth } from '../context/AuthContext';
 import { toast } from 'sonner';
+import { EntregaImageCapture, type EntregaInformeExtraido, type EntregaCeldaExtraida } from './EntregaImageCapture';
 
 // ── Helpers ──────────────────────────────────────────────────
 
@@ -25,6 +26,33 @@ const fmtM3 = (v: number) =>
     v >= 1_000_000
         ? `${(v / 1_000_000).toFixed(3)} Mm³`
         : v.toLocaleString('es-MX') + ' m³';
+
+// "Mod.1", "Mód.5", "Mod 12", "M12" → código_corto del catálogo ("M1".."M12")
+const normalizeModuloLabel = (label: string): string | null => {
+    const m = (label || '').match(/(\d+)/);
+    return m ? `M${parseInt(m[1], 10)}` : null;
+};
+
+// Una fila de la cuadrícula resuelta a IDs reales del catálogo, lista para guardar/editar.
+interface CeldaResuelta {
+    key: string;             // modulo_id|zona_id — clave de upsert (igual que handleSave)
+    modulo_id: string;
+    modulo_label: string;    // texto del catálogo: "[M1] Módulo 1"
+    zona_id: string;
+    zona_codigo: string;
+    gasto_m3s: number;
+    nota?: string;
+    es_primaria: boolean;
+    incluir: boolean;        // checkbox de la tabla de revisión
+    error?: string;          // p.ej. módulo/zona no encontrado o relación inexistente
+}
+
+// Un informe (día) en revisión. La foto puede traer uno o dos.
+interface InformeRevision {
+    fecha: string;           // YYYY-MM-DD editable
+    sumaTotalOCR: number | null;
+    celdas: CeldaResuelta[];
+}
 
 // ── Estado semáforo ───────────────────────────────────────────
 const ESTADO_COLOR: Record<string, string> = {
@@ -155,6 +183,132 @@ export function EntregaForm({ onSaved }: EntregaFormProps) {
         supabase.from('ciclos_agricolas').select('id').eq('activo', true).single()
             .then(({ data }) => { if (data) setCicloActivoId(data.id); });
     }, []);
+
+    // ── OCR: revisión de la(s) cuadrícula(s) extraída(s) del informe físico ──
+    // Un array porque la foto puede traer uno o dos días apilados.
+    const [informesRevision, setInformesRevision] = useState<InformeRevision[] | null>(null);
+    const [savingGrid,        setSavingGrid]        = useState(false);
+
+    // Resuelve una celda del OCR a (modulo_id, zona_id) reales del catálogo.
+    const resolverCelda = (c: EntregaCeldaExtraida): CeldaResuelta => {
+        const codigo = normalizeModuloLabel(c.modulo_label);
+        const modulo = codigo
+            ? modulos.find(m => (m.codigo_corto || '').toUpperCase() === codigo.toUpperCase())
+            : undefined;
+        const zona = zonas.find(z => z.codigo?.toUpperCase() === `Z${c.zona_numero}`);
+
+        let error: string | undefined;
+        if (!modulo) error = `Módulo "${c.modulo_label}" no está en el catálogo`;
+        else if (!zona) error = `Zona ${c.zona_numero} no encontrada`;
+
+        // Validar que el módulo realmente sirve esa zona (modulo_zonas)
+        let es_primaria = false;
+        if (modulo && zona) {
+            const rel = moduloZonas.find(mz => mz.modulo_id === modulo.id && mz.zona_id === zona.id);
+            if (!rel) error = `${codigo} no opera en Z${c.zona_numero} (revisar)`;
+            else es_primaria = rel.es_primaria;
+        }
+
+        return {
+            key:          `${modulo?.id ?? '?'}|${zona?.id ?? '?'}`,
+            modulo_id:    modulo?.id ?? '',
+            modulo_label: modulo ? `${codigo} ${modulo.nombre}` : c.modulo_label,
+            zona_id:      zona?.id ?? '',
+            zona_codigo:  zona?.codigo ?? `Z${c.zona_numero}`,
+            gasto_m3s:    c.gasto_m3s,
+            nota:         c.nota,
+            es_primaria,
+            incluir:      !error,    // por defecto se incluyen solo las válidas
+            error,
+        };
+    };
+
+    // Recibe uno o dos informes del OCR y los prepara para revisión.
+    const resolverInformes = (informes: EntregaInformeExtraido[]) => {
+        const hoy = getTodayString();
+        const revisiones: InformeRevision[] = informes.map(inf => ({
+            fecha:        inf.fecha || hoy,
+            sumaTotalOCR: inf.suma_total_m3s ?? null,
+            celdas:       inf.celdas.map(resolverCelda),
+        }));
+        setInformesRevision(revisiones);
+    };
+
+    // Guarda todas las celdas marcadas de todos los informes (m³/s → L/s).
+    // Reusa la misma clave de upsert (modulo_id, zona_id, tipo_entrega, fecha) que handleSave.
+    const guardarCuadricula = async () => {
+        if (!informesRevision) return;
+        const planes = informesRevision.flatMap(inf =>
+            inf.celdas
+                .filter(c => c.incluir && !c.error && c.gasto_m3s > 0)
+                .map(c => ({ celda: c, fecha: inf.fecha }))
+        );
+        if (planes.length === 0) {
+            toast.error('No hay celdas válidas para guardar.');
+            return;
+        }
+        setSavingGrid(true);
+        try {
+            const horaCaptura = new Date().toTimeString().slice(0, 8);
+            for (const { celda: c, fecha } of planes) {
+                const gastoLpsVal = Math.round(c.gasto_m3s * 1000); // m³/s → L/s
+                const existente = await db.records
+                    .filter(r =>
+                        r.tipo === 'entrega' &&
+                        r.modulo_id === c.modulo_id &&
+                        r.fecha_captura === fecha &&
+                        r.tipo_entrega === 'base' &&
+                        r.zona_id === c.zona_id
+                    )
+                    .first();
+
+                await db.records.put({
+                    id:                  existente?.id ?? uuidv4(),
+                    tipo:                'entrega' as const,
+                    punto_id:            c.modulo_id,
+                    modulo_id:           c.modulo_id,
+                    zona_id:             c.zona_id,
+                    ciclo_id:            cicloActivoId || undefined,
+                    fecha_captura:       fecha,
+                    hora_captura:        horaCaptura,
+                    valor_q:             gastoLpsVal,
+                    tipo_entrega:        'base' as const,
+                    hora_inicio_entrega: '06:00:00',
+                    hora_fin_entrega:    '18:00:00',
+                    horas_operacion:     12,
+                    volumen_m3:          calcVolumen(gastoLpsVal, 12),
+                    estado_operativo:    existente ? 'modificacion' as const : 'inicio' as const,
+                    notas:               `Informe Jefes de Zona ${fecha}` + (c.nota ? ` · sangría ${c.nota}` : ''),
+                    responsable_id:      profile?.id,
+                    responsable_nombre:  profile?.nombre || 'Operador',
+                    sincronizado:        'false' as const,
+                });
+            }
+            const dias = new Set(planes.map(p => p.fecha)).size;
+            toast.success(
+                dias > 1
+                    ? `${planes.length} entregas guardadas (${dias} días)`
+                    : `${planes.length} entregas guardadas del informe ${planes[0].fecha}`
+            );
+            setInformesRevision(null);
+            onSaved?.();
+        } catch (e) {
+            console.error('[EntregaForm] guardarCuadricula:', e);
+            toast.error('Error al guardar la cuadrícula');
+        } finally {
+            setSavingGrid(false);
+        }
+    };
+
+    // Helpers de edición sobre informesRevision[idxInf].celdas[idxCelda]
+    const patchCelda = (idxInf: number, idxCelda: number, patch: Partial<CeldaResuelta>) =>
+        setInformesRevision(prev => prev!.map((inf, i) =>
+            i !== idxInf ? inf : {
+                ...inf,
+                celdas: inf.celdas.map((c, j) => j === idxCelda ? { ...c, ...patch } : c),
+            }));
+    const patchFecha = (idxInf: number, fecha: string) =>
+        setInformesRevision(prev => prev!.map((inf, i) => i === idxInf ? { ...inf, fecha } : inf));
 
     // Pre-selección ACU: fija el módulo; la zona se auto-selecciona solo si es única
     useEffect(() => {
@@ -413,8 +567,142 @@ export function EntregaForm({ onSaved }: EntregaFormProps) {
     const estadoColor = ESTADO_COLOR[balanceModulo?.estado_volumen ?? 'normal'];
     const esZonaSecundaria = balanceModulo !== null && balanceModulo?.es_primaria === false;
 
+    const totalIncluidas = useMemo(
+        () => (informesRevision ?? []).reduce(
+            (n, inf) => n + inf.celdas.filter(c => c.incluir && !c.error).length, 0),
+        [informesRevision]
+    );
+
     return (
         <div className="space-y-4 pb-6">
+
+            {/* ── OCR: captura del Informe Diario de Jefes de Zona ── */}
+            <EntregaImageCapture onExtracted={resolverInformes} />
+
+            {/* ── Revisión de la(s) cuadrícula(s) extraída(s) — uno o dos días ── */}
+            {informesRevision && (
+                <div className="rounded-xl border border-indigo-500/40 bg-slate-900/80 overflow-hidden">
+                    <div className="flex items-center justify-between px-4 py-2.5 border-b border-slate-700 bg-indigo-500/10">
+                        <div>
+                            <p className="text-[10px] font-black uppercase tracking-widest text-indigo-300">
+                                Revisar gastos del informe
+                            </p>
+                            <p className="text-[10px] text-slate-400">
+                                {informesRevision.length > 1
+                                    ? `${informesRevision.length} días detectados · ajusta y confirma`
+                                    : 'Ajusta y confirma'}
+                            </p>
+                        </div>
+                        <button
+                            type="button"
+                            title="Descartar"
+                            onClick={() => setInformesRevision(null)}
+                            className="p-1.5 rounded-lg bg-slate-800 border border-slate-700 text-slate-400"
+                        >
+                            <X size={14} />
+                        </button>
+                    </div>
+
+                    {informesRevision.map((inf, idxInf) => {
+                        const totalM3s = inf.celdas
+                            .filter(c => c.incluir && !c.error)
+                            .reduce((s, c) => s + (c.gasto_m3s || 0), 0);
+                        const desfase = inf.sumaTotalOCR != null && Math.abs(totalM3s - inf.sumaTotalOCR) > 0.05;
+                        return (
+                            <div key={idxInf} className={idxInf > 0 ? 'border-t-4 border-slate-800' : ''}>
+                                {/* Fecha del informe (una por día) */}
+                                <div className="px-4 pt-3">
+                                    <label className="block text-[10px] font-black uppercase tracking-widest text-slate-500 mb-1">
+                                        {informesRevision.length > 1 ? `Informe ${idxInf + 1} — fecha` : 'Fecha del informe'}
+                                    </label>
+                                    <input
+                                        type="date"
+                                        title="Fecha del informe"
+                                        value={inf.fecha}
+                                        max={getTodayString()}
+                                        onChange={e => patchFecha(idxInf, e.target.value)}
+                                        className="w-full bg-slate-800 border border-slate-700 text-white rounded-lg px-3 py-2 text-sm"
+                                    />
+                                </div>
+
+                                {/* Tabla de celdas */}
+                                <div className="p-3 space-y-1.5 max-h-72 overflow-y-auto">
+                                    {inf.celdas.map((c, idxCelda) => (
+                                        <div
+                                            key={`${c.key}-${idxCelda}`}
+                                            className={`flex items-center gap-2 px-2.5 py-2 rounded-lg border ${
+                                                c.error
+                                                    ? 'bg-rose-900/20 border-rose-800/50'
+                                                    : c.incluir
+                                                        ? 'bg-slate-800/60 border-slate-700'
+                                                        : 'bg-slate-800/20 border-slate-800 opacity-60'
+                                            }`}
+                                        >
+                                            <input
+                                                type="checkbox"
+                                                title="Incluir esta entrega"
+                                                checked={c.incluir}
+                                                disabled={!!c.error}
+                                                onChange={e => patchCelda(idxInf, idxCelda, { incluir: e.target.checked })}
+                                                className="w-4 h-4 flex-shrink-0 accent-indigo-500"
+                                            />
+                                            <div className="min-w-0 flex-1">
+                                                <p className="text-xs font-bold text-white truncate">
+                                                    {c.modulo_label}
+                                                    <span className="ml-1.5 text-[10px] font-normal text-slate-400">{c.zona_codigo}</span>
+                                                    {!c.es_primaria && !c.error && (
+                                                        <span className="ml-1.5 text-[9px] text-sky-400">2ª</span>
+                                                    )}
+                                                </p>
+                                                {c.error
+                                                    ? <p className="text-[10px] text-rose-400">{c.error}</p>
+                                                    : c.nota && <p className="text-[10px] text-slate-500">sangría {c.nota}</p>}
+                                            </div>
+                                            <div className="flex items-center gap-1 flex-shrink-0">
+                                                <input
+                                                    type="number"
+                                                    min="0"
+                                                    step="0.001"
+                                                    title="Gasto m³/s"
+                                                    value={c.gasto_m3s}
+                                                    disabled={!!c.error}
+                                                    onChange={e => patchCelda(idxInf, idxCelda, { gasto_m3s: parseFloat(e.target.value) || 0 })}
+                                                    className="w-20 bg-slate-900 border border-slate-700 text-white rounded-md px-2 py-1 text-xs text-right font-bold disabled:opacity-50"
+                                                />
+                                                <span className="text-[10px] text-slate-500 w-7">m³/s</span>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+
+                                {/* Total y verificación contra Suma Total del formato */}
+                                <div className="px-4 py-2 border-t border-slate-700/60 flex items-center justify-between text-[11px]">
+                                    <span className="text-slate-400 font-semibold">
+                                        Σ incluidos: <span className="text-white font-bold">{totalM3s.toFixed(3)} m³/s</span>
+                                    </span>
+                                    {inf.sumaTotalOCR != null && (
+                                        <span className={desfase ? 'text-amber-400' : 'text-emerald-400'}>
+                                            Suma Total formato: {inf.sumaTotalOCR.toFixed(3)}{desfase && ' ⚠'}
+                                        </span>
+                                    )}
+                                </div>
+                            </div>
+                        );
+                    })}
+
+                    <div className="p-3">
+                        <button
+                            type="button"
+                            onClick={guardarCuadricula}
+                            disabled={savingGrid || totalIncluidas === 0}
+                            className="w-full py-3 rounded-xl font-black text-sm uppercase tracking-widest flex items-center justify-center gap-2 bg-gradient-to-r from-indigo-600 to-violet-600 text-white disabled:opacity-40"
+                        >
+                            <Save size={16} />
+                            {savingGrid ? 'Guardando…' : `Guardar ${totalIncluidas} entregas`}
+                        </button>
+                    </div>
+                </div>
+            )}
 
             {/* ── Selectores ── */}
             <div className="grid grid-cols-2 gap-3">

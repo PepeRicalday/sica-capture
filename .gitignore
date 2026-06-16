@@ -33,3 +33,4 @@ lint_*.txt
 tsc_errors.txt
 eslint_errors.txt
 _agents/
+supabase/.temp/
