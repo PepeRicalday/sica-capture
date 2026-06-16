@@ -6,7 +6,7 @@ import {
 import { db, type SicaRecord, type SicaAforoRecord } from '../lib/db';
 import { syncPendingRecords, downloadCatalogs } from '../lib/sync';
 import { getTodayString } from '../lib/dateHelpers';
-import { calculateFlow, validateGateAperture, getFactorCorreccion } from '../lib/hydraulicCalculations';
+import { calculateFlow, validateGateAperture, getFactorCorreccion, calcGastoCurvaNivel } from '../lib/hydraulicCalculations';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useAuth } from '../context/AuthContext';
 import { toast } from 'sonner';
@@ -77,6 +77,9 @@ const Capture = () => {
     const [escalaField, setEscalaField] = useState<'arriba' | 'abajo' | 'apertura'>('arriba');
     const [escalaData, setEscalaData] = useState<{ arriba: number, abajo: number, aperturas: number[] }>({ arriba: 0, abajo: 0, aperturas: [] });
     const [activeGateIndex, setActiveGateIndex] = useState(0);
+    // Método de gasto elegido por el operador cuando el punto tiene curva nivel-gasto.
+    // 'compuertas' = fórmula radial M1 · 'curva' = rating curve Q=C·h^n.
+    const [metodoGasto, setMetodoGasto] = useState<'compuertas' | 'curva'>('compuertas');
 
     // val: valor formateado para el display principal
     // - toma:   entero L/s  (rawValue directo)
@@ -98,8 +101,10 @@ const Capture = () => {
         escala: '', toma: '', aforo: '', presas: ''
     });
     const selectedPoint = selectedPoints[activeTab] || '';
-    const setSelectedPoint = (id: string) =>
+    const setSelectedPoint = (id: string) => {
         setSelectedPoints(prev => ({ ...prev, [activeTab]: id }));
+        setMetodoGasto('compuertas'); // cada punto arranca en compuertas; el operador cambia a curva si aplica
+    };
     const puntos = useLiveQuery(() => db.puntos.toArray()) || [];
 
     // Red y Sincronía
@@ -381,12 +386,20 @@ const Capture = () => {
                     esGargantaLarga: !pt?.pzas_radiales && !!(pt?.ancho_radiales && pt.ancho_radiales > 0),
                 });
 
+                // Gasto a reportar: si el punto tiene curva nivel-gasto y el operador
+                // eligió 'curva', se guarda ese valor (robusto ante compuertas taponadas);
+                // si no, el de compuertas. El método elegido queda registrado para auditoría.
+                const curvaSave = calcGastoCurvaNivel(pt?.name, hAbajo);
+                const usarCurva = curvaSave !== null && metodoGasto === 'curva';
+                const qReporte = usarCurva ? curvaSave!.q : q;
+
                 payload.punto_id = selectedPoint;
                 payload.valor_q = hArriba; // nivel principal (arriba)
                 payload.nivel_abajo_m = hAbajo;
                 payload.apertura_radiales_m = maxAperturaStr; // Guardamos la máxima como numérico legacy
                 payload.radiales_json = realAperturasStr; // JSON Guardamos para ver cada una al renderizar
-                payload.gasto_calculado_m3s = q;
+                payload.gasto_calculado_m3s = qReporte;
+                payload.gasto_metodo = usarCurva ? 'curva_nivel' : 'compuertas_m1';
 
                 // ---- VALIDACIÓN DE CAPACIDAD CONTRA PERFIL DE DISEÑO (Offline-First) ----
                 const ptKm = pt?.km;
@@ -616,7 +629,7 @@ const Capture = () => {
                         return (
                             <button
                                 key={tab}
-                                onClick={() => { setActiveTab(tab); setRawValue(0); setEscalaData({ arriba: 0, abajo: 0, aperturas: [] }); }}
+                                onClick={() => { setActiveTab(tab); setRawValue(0); setEscalaData({ arriba: 0, abajo: 0, aperturas: [] }); setMetodoGasto('compuertas'); }}
                                 className={`flex-1 py-3 px-1 rounded-lg font-black uppercase tracking-wider transition-all duration-300 ${activeTab === tab
                                     ? 'bg-mobile-accent text-slate-900 shadow-lg shadow-mobile-accent/30 scale-[1.02]'
                                     : 'text-slate-500 hover:text-slate-300'
@@ -1091,6 +1104,12 @@ const Capture = () => {
                                 esGargantaLarga: !pt?.pzas_radiales && !!(pt?.ancho_radiales && pt.ancho_radiales > 0),
                             });
 
+                            // Curva nivel-gasto (rating curve) — solo puntos calibrados (K-0+000).
+                            // Se alimenta del NIVEL ABAJO (tirante del cauce = escala aforada),
+                            // no del remanso aguas arriba de la compuerta.
+                            const curva = calcGastoCurvaNivel(pt?.name, hAbajo);
+                            const tieneCurva = curva !== null;
+
                             return (
                                 <>
                                     {pt?.pzas_radiales !== undefined && pt.pzas_radiales > 0 && escalaField === 'apertura' && (
@@ -1122,12 +1141,60 @@ const Capture = () => {
                                                 </div>
                                             );
                                         })()}
-                                        <div className="flex items-center justify-end">
-                                            <span className="text-slate-500 text-xs mr-2">
-                                                {pt?.pzas_radiales && hasRadialesOpen ? 'Gasto Sumado (Radiales):' : 'Gasto Calculado:'}
-                                            </span>
-                                            <span className="text-mobile-accent font-mono font-bold text-lg">{q.toFixed(3)} m³/s</span>
-                                        </div>
+
+                                        {tieneCurva ? (
+                                            // ── Selector de método: compuertas vs curva nivel-gasto ──
+                                            // El operador elige cuál se guarda en el reporte de gasto.
+                                            (() => {
+                                                const qCompuertas = q;
+                                                const qCurva = curva!.q;
+                                                const divergPct = qCurva > 0 ? Math.abs(qCompuertas - qCurva) / qCurva * 100 : 0;
+                                                const opciones = [
+                                                    { id: 'compuertas' as const, label: 'Compuertas (M1)', val: qCompuertas, sub: hasRadialesOpen ? 'Σ radiales' : 'sin apertura' },
+                                                    { id: 'curva' as const,      label: 'Curva nivel-gasto', val: qCurva, sub: `Q=C·h^n · R²=${curva!.r2.toFixed(2)}` },
+                                                ];
+                                                return (
+                                                    <div>
+                                                        <div className="flex items-center justify-between mb-1.5">
+                                                            <span className="text-[9px] text-amber-400 uppercase tracking-wide font-black">Elige gasto a guardar</span>
+                                                            {divergPct > 15 && (
+                                                                <span className="text-[8px] text-amber-500 font-bold uppercase">⚠ divergen {divergPct.toFixed(0)}%</span>
+                                                            )}
+                                                        </div>
+                                                        <div className="grid grid-cols-2 gap-2">
+                                                            {opciones.map(o => {
+                                                                const activo = metodoGasto === o.id;
+                                                                return (
+                                                                    <button
+                                                                        key={o.id}
+                                                                        type="button"
+                                                                        onClick={() => setMetodoGasto(o.id)}
+                                                                        className={`rounded-lg p-2 border text-left transition-all ${activo ? 'bg-mobile-accent/15 border-mobile-accent ring-1 ring-mobile-accent/40' : 'bg-slate-950/60 border-slate-700/50'}`}
+                                                                    >
+                                                                        <div className="flex items-center justify-between">
+                                                                            <span className={`text-[9px] font-black uppercase ${activo ? 'text-mobile-accent' : 'text-slate-400'}`}>{o.label}</span>
+                                                                            {activo && <span className="text-[8px] text-mobile-accent font-black">✓</span>}
+                                                                        </div>
+                                                                        <div className={`font-mono font-bold text-lg ${activo ? 'text-white' : 'text-slate-400'}`}>{o.val.toFixed(3)}<span className="text-[9px] text-slate-500 ml-1">m³/s</span></div>
+                                                                        <div className="text-[8px] text-slate-500 font-mono">{o.sub}</div>
+                                                                    </button>
+                                                                );
+                                                            })}
+                                                        </div>
+                                                        {curva!.fueraDeRango && metodoGasto === 'curva' && (
+                                                            <div className="text-[8px] text-amber-500/80 mt-1 font-bold uppercase">⚠ nivel fuera del rango aforado — curva extrapolada</div>
+                                                        )}
+                                                    </div>
+                                                );
+                                            })()
+                                        ) : (
+                                            <div className="flex items-center justify-end">
+                                                <span className="text-slate-500 text-xs mr-2">
+                                                    {pt?.pzas_radiales && hasRadialesOpen ? 'Gasto Sumado (Radiales):' : 'Gasto Calculado:'}
+                                                </span>
+                                                <span className="text-mobile-accent font-mono font-bold text-lg">{q.toFixed(3)} m³/s</span>
+                                            </div>
+                                        )}
                                     </div>
                                 </>
                             );

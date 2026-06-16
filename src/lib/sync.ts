@@ -663,7 +663,11 @@ export const syncPendingRecords = async () => {
             hora_lectura: p.hora_captura,
             responsable: p.responsable_nombre || 'Operador Móvil',
             turno: parseInt(p.hora_captura.split(':')[0]) < 14 ? 'am' : 'pm',
-            notas: p.notas, // Incluir notas (GPS, Arribos, etc.)
+            // Método de gasto (compuertas_m1 | curva_nivel) anexado a notas para
+            // auditoría sin requerir migración de columna en lecturas_escalas.
+            notas: p.gasto_metodo === 'curva_nivel'
+                ? `${p.notas ? p.notas + ' · ' : ''}[gasto: curva nivel-gasto]`
+                : p.notas, // Incluir notas (GPS, Arribos, etc.)
             confirmada: p.confirmada === true ? true : false // Solo true si fue explícitamente autorizado
         }));
 

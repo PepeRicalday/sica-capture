@@ -67,6 +67,7 @@ export interface SicaRecord {
 
     // Nuevas métricas para Reporte de Escalas (Represos)
     gasto_calculado_m3s?: number;
+    gasto_metodo?: 'compuertas_m1' | 'curva_nivel'; // método elegido para gasto_calculado_m3s
     radiales_json?: any[]; // Arreglo detallado de cada compuerta radial
 
     // Campos exclusivos de tipo 'entrega'

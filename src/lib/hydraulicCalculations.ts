@@ -152,6 +152,52 @@ export function getFactorCorreccion(nombre?: string, km?: number): number {
     return 1.0;
 }
 
+/**
+ * ── CURVAS NIVEL-GASTO (RATING CURVES) ───────────────────────────────────
+ * Q = C · h^n  ajustada por mínimos cuadrados a los aforos de molinete.
+ *
+ * Uso operativo: cuando las compuertas se taponan (azolve/basura), la fórmula
+ * de orificio sobreestima porque confía en la apertura registrada (el área
+ * efectiva real es menor). La curva nivel-gasto NO depende de la apertura —
+ * solo del nivel del CAUCE medido — por lo que da el gasto real aún con
+ * compuertas obstruidas.
+ *
+ * IMPORTANTE — qué nivel alimenta la curva:
+ *   La "Escala" de las cédulas K1+000 (2.19, 2.56, 2.67…) es el TIRANTE del
+ *   cauce medido en K-1+000, 1 km AGUAS ABAJO de la compuerta K-0+000. En SICA
+ *   eso corresponde al NIVEL ABAJO (h_abajo), NO al remanso aguas arriba.
+ *   → la curva debe evaluarse con h_abajo (nivel del cauce / escala aforada).
+ *
+ * K-0+000: ajuste sobre 6 aforos K1+000 (excl. 14/05 sobreestimado).
+ *   Q = 6.450 · h^1.611   R² = 0.972   (válido h ≈ 2.0–2.8 m, escala de cauce)
+ *   Verificado: h=2.19 → 22.80 m³/s (aforo real 22.6; compuertas marcaban 42.6).
+ */
+export const RATING_CURVES: Record<string, { C: number; n: number; r2: number; h_min: number; h_max: number; fuente: string }> = {
+    'K-0+000': { C: 6.450, n: 1.611, r2: 0.972, h_min: 2.0, h_max: 2.8, fuente: '6 aforos K1+000 2026 (excl. 14/05)' },
+};
+
+/**
+ * Calcula el gasto por curva nivel-gasto. Retorna null si el punto no tiene
+ * curva calibrada. `fueraDeRango=true` si el nivel está fuera del rango aforado.
+ *
+ * @param hEscala  nivel del CAUCE / escala aforada (en K-0+000 = NIVEL ABAJO,
+ *                 no el remanso aguas arriba de la compuerta).
+ */
+export function calcGastoCurvaNivel(
+    nombre: string | undefined,
+    hEscala: number,
+): { q: number; r2: number; fueraDeRango: boolean; fuente: string } | null {
+    if (!nombre || hEscala <= 0) return null;
+    const key = nombre.trim().toUpperCase();
+    const entry = Object.entries(RATING_CURVES).find(
+        ([k]) => k.toUpperCase() === key || key.includes(k.toUpperCase()),
+    );
+    if (!entry) return null;
+    const { C, n, r2, h_min, h_max, fuente } = entry[1];
+    const q = C * Math.pow(hEscala, n);
+    return { q, r2, fueraDeRango: hEscala < h_min || hEscala > h_max, fuente };
+}
+
 export interface RadialGate {
     index: number;
     apertura_m: number;
