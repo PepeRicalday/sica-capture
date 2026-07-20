@@ -9,6 +9,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { TrapezoidalSchema } from './TrapezoidalSchema';
 import { supabase } from '../lib/supabase';
 import { AforoImageCapture, type AforoExtraido } from './AforoImageCapture';
+import { marcarTrabajoSinGuardar } from '../utils/trabajoSinGuardar';
 
 interface AforoFormProps {
     selectedPoint: string;
@@ -54,6 +55,25 @@ export const AforoForm = ({ selectedPoint, isOnline, onSaveSuccess, editRecord, 
     const [dobelas, setDobelas] = useState<AforoDobela[]>([
         { base_m: 0, tirante_m: 0, velocidades_revoluciones: [0, 0, 0], velocidades_segundos: [0, 0, 0] }
     ]);
+
+    // ── Aviso de captura en curso ───────────────────────────────────────────
+    // VersionGuard recarga sola al llegar una versión nueva. Mientras haya
+    // datos escritos aquí y no guardados, cede el paso y solo ofrece el banner:
+    // un aforo se mide una vez y no se puede reconstruir tras una recarga.
+    const hayCaptura = Boolean(
+        horaInicial || horaFinal || escalaInicial !== '' || escalaFinal !== '' ||
+        espejo !== '' || tirante !== '' || aforador || molineteSerie ||
+        dobelas.some(d =>
+            d.base_m > 0 || d.tirante_m > 0 ||
+            d.velocidades_revoluciones?.some(v => v > 0) ||
+            d.velocidades_segundos?.some(v => v > 0)
+        )
+    );
+    useEffect(() => {
+        marcarTrabajoSinGuardar('aforo-form', hayCaptura);
+        // Al desmontar (cambio de pestaña, guardado) se libera el candado.
+        return () => marcarTrabajoSinGuardar('aforo-form', false);
+    }, [hayCaptura]);
 
     // EFECTO DE HIDRATACIÓN (Para Corregir Aforos Anteriores)
     useEffect(() => {

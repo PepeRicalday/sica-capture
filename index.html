@@ -1,51 +1,32 @@
 <!doctype html>
-<!-- Build Timestamp: 2026-04-10T00:00:00Z - FORCED REFRESH v2.6.1 -->
-<html lang="es">
+<html lang="es" translate="no">
 
 <head>
   <meta charset="UTF-8" />
+  <meta name="google" content="notranslate" />
   <link rel="icon" type="image/png" href="/icon.png" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="SICA Captura">
 
-  <!-- Aggressive Caching Prevention -->
-  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
-  <meta http-equiv="Pragma" content="no-cache" />
-  <meta http-equiv="Expires" content="0" />
-
   <link rel="apple-touch-icon" href="/icon-512.png">
-  <title>SICA Capture v2.6.1</title>
-  <script>
-    // CACHE BOUNCE v2.6.1
-    (function () {
-      const REQ_V = '261';
-      const urlParams = new URLSearchParams(window.location.search);
-      if (urlParams.get('v') !== REQ_V) {
-        window.location.replace(window.location.origin + window.location.pathname + '?v=' + REQ_V + '&t=' + Date.now());
-      }
-    })();
-  </script>
+  <!-- %APP_VERSION% lo sustituye el plugin html-app-version desde package.json.
+       Escrito a mano se desincronizaba: llegó a decir v2.6.1 cuando el bundle
+       era 2.6.6. -->
+  <title>SICA Capture v%APP_VERSION%</title>
 
-  <script>
-    // CACHE NUKE TRINITY - SICA 2026
-    (function () {
-      // If we are already on a hard refresh, don't loop
-      if (window.location.search.indexOf('hard_refresh=') !== -1) {
-        return;
-      }
+  <!-- Sin "CACHE BOUNCE" ni "CACHE NUKE TRINITY".
+       El bounce redirigía a ?v=261 siempre que el parámetro no coincidiera.
+       VersionGuard recarga con ?v=<timestamp>, que nunca es '261': los dos se
+       reescribían la URL mutuamente en bucle infinito. La invalidación de caché
+       ahora vive donde corresponde — cabeceras en vercel.json y sw-purge.js —
+       no en un redirect que pelea con la app.
 
-      // Check for service worker registration and force update
-      if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.getRegistrations().then(function (registrations) {
-          for (var i = 0; i < registrations.length; i++) {
-            registrations[i].update();
-          }
-        });
-      }
-    })();
-  </script>
+       Tampoco se fuerza aquí el update() del service worker: main.tsx ya lo
+       hace de forma controlada (con guarda de controllerchange), y hacerlo dos
+       veces provocaba recargas simultáneas que abortaban la descarga de chunks
+       a medio vuelo. -->
 </head>
 
 <body>

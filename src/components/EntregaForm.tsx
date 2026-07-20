@@ -8,6 +8,7 @@ import { getTodayString } from '../lib/dateHelpers';
 import { useAuth } from '../context/AuthContext';
 import { toast } from 'sonner';
 import { EntregaImageCapture, type EntregaInformeExtraido, type EntregaCeldaExtraida } from './EntregaImageCapture';
+import { marcarTrabajoSinGuardar } from '../utils/trabajoSinGuardar';
 
 // ── Helpers ──────────────────────────────────────────────────
 
@@ -188,6 +189,20 @@ export function EntregaForm({ onSaved }: EntregaFormProps) {
     // Un array porque la foto puede traer uno o dos días apilados.
     const [informesRevision, setInformesRevision] = useState<InformeRevision[] | null>(null);
     const [savingGrid,        setSavingGrid]        = useState(false);
+
+    // ── Aviso de captura en curso ───────────────────────────────────────────
+    // Ver utils/trabajoSinGuardar.ts: bloquea la recarga automática por versión
+    // nueva mientras haya datos escritos sin guardar. Incluye la cuadrícula del
+    // OCR pendiente de revisión — reponerla exige volver a fotografiar el
+    // informe físico, que en campo puede ya no estar a la mano.
+    const hayCaptura = Boolean(
+        gastoLps || motivo || notas || selectedModuloId || selectedZonaId ||
+        (informesRevision && informesRevision.length > 0)
+    );
+    useEffect(() => {
+        marcarTrabajoSinGuardar('entrega-form', hayCaptura);
+        return () => marcarTrabajoSinGuardar('entrega-form', false);
+    }, [hayCaptura]);
 
     // Resuelve una celda del OCR a (modulo_id, zona_id) reales del catálogo.
     const resolverCelda = (c: EntregaCeldaExtraida): CeldaResuelta => {
