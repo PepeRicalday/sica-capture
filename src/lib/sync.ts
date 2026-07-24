@@ -171,23 +171,38 @@ export const downloadCatalogs = async (forceCatalog = false) => {
         localDexieEscalas.forEach(p => localEscalasFallback.set(p.id, p));
 
         if (shouldFetchStatic) {
-            const { data: e } = await supabase.from('escalas').select('id, nombre, latitud, longitud, km, nivel_min_operativo, nivel_max_operativo, ancho, alto, pzas_radiales').eq('activa', true);
-            const { data: t } = await supabase.from('puntos_entrega').select('id, nombre, tipo, seccion_id, km, coords_x, coords_y, capacidad_max_lps, modulos ( codigo_corto, nombre ), secciones ( nombre )');
-            const { data: a } = await supabase.from('aforos_control').select('id, nombre_punto, latitud, longitud, foto_url, caracteristicas_hidraulicas');
-            const { data: pr } = await supabase.from('presas').select('id, nombre, nombre_corto, capacidad_max');
+            const { data: e, error: errE } = await supabase.from('escalas').select('id, nombre, latitud, longitud, km, nivel_min_operativo, nivel_max_operativo, ancho, alto, pzas_radiales').eq('activa', true);
+            const { data: t, error: errT } = await supabase.from('puntos_entrega').select('id, nombre, tipo, seccion_id, km, coords_x, coords_y, capacidad_max_lps, modulos ( codigo_corto, nombre ), secciones ( nombre )');
+            const { data: a, error: errA } = await supabase.from('aforos_control').select('id, nombre_punto, latitud, longitud, foto_url, caracteristicas_hidraulicas');
+            const { data: pr, error: errPr } = await supabase.from('presas').select('id, nombre, nombre_corto, capacidad_max');
             const { data: pf } = await supabase.from('perfil_hidraulico_canal').select('id, km_inicio, km_fin, capacidad_diseno_m3s');
             // Última elevación/porcentaje conocidos por presa — referencia para
             // que el operador vea la variación en cm al capturar el nivel de hoy.
-            const { data: ulp } = await supabase
+            const { data: ulp, error: errUlp } = await supabase
                 .from('lecturas_presas')
                 .select('presa_id, fecha, escala_msnm, porcentaje_llenado')
                 .order('fecha', { ascending: false })
                 .limit(200);
 
-            baseEscalas = e;
-            tomas = t;
-            aforosControl = a;
-            presas = pr;
+            // Supabase JS no lanza en error de query: solo retorna { data: null, error }.
+            // Sin este log, un fallo de RLS/columna quedaba invisible y el fallback
+            // a Dexie de abajo lo disimulaba en silencio.
+            if (errE) console.error('[sync] Error consultando escalas:', errE.message);
+            if (errT) console.error('[sync] Error consultando puntos_entrega:', errT.message);
+            if (errA) console.error('[sync] Error consultando aforos_control:', errA.message);
+            if (errPr) console.error('[sync] Error consultando presas:', errPr.message);
+            if (errUlp) console.error('[sync] Error consultando lecturas_presas (referencia):', errUlp.message);
+
+            // Fallback a Dexie si alguna consulta falla silenciosamente (Supabase JS
+            // no lanza excepción: retorna { data: null, error } y el try/catch de
+            // downloadCatalogs nunca se entera). Sin esto, un fallo puntual en UNA
+            // tabla borraba TODO el catálogo de ese tipo en el clear()+bulkPut de
+            // abajo, incluido lo que ya existía de sincronizaciones anteriores.
+            const localPuntosFallback = (!e || !t || !a || !pr) ? await db.puntos.toArray() : [];
+            baseEscalas = e ?? localDexieEscalas;
+            tomas = t ?? localPuntosFallback.filter(p => p.type !== 'escala' && p.type !== 'aforo' && p.type !== 'presa');
+            aforosControl = a ?? localPuntosFallback.filter(p => p.type === 'aforo');
+            presas = pr ?? localDexiePresas;
             perfiles = pf;
             ultimasLecturasPresas = ulp;
         } else {
