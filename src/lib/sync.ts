@@ -61,6 +61,26 @@ export const downloadCatalogs = async (forceCatalog = false) => {
             .gte('fecha', yesterdayStr)
             .order('fecha', { ascending: false });
 
+        // C. Último gasto por obra de toma reportado, por presa — una obra sigue en
+        // el mismo gasto hasta que se registre un cierre/modificación explícito. Sin
+        // esto, el formulario abre en 0.00 cada día y el operador tendría que
+        // re-teclear el mismo valor de CFE/Toma Baja aunque nada haya cambiado desde
+        // el último reporte. Fetch siempre (no solo en shouldFetchStatic): un
+        // movimiento puede registrarse cualquier día, no solo cada 12h.
+        const { data: ultimoGastoObrasDB, error: errUgo } = await supabase
+            .from('movimientos_presas')
+            .select('presa_id, fecha_hora, gasto_toma_baja_m3s, gasto_cfe_m3s, gasto_toma_izq_m3s, gasto_toma_der_m3s')
+            .order('fecha_hora', { ascending: false })
+            .limit(100);
+        if (errUgo) console.error('[sync] Error consultando movimientos_presas (referencia obras):', errUgo.message);
+
+        // ultimoGastoObrasMap: presa_id → último registro con desglose por obra
+        // (viene ordenado desc, así que el primero por presa ya es el más reciente).
+        const ultimoGastoObrasMap = new Map<string, any>();
+        (ultimoGastoObrasDB || []).forEach(m => {
+            if (!ultimoGastoObrasMap.has(m.presa_id)) ultimoGastoObrasMap.set(m.presa_id, m);
+        });
+
         const dictResumenEscalas = new Map<string, any>();
         if (resumenEscalas) {
             resumenEscalas.forEach((r: any) => {
@@ -183,7 +203,6 @@ export const downloadCatalogs = async (forceCatalog = false) => {
                 .select('presa_id, fecha, escala_msnm, porcentaje_llenado')
                 .order('fecha', { ascending: false })
                 .limit(200);
-
             // Supabase JS no lanza en error de query: solo retorna { data: null, error }.
             // Sin este log, un fallo de RLS/columna quedaba invisible y el fallback
             // a Dexie de abajo lo disimulaba en silencio.
@@ -313,6 +332,7 @@ export const downloadCatalogs = async (forceCatalog = false) => {
             mappedPuntos.push(...presas.map((p: any) => {
                 const lecturaReciente = (ultimasLecturasPresas || []).find((l: any) => l.presa_id === p.id);
                 const fallback = localPresasFallback.get(p.id);
+                const ultimoGastoObras = ultimoGastoObrasMap.get(p.id);
                 return {
                     id: p.id,
                     name: p.nombre_corto || p.nombre || p.name,
@@ -328,6 +348,17 @@ export const downloadCatalogs = async (forceCatalog = false) => {
                     // Capacidad máxima (Mm³) — para derivar almacenamiento_mm3 = % × capacidad
                     // al capturar el nivel, sin pedirle un tercer número al operador.
                     capacidad_max_mm3: p.capacidad_max != null ? Number(p.capacidad_max) : fallback?.capacidad_max_mm3,
+                    // Último gasto reportado por obra de toma — referencia para prellenar
+                    // el formulario (la obra sigue en el mismo gasto hasta que se reporte
+                    // un cambio explícito). null si nunca se ha capturado desglosado.
+                    gasto_toma_baja_ref: ultimoGastoObras?.gasto_toma_baja_m3s != null
+                        ? Number(ultimoGastoObras.gasto_toma_baja_m3s) : fallback?.gasto_toma_baja_ref,
+                    gasto_cfe_ref: ultimoGastoObras?.gasto_cfe_m3s != null
+                        ? Number(ultimoGastoObras.gasto_cfe_m3s) : fallback?.gasto_cfe_ref,
+                    gasto_toma_izq_ref: ultimoGastoObras?.gasto_toma_izq_m3s != null
+                        ? Number(ultimoGastoObras.gasto_toma_izq_m3s) : fallback?.gasto_toma_izq_ref,
+                    gasto_toma_der_ref: ultimoGastoObras?.gasto_toma_der_m3s != null
+                        ? Number(ultimoGastoObras.gasto_toma_der_m3s) : fallback?.gasto_toma_der_ref,
                 };
             }));
         }

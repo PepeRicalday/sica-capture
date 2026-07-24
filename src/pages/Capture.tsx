@@ -634,10 +634,11 @@ const Capture = () => {
             // - rawValue se resetea solo para 'presas' y 'escala' (irrelevante para escala)
             if (activeTab !== 'toma') setRawValue(0);
             if (activeTab === 'presas') {
-                setPresaData({ tomaBaja: 0, cfe: 0, tomaIzq: 0, tomaDer: 0 });
+                // presaData se mantiene tal cual quedó guardado: es la nueva referencia
+                // vigente para esta obra hasta el próximo cambio (misma lógica que
+                // nivelData/escalaData). Solo se limpia la posición de compuerta, que
+                // es un dato puntual del reporte de hoy, no un estado persistente.
                 setPresaPosicion({ tomaBaja: '', cfe: '', tomaIzq: '', tomaDer: '' });
-                // nivelData se mantiene como referencia (misma lógica que escalaData):
-                // el operador ve la última elevación capturada al reabrir el formulario.
             }
             setActiveGateIndex(0);
             setManualTime('');
@@ -786,7 +787,15 @@ const Capture = () => {
                                     }
                                 } else if (activeTab === 'presas') {
                                     const pt = puntos.find(p => p.id === newId);
-                                    setPresaData({ tomaBaja: 0, cfe: 0, tomaIzq: 0, tomaDer: 0 });
+                                    // Prellenar con el último gasto reportado por obra — la obra
+                                    // sigue operando en ese valor hasta que se registre un cambio
+                                    // explícito. Evita re-teclear el mismo número cada día.
+                                    setPresaData({
+                                        tomaBaja: pt?.gasto_toma_baja_ref ? Math.round(pt.gasto_toma_baja_ref * 100) : 0,
+                                        cfe: pt?.gasto_cfe_ref ? Math.round(pt.gasto_cfe_ref * 100) : 0,
+                                        tomaIzq: pt?.gasto_toma_izq_ref ? Math.round(pt.gasto_toma_izq_ref * 100) : 0,
+                                        tomaDer: pt?.gasto_toma_der_ref ? Math.round(pt.gasto_toma_der_ref * 100) : 0,
+                                    });
                                     setPresaPosicion({ tomaBaja: '', cfe: '', tomaIzq: '', tomaDer: '' });
                                     setNivelData({
                                         elevacion: pt?.nivel_actual ? Math.round(pt.nivel_actual * 100) : 0,

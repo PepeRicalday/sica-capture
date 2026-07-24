@@ -41,6 +41,13 @@ export interface OfflinePoint {
     // referencia y calcular variación en cm al capturar el nivel de hoy.
     porcentaje_llenado_actual?: number;
     capacidad_max_mm3?: number;
+
+    // Último gasto reportado por obra de toma (presas) — una obra sigue en el
+    // mismo gasto hasta que se registre un cierre/modificación explícito.
+    gasto_toma_baja_ref?: number;
+    gasto_cfe_ref?: number;
+    gasto_toma_izq_ref?: number;
+    gasto_toma_der_ref?: number;
 }
 
 // 2. Registro a Sincronizar (Mochila)
