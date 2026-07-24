@@ -52,7 +52,7 @@ export const PendingRecordsModal = ({ onClose }: PendingRecordsModalProps) => {
     const handleAuthSuccess = async () => {
         if (!selectedRecordForAuth) return;
         try {
-            const bypassNote = `\n[AUTORIZADO: Bypass Gerencial SRL - ${new Date().toLocaleString()}]`;
+            const bypassNote = `\n[AUTORIZADO: Bypass Gerencial SRL - ${new Date().toLocaleString('es-MX', { timeZone: 'America/Chihuahua' })}]`;
             await db.records.update(selectedRecordForAuth.id, {
                 notas: (selectedRecordForAuth.notas || '') + bypassNote,
                 error_sync: undefined,
@@ -168,7 +168,7 @@ export const PendingRecordsModal = ({ onClose }: PendingRecordsModalProps) => {
                                         </p>
                                         <p className="text-slate-600 text-[9px] mt-1">
                                             {record.retry_count ?? 0} intento{(record.retry_count ?? 0) !== 1 ? 's' : ''} fallido{(record.retry_count ?? 0) !== 1 ? 's' : ''}
-                                            {record.first_failed_at ? ` · desde ${new Date(record.first_failed_at).toLocaleDateString()}` : ''}
+                                            {record.first_failed_at ? ` · desde ${new Date(record.first_failed_at).toLocaleDateString('es-MX', { timeZone: 'America/Chihuahua' })}` : ''}
                                         </p>
                                     </div>
                                 ))}

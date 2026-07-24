@@ -10,6 +10,7 @@ import { TrapezoidalSchema } from './TrapezoidalSchema';
 import { supabase } from '../lib/supabase';
 import { AforoImageCapture, type AforoExtraido } from './AforoImageCapture';
 import { marcarTrabajoSinGuardar } from '../utils/trabajoSinGuardar';
+import { getTodayString } from '../lib/dateHelpers';
 
 interface AforoFormProps {
     selectedPoint: string;
@@ -381,7 +382,7 @@ export const AforoForm = ({ selectedPoint, isOnline, onSaveSuccess, editRecord, 
             return;
         }
 
-        const captureDateStr = manualDate || new Date().toISOString().split('T')[0];
+        const captureDateStr = manualDate || getTodayString();
         const captureTimeStr = manualTime ? `${manualTime}:00` : new Date().toTimeString().split(' ')[0];
 
         const payload: SicaAforoRecord = {

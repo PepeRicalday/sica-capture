@@ -25,16 +25,12 @@ export const downloadCatalogs = async (forceCatalog = false) => {
             localStorage.setItem('sica_app_version', currentVersion);
         }
 
-        const yesterday = new Date();
-        yesterday.setDate(yesterday.getDate() - 1);
-        const yesterdayStr = yesterday.toISOString().split('T')[0];
+        const yesterdayStr = getDaysAgoString(1);
 
         // Ventana extendida para pre-llenado de nivel_abajo y aperturas:
         // Las escalas no se leen todos los días — con 1 día se perdía el último registro
         // si no hubo lectura ayer. 7 días garantiza capturar la última lectura real.
-        const sevenDaysAgo = new Date();
-        sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-        const sevenDaysAgoStr = sevenDaysAgo.toISOString().split('T')[0];
+        const sevenDaysAgoStr = getDaysAgoString(7);
 
         // 1. DYNAMIC DATA (Always fetch)
 

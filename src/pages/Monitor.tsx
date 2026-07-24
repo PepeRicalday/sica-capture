@@ -99,9 +99,7 @@ const Monitor = () => {
             const today = getTodayString();
 
             // Ventana de 7 días para escalas y movimientos (en caso de que no haya lectura hoy)
-            const sevenDaysAgo = new Date();
-            sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-            const sevenDaysAgoStr = sevenDaysAgo.toISOString().slice(0, 10);
+            const sevenDaysAgoStr = getDaysAgoString(7);
 
             // TIER 1: Aforo directo del día en CANAL-000 / CANAL-104
             const { data: aforos } = await supabase
@@ -372,8 +370,8 @@ const Monitor = () => {
     // 4. Balance: Diferencia No Contabilizada = Entrada - Entregado - Salida
     const diferenciaGasto = balanceCanal.entrada000 - entregadoModulosM3s - balanceCanal.salida104;
 
-    const dateStr = currentTime.toLocaleDateString('es-MX', { weekday: 'short', day: '2-digit', month: 'short' }).replace('.', '').toUpperCase();
-    const timeStr = currentTime.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' });
+    const dateStr = currentTime.toLocaleDateString('es-MX', { weekday: 'short', day: '2-digit', month: 'short', timeZone: 'America/Chihuahua' }).replace('.', '').toUpperCase();
+    const timeStr = currentTime.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Chihuahua' });
 
     return (
         <div className="flex flex-col h-[100dvh] bg-mobile-dark">

@@ -7,6 +7,7 @@ import clsx from 'clsx';
 import { formatCaudalLps } from '../lib/formatters';
 import { useAuth } from '../context/AuthContext';
 import { calcVolumeM3 } from '../lib/volumeCalculations';
+import { toDateString } from '../lib/dateHelpers';
 
 interface TomaHistoryModalProps {
     isOpen: boolean;
@@ -254,8 +255,8 @@ export const TomaHistoryModal: React.FC<TomaHistoryModalProps> = ({ isOpen, onCl
             id: ev.id,
             tipo: 'toma',
             punto_id: punto.id,
-            fecha_captura: date.toISOString().split('T')[0],
-            hora_captura: date.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+            fecha_captura: toDateString(date),
+            hora_captura: date.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit', timeZone: 'America/Chihuahua' }),
             valor_q: ev.valor_q,
             estado_operativo: ev.estado_evento,
             sincronizado: 'true',

@@ -43,8 +43,8 @@ const LiveClock = () => {
         const timer = setInterval(() => setTime(new Date()), 1000);
         return () => clearInterval(timer);
     }, []);
-    const dateStr = time.toLocaleDateString('es-MX', { weekday: 'short', day: '2-digit', month: 'short' }).replace('.', '').toUpperCase();
-    const timeStr = time.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' });
+    const dateStr = time.toLocaleDateString('es-MX', { weekday: 'short', day: '2-digit', month: 'short', timeZone: 'America/Chihuahua' }).replace('.', '').toUpperCase();
+    const timeStr = time.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Chihuahua' });
     return (
         <span className="text-mobile-accent font-mono text-[10px] font-semibold tracking-wider mt-0.5">
             {dateStr} • {timeStr}
@@ -181,7 +181,7 @@ const Capture = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [activeTab]);
 
-    const getCurrentTimeStr24 = () => new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+    const getCurrentTimeStr24 = () => new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Chihuahua' });
 
     const handleKeypad = (num: number) => {
         if (activeTab === 'escala') {
@@ -905,7 +905,7 @@ const Capture = () => {
                                                 tipo: 'escala',
                                                 punto_id: selectedPoint,
                                                 fecha_captura: getTodayString(),
-                                                hora_captura: now.toLocaleTimeString('en-US', { hour12: false }),
+                                                hora_captura: now.toLocaleTimeString('en-US', { hour12: false, timeZone: 'America/Chihuahua' }),
                                                 sincronizado: 'false',
                                                 confirmada: true,
                                                 responsable_id: profile?.id,
