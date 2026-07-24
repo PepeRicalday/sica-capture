@@ -143,8 +143,18 @@ const Monitor = () => {
                     const id000 = scales.find(s => s.km === 0)?.id;
                     const id104 = scales.find(s => s.km === 104)?.id;
 
+                    // El gasto guardado en la lectura ya refleja el método elegido por el
+                    // operador al capturar (gasto_metodo: 'curva_nivel' o 'compuertas_m1').
+                    // Para puntos con curva nivel-gasto calibrada (ej. K-0+000), la curva es
+                    // robusta ante compuertas taponadas y NO debe sobreescribirse recalculando
+                    // por fórmula de orificio en el cliente — eso ignora la calibración y
+                    // sobreestima (ver comentario en hydraulicCalculations.ts RATING_CURVES).
+                    // Solo se recalcula por compuertas si la lectura no trae gasto guardado.
                     const recalcQ = (r: any, escala: any): number => {
                         if (!r || !escala) return 0;
+                        if (r.gasto_calculado_m3s && r.gasto_calculado_m3s > 0) {
+                            return r.gasto_calculado_m3s;
+                        }
                         const aperturas = Array.isArray(r.radiales_json)
                             ? Array.from({ length: escala.pzas_radiales || 0 }, (_: any, i: number) => {
                                 const g = r.radiales_json.find((x: any) => x.index === i);
@@ -159,8 +169,9 @@ const Monitor = () => {
                             anchoRadial: escala.ancho || 0,
                             aperturas,
                             factorCorreccion: fc,
+                            nombre: escala.nombre,
                         });
-                        return res.q_total > 0 ? res.q_total : (r.gasto_calculado_m3s || 0);
+                        return res.q_total;
                     };
 
                     if (needs000 && id000) {

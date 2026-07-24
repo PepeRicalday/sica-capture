@@ -384,6 +384,7 @@ const Capture = () => {
                     aperturas: aperturas_m,
                     factorCorreccion: getFactorCorreccion(pt?.name, pt?.km),
                     esGargantaLarga: !pt?.pzas_radiales && !!(pt?.ancho_radiales && pt.ancho_radiales > 0),
+                    nombre: pt?.name,
                 });
 
                 // Gasto a reportar: si el punto tiene curva nivel-gasto y el operador
@@ -1102,6 +1103,7 @@ const Capture = () => {
                                 aperturas: realAps,
                                 factorCorreccion: getFactorCorreccion(pt?.name, pt?.km),
                                 esGargantaLarga: !pt?.pzas_radiales && !!(pt?.ancho_radiales && pt.ancho_radiales > 0),
+                                nombre: pt?.name,
                             });
 
                             // Curva nivel-gasto (rating curve) — solo puntos calibrados (K-0+000).

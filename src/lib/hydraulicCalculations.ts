@@ -212,20 +212,25 @@ export interface FlowConfig {
     aperturas: number[];       // Apertura por compuerta (m), longitud = pzasRadiales
     factorCorreccion?: number; // Factor de corrección M1 empírico por punto de control (default 1.0)
     esGargantaLarga?: boolean; // true → usar fórmula Cd·H^n (p.ej. K-94+200). false/absent → escala de referencia pura (K-64), Q=0
+    nombre?: string;           // Nombre del punto de control — necesario para detectar estructuras mixtas (p.ej. K-68)
 }
 
 export interface FlowResult {
-    q_total: number;            // Gasto total (m³/s)
+    q_total: number;            // Gasto total (m³/s), incluye sobrepaso si aplica
     hasRadialesOpen: boolean;   // Si hay al menos una compuerta con flujo
     gatesFlow: number[];        // Gasto por compuerta (m³/s)
+    q_sobrepaso: number;        // Gasto por vertedor de sobrepaso (0 si no aplica o H ≤ H_crit)
 }
 
 /**
  * Calcula el gasto total en m³/s para una escala.
  * Acepta tanto configuraciones con compuertas radiales como garganta larga.
+ * Para estructuras mixtas (ver SOBREPASO_CONFIG), suma el vertedor de sobrepaso
+ * cuando hArriba supera H_crit — el M1 de compuertas permanece en su valor
+ * calibrado (no se recalcula) mientras el sobrepaso está activo.
  */
 export function calculateFlow(config: FlowConfig): FlowResult {
-    const { hArriba, hAbajo, pzasRadiales, anchoRadial, aperturas, factorCorreccion, esGargantaLarga } = config;
+    const { hArriba, hAbajo, pzasRadiales, anchoRadial, aperturas, factorCorreccion, esGargantaLarga, nombre } = config;
     const { Cd, Cv, g, Cd_gl, n_gl, MIN_CARGA } = HYDRAULIC_CONSTANTS;
 
     // Factor de corrección M1 empírico — solo se aplica a compuertas radiales.
@@ -272,7 +277,12 @@ export function calculateFlow(config: FlowConfig): FlowResult {
     }
     // Si no hay radiales y no es garganta larga → escala de referencia pura (p.ej. K-64): Q = 0
 
-    return { q_total, hasRadialesOpen, gatesFlow };
+    // Estructura mixta (K-68): el vertedor de sobrepaso se suma al gasto de compuertas
+    // cuando hArriba > H_crit, independientemente del régimen de compuertas anterior.
+    const q_sobrepaso = calcQSobrepaso(nombre ?? '', hArriba);
+    q_total += q_sobrepaso;
+
+    return { q_total, hasRadialesOpen, gatesFlow, q_sobrepaso };
 }
 
 /**
