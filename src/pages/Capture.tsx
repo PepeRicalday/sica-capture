@@ -80,15 +80,29 @@ const Capture = () => {
     // Método de gasto elegido por el operador cuando el punto tiene curva nivel-gasto.
     // 'compuertas' = fórmula radial M1 · 'curva' = rating curve Q=C·h^n.
     const [metodoGasto, setMetodoGasto] = useState<'compuertas' | 'curva'>('compuertas');
+    // Desglose de obras de toma para presas — mismo patrón "cajero automático" que
+    // escalaData/escalaField: cada obra guarda su gasto en centésimas de m³/s.
+    const [presaField, setPresaField] = useState<'tomaBaja' | 'cfe' | 'tomaIzq' | 'tomaDer'>('tomaBaja');
+    const [presaData, setPresaData] = useState<{ tomaBaja: number; cfe: number; tomaIzq: number; tomaDer: number }>({ tomaBaja: 0, cfe: 0, tomaIzq: 0, tomaDer: 0 });
+    // Posición de compuerta por obra de toma — solo trazabilidad (ej. "1/10"), no
+    // hay curva calibrada posición→gasto para obras de toma como sí existe para
+    // compuertas radiales de canal. El gasto real sigue viniendo de presaData.
+    const [presaPosicion, setPresaPosicion] = useState<{ tomaBaja: string; cfe: string; tomaIzq: string; tomaDer: string }>({ tomaBaja: '', cfe: '', tomaIzq: '', tomaDer: '' });
+    // Sub-modo de la pestaña "presas": gasto por obra de toma, o nivel del embalse.
+    const [presaModo, setPresaModo] = useState<'obras' | 'nivel'>('obras');
+    // Nivel de embalse: elevación en centésimas de metro (msnm) y % de llenado en centésimas.
+    const [nivelData, setNivelData] = useState<{ elevacion: number; porcentaje: number }>({ elevacion: 0, porcentaje: 0 });
+    const [nivelField, setNivelField] = useState<'elevacion' | 'porcentaje'>('elevacion');
 
     // val: valor formateado para el display principal
     // - toma:   entero L/s  (rawValue directo)
-    // - presas: m³/s con 2 decimales (rawValue / 100, igual que escala almacena cm)
+    // - presas (obras): m³/s con 2 decimales, por obra de toma activa (presaField)
+    // - presas (nivel): msnm o % con 2 decimales, por campo activo (nivelField)
     // - escala: metros con 2 decimales (rawValue / 100)
     const val = activeTab === 'toma'
         ? rawValue.toString()
         : activeTab === 'presas'
-            ? (rawValue / 100).toFixed(2)
+            ? (presaModo === 'nivel' ? (nivelData[nivelField] / 100).toFixed(2) : (presaData[presaField] / 100).toFixed(2))
             : activeTab === 'escala'
                 ? (escalaField === 'apertura' ? ((escalaData.aperturas[activeGateIndex] || 0) / 100).toFixed(2) : (escalaData[escalaField] / 100).toFixed(2))
                 : '0.00';
@@ -200,6 +214,18 @@ const Capture = () => {
                     return { ...prev, [escalaField]: next > 999999 ? prevVal : next };
                 });
             }
+        } else if (activeTab === 'presas' && presaModo === 'nivel') {
+            setNivelData(prev => {
+                const prevVal = prev[nivelField];
+                const next = prevVal * 10 + num;
+                return { ...prev, [nivelField]: next > 999999 ? prevVal : next };
+            });
+        } else if (activeTab === 'presas') {
+            setPresaData(prev => {
+                const prevVal = prev[presaField];
+                const next = prevVal * 10 + num;
+                return { ...prev, [presaField]: next > 999999 ? prevVal : next };
+            });
         } else {
             setRawValue(prev => {
                 const next = prev * 10 + num;
@@ -219,6 +245,10 @@ const Capture = () => {
             } else {
                 setEscalaData(prev => ({ ...prev, [escalaField]: 0 }));
             }
+        } else if (activeTab === 'presas' && presaModo === 'nivel') {
+            setNivelData(prev => ({ ...prev, [nivelField]: 0 }));
+        } else if (activeTab === 'presas') {
+            setPresaData(prev => ({ ...prev, [presaField]: 0 }));
         } else {
             setRawValue(0);
         }
@@ -235,6 +265,10 @@ const Capture = () => {
             } else {
                 setEscalaData(prev => ({ ...prev, [escalaField]: Math.floor(prev[escalaField] / 10) }));
             }
+        } else if (activeTab === 'presas' && presaModo === 'nivel') {
+            setNivelData(prev => ({ ...prev, [nivelField]: Math.floor(prev[nivelField] / 10) }));
+        } else if (activeTab === 'presas') {
+            setPresaData(prev => ({ ...prev, [presaField]: Math.floor(prev[presaField] / 10) }));
         } else {
             setRawValue(prev => Math.floor(prev / 10));
         }
@@ -465,15 +499,56 @@ const Capture = () => {
                 // Solo divide entre 1000 si NO es canal (el canal captura directo en m3/s)
                 payload.valor_q = refPt?.type === 'canal' ? numVal : numVal / 1000;
                 payload.estado_operativo = estadoToma;
-            } else if (activeTab === 'presas') {
-                // val está en m³/s con 2 decimales (rawValue / 100)
-                const numVal = parseFloat(val);
-                if (isNaN(numVal) || numVal < 0) {
-                    toast.error('Gasto inválido');
+            } else if (activeTab === 'presas' && presaModo === 'nivel') {
+                const elevacion = nivelData.elevacion / 100;
+                const porcentaje = nivelData.porcentaje / 100;
+
+                if (isNaN(elevacion) || elevacion <= 0) {
+                    toast.error('Elevación inválida. Debe ser mayor a 0 msnm.');
                     return;
                 }
-                payload.valor_q = numVal; // ya en m³/s — sync maps directo a gasto_m3s
-                // No mandatory state for presas, just the flow movement
+                if (isNaN(porcentaje) || porcentaje < 0 || porcentaje > 100) {
+                    toast.error('% de llenado inválido. Debe estar entre 0 y 100.');
+                    return;
+                }
+
+                const ptPresa = puntos.find(p => p.id === selectedPoint);
+                payload.presa_subtipo = 'nivel';
+                payload.escala_msnm = elevacion;
+                payload.porcentaje_llenado = porcentaje;
+                // Derivado, no capturado directo: % × capacidad máxima de la presa.
+                if (ptPresa?.capacidad_max_mm3) {
+                    payload.almacenamiento_mm3 = (porcentaje / 100) * ptPresa.capacidad_max_mm3;
+                }
+            } else if (activeTab === 'presas') {
+                const tomaBaja = presaData.tomaBaja / 100;
+                const cfe = presaData.cfe / 100;
+                const tomaIzq = presaData.tomaIzq / 100;
+                const tomaDer = presaData.tomaDer / 100;
+                const total = tomaBaja + cfe + tomaIzq + tomaDer;
+
+                if ([tomaBaja, cfe, tomaIzq, tomaDer].some(v => isNaN(v) || v < 0)) {
+                    toast.error('Gasto inválido en alguna obra de toma.');
+                    return;
+                }
+                if (total === 0) {
+                    toast.error('El gasto total no puede ser 0. Captura al menos una obra de toma.');
+                    return;
+                }
+
+                payload.presa_subtipo = 'obras';
+                payload.valor_q = total; // total — sync lo sube a movimientos_presas.gasto_m3s
+                payload.gasto_toma_baja_m3s = tomaBaja;
+                payload.gasto_cfe_m3s = cfe;
+                payload.gasto_toma_izq_m3s = tomaIzq;
+                payload.gasto_toma_der_m3s = tomaDer;
+
+                const posicionesLlenas = Object.fromEntries(
+                    Object.entries(presaPosicion).filter(([, v]) => v.trim() !== '')
+                );
+                if (Object.keys(posicionesLlenas).length > 0) {
+                    payload.posiciones_compuerta = posicionesLlenas;
+                }
             }
 
             // ---- VALIDACIÓN GEOGRÁFICA (GEOFENCING) ----
@@ -558,6 +633,12 @@ const Capture = () => {
             // - rawValue se mantiene para 'toma' (gasto en L/s queda como referencia)
             // - rawValue se resetea solo para 'presas' y 'escala' (irrelevante para escala)
             if (activeTab !== 'toma') setRawValue(0);
+            if (activeTab === 'presas') {
+                setPresaData({ tomaBaja: 0, cfe: 0, tomaIzq: 0, tomaDer: 0 });
+                setPresaPosicion({ tomaBaja: '', cfe: '', tomaIzq: '', tomaDer: '' });
+                // nivelData se mantiene como referencia (misma lógica que escalaData):
+                // el operador ve la última elevación capturada al reabrir el formulario.
+            }
             setActiveGateIndex(0);
             setManualTime('');
             setManualDate(getTodayString());
@@ -703,6 +784,14 @@ const Capture = () => {
                                         setRawValue(0);
                                         setEstadoToma('inicio');
                                     }
+                                } else if (activeTab === 'presas') {
+                                    const pt = puntos.find(p => p.id === newId);
+                                    setPresaData({ tomaBaja: 0, cfe: 0, tomaIzq: 0, tomaDer: 0 });
+                                    setPresaPosicion({ tomaBaja: '', cfe: '', tomaIzq: '', tomaDer: '' });
+                                    setNivelData({
+                                        elevacion: pt?.nivel_actual ? Math.round(pt.nivel_actual * 100) : 0,
+                                        porcentaje: pt?.porcentaje_llenado_actual ? Math.round(pt.porcentaje_llenado_actual * 100) : 0,
+                                    });
                                 } else {
                                     setRawValue(0);
                                 }
@@ -772,6 +861,29 @@ const Capture = () => {
                         <p className="text-mobile-warning text-[10px] mt-1">Buscando catálogos en caché...</p>
                     )}
                 </div>
+
+                {/* 1.5 Sub-modo de Presas: Obras de Toma vs Nivel de Embalse */}
+                {activeTab === 'presas' && (
+                    <div className="flex bg-slate-900 rounded-lg p-1 mb-3 flex-shrink-0 ring-1 ring-slate-800">
+                        {(
+                            [
+                                { id: 'obras', title: '💧 Obras de Toma' },
+                                { id: 'nivel', title: '🏔️ Nivel de Embalse' },
+                            ] as const
+                        ).map(m => (
+                            <button
+                                key={m.id}
+                                onClick={() => setPresaModo(m.id)}
+                                className={`flex-1 py-2 rounded-md text-[10px] font-bold uppercase transition-all ${presaModo === m.id
+                                    ? 'bg-mobile-accent text-mobile-dark shadow-lg scale-105'
+                                    : 'bg-transparent text-slate-400 hover:bg-slate-700/50'
+                                    }`}
+                            >
+                                {m.title}
+                            </button>
+                        ))}
+                    </div>
+                )}
 
                 {/* 2.1 Mini-Widget: Fecha y Hora de Reporte (Global) */}
                 {(activeTab === 'escala' || activeTab === 'toma' || activeTab === 'presas' || activeTab === 'aforo') && (
@@ -1073,9 +1185,74 @@ const Capture = () => {
                                     </button>
                                 ))}
                             </div>
+                        ) : activeTab === 'presas' && presaModo === 'nivel' ? (
+                            <div className="flex bg-slate-800 rounded-lg p-1 mb-2">
+                                {(
+                                    [
+                                        { id: 'elevacion', title: 'Elevación (msnm)' },
+                                        { id: 'porcentaje', title: '% Llenado' },
+                                    ] as const
+                                ).map(f => (
+                                    <button
+                                        key={f.id}
+                                        onClick={() => setNivelField(f.id)}
+                                        className={`flex-1 py-2 px-1 rounded-md text-[10px] font-bold uppercase transition-all flex flex-col items-center ${nivelField === f.id
+                                            ? 'bg-mobile-accent text-mobile-dark shadow-lg scale-105'
+                                            : 'bg-transparent text-slate-400 hover:bg-slate-700/50'
+                                            }`}
+                                    >
+                                        <span>{f.title}</span>
+                                        <span className="text-sm font-mono mt-0.5">
+                                            {(nivelData[f.id] / 100).toFixed(2)}
+                                        </span>
+                                    </button>
+                                ))}
+                            </div>
+                        ) : activeTab === 'presas' ? (
+                            <div className="flex bg-slate-800 rounded-lg p-1 mb-2">
+                                {(
+                                    [
+                                        { id: 'tomaBaja', title: 'Toma Baja' },
+                                        { id: 'cfe', title: 'CFE' },
+                                        { id: 'tomaIzq', title: 'Toma Izq.' },
+                                        { id: 'tomaDer', title: 'Toma Der.' },
+                                    ] as const
+                                ).map(f => (
+                                    <button
+                                        key={f.id}
+                                        onClick={() => setPresaField(f.id)}
+                                        className={`flex-1 py-2 px-1 rounded-md text-[10px] font-bold uppercase transition-all flex flex-col items-center ${presaField === f.id
+                                            ? 'bg-mobile-accent text-mobile-dark shadow-lg scale-105'
+                                            : 'bg-transparent text-slate-400 hover:bg-slate-700/50'
+                                            }`}
+                                    >
+                                        <span>{f.title}</span>
+                                        <span className="text-sm font-mono mt-0.5">
+                                            {(presaData[f.id] / 100).toFixed(2)}
+                                        </span>
+                                    </button>
+                                ))}
+                            </div>
                         ) : (
                             <div className="text-right text-slate-400 text-xs font-semibold mb-1 flex-shrink-0">
-                                {activeTab === 'presas' ? 'Gasto de Extracción (m³/s)' : 'Captura de Gasto (L/s)'}
+                                {'Captura de Gasto (L/s)'}
+                            </div>
+                        )}
+                        {activeTab === 'presas' && presaModo === 'obras' && (
+                            <div className="flex items-center gap-2 mb-2 flex-shrink-0">
+                                <label className="text-slate-500 text-[9px] font-black uppercase tracking-wider whitespace-nowrap">
+                                    Posición compuerta:
+                                </label>
+                                <input
+                                    type="text"
+                                    inputMode="text"
+                                    placeholder="ej. 1/10"
+                                    maxLength={10}
+                                    value={presaPosicion[presaField]}
+                                    onChange={(e) => setPresaPosicion(prev => ({ ...prev, [presaField]: e.target.value }))}
+                                    className="bg-slate-900 border border-slate-800 text-white text-xs px-2 py-1.5 rounded-lg outline-none focus:border-mobile-accent focus:ring-1 focus:ring-mobile-accent/50 font-mono w-24"
+                                />
+                                <span className="text-slate-600 text-[9px] italic">solo referencia — no calcula gasto</span>
                             </div>
                         )}
                         <div className="flex flex-col items-end flex-shrink-0">
@@ -1088,6 +1265,29 @@ const Capture = () => {
                                 {val}
                             </div>
                         </div>
+                        {activeTab === 'presas' && presaModo === 'obras' && (() => {
+                            const total = (presaData.tomaBaja + presaData.cfe + presaData.tomaIzq + presaData.tomaDer) / 100;
+                            return (
+                                <div className="flex items-center justify-between bg-slate-900/50 rounded p-2 mb-2 flex-shrink-0">
+                                    <span className="text-[10px] text-slate-500 uppercase tracking-wide font-bold">Gasto Total (Σ obras)</span>
+                                    <span className="font-mono font-bold text-sm text-cyan-300">{total.toFixed(2)} m³/s</span>
+                                </div>
+                            );
+                        })()}
+                        {activeTab === 'presas' && presaModo === 'nivel' && (() => {
+                            const pt = puntos.find(p => p.id === selectedPoint);
+                            const elevAnterior = pt?.nivel_actual ?? null;
+                            const elevActual = nivelData.elevacion / 100;
+                            const diffM = (elevAnterior != null && elevActual > 0) ? elevActual - elevAnterior : null;
+                            return (
+                                <div className="flex items-center justify-between bg-slate-900/50 rounded p-2 mb-2 flex-shrink-0">
+                                    <span className="text-[10px] text-slate-500 uppercase tracking-wide font-bold">Variación vs. última lectura</span>
+                                    <span className="font-mono font-bold text-sm text-cyan-300">
+                                        {diffM != null ? `${diffM >= 0 ? '+' : ''}${(diffM * 100).toFixed(0)} cm` : 'Sin referencia'}
+                                    </span>
+                                </div>
+                            );
+                        })()}
                         {activeTab === 'escala' && (() => {
                             const pt = puntos.find(p => p.id === selectedPoint);
                             const hArriba = escalaData.arriba / 100;

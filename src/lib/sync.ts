@@ -155,6 +155,7 @@ export const downloadCatalogs = async (forceCatalog = false) => {
         let aforosControl: any[] | null = null;
         let presas: any[] | null = null;
         let perfiles: any[] | null = null;
+        let ultimasLecturasPresas: any[] | null = null;
 
         // Mapa de respaldo: última lectura conocida del catálogo local Dexie.
         // Necesario cuando shouldFetchStatic=true: la tabla 'escalas' no tiene
@@ -162,20 +163,33 @@ export const downloadCatalogs = async (forceCatalog = false) => {
         // descarga anterior para no perderlos en un refresco de catálogo estático.
         const localEscalasFallback = new Map<string, any>();
         const localDexieEscalas = await db.puntos.where('type').equals('escala').toArray();
+        // Mismo patrón para presas: preserva nivel_actual/porcentaje_llenado_actual
+        // (última elevación conocida) entre descargas de catálogo estático.
+        const localPresasFallback = new Map<string, any>();
+        const localDexiePresas = await db.puntos.where('type').equals('presa').toArray();
+        localDexiePresas.forEach(p => localPresasFallback.set(p.id, p));
         localDexieEscalas.forEach(p => localEscalasFallback.set(p.id, p));
 
         if (shouldFetchStatic) {
             const { data: e } = await supabase.from('escalas').select('id, nombre, latitud, longitud, km, nivel_min_operativo, nivel_max_operativo, ancho, alto, pzas_radiales').eq('activa', true);
             const { data: t } = await supabase.from('puntos_entrega').select('id, nombre, tipo, seccion_id, km, coords_x, coords_y, capacidad_max_lps, modulos ( codigo_corto, nombre ), secciones ( nombre )');
             const { data: a } = await supabase.from('aforos_control').select('id, nombre_punto, latitud, longitud, foto_url, caracteristicas_hidraulicas');
-            const { data: pr } = await supabase.from('presas').select('id, nombre, nombre_corto');
+            const { data: pr } = await supabase.from('presas').select('id, nombre, nombre_corto, capacidad_max');
             const { data: pf } = await supabase.from('perfil_hidraulico_canal').select('id, km_inicio, km_fin, capacidad_diseno_m3s');
-            
+            // Última elevación/porcentaje conocidos por presa — referencia para
+            // que el operador vea la variación en cm al capturar el nivel de hoy.
+            const { data: ulp } = await supabase
+                .from('lecturas_presas')
+                .select('presa_id, fecha, escala_msnm, porcentaje_llenado')
+                .order('fecha', { ascending: false })
+                .limit(200);
+
             baseEscalas = e;
             tomas = t;
             aforosControl = a;
             presas = pr;
             perfiles = pf;
+            ultimasLecturasPresas = ulp;
         } else {
             // Re-mapear desde Dexie para mezclar con el estado dinámico nuevo
             const localPuntos = await db.puntos.toArray();
@@ -281,11 +295,26 @@ export const downloadCatalogs = async (forceCatalog = false) => {
         }
 
         if (presas) {
-            mappedPuntos.push(...presas.map((p: any) => ({
-                id: p.id,
-                name: p.nombre_corto || p.nombre || p.name,
-                type: 'presa'
-            })));
+            mappedPuntos.push(...presas.map((p: any) => {
+                const lecturaReciente = (ultimasLecturasPresas || []).find((l: any) => l.presa_id === p.id);
+                const fallback = localPresasFallback.get(p.id);
+                return {
+                    id: p.id,
+                    name: p.nombre_corto || p.nombre || p.name,
+                    type: 'presa',
+                    // Última elevación/% conocidos — referencia visual y para calcular
+                    // la variación en cm al capturar el nivel de hoy en Capture.tsx.
+                    nivel_actual: lecturaReciente?.escala_msnm != null
+                        ? Number(lecturaReciente.escala_msnm)
+                        : fallback?.nivel_actual,
+                    porcentaje_llenado_actual: lecturaReciente?.porcentaje_llenado != null
+                        ? Number(lecturaReciente.porcentaje_llenado)
+                        : fallback?.porcentaje_llenado_actual,
+                    // Capacidad máxima (Mm³) — para derivar almacenamiento_mm3 = % × capacidad
+                    // al capturar el nivel, sin pedirle un tercer número al operador.
+                    capacidad_max_mm3: p.capacidad_max != null ? Number(p.capacidad_max) : fallback?.capacidad_max_mm3,
+                };
+            }));
         }
 
         if (mappedPuntos.length > 0) {
@@ -822,13 +851,20 @@ export const syncPendingRecords = async () => {
             }
         }
 
-        // 1E. Movimientos de Presa (van a movimientos_presas)
-        const presasPending = pending.filter(p => p.tipo === 'presa');
+        // 1E. Movimientos de Presa — Obras de Toma (van a movimientos_presas)
+        const presasPending = pending.filter(p => p.tipo === 'presa' && p.presa_subtipo !== 'nivel');
         const presasPayload = presasPending.map(p => ({
             id: p.id,
             presa_id: p.punto_id,
             fecha_hora: `${p.fecha_captura}T${p.hora_captura}${offsetString}`,
             gasto_m3s: p.valor_q,
+            // Desglose por obra de toma — null si el registro es legacy (un solo total).
+            gasto_toma_baja_m3s: p.gasto_toma_baja_m3s ?? null,
+            gasto_cfe_m3s: p.gasto_cfe_m3s ?? null,
+            gasto_toma_izq_m3s: p.gasto_toma_izq_m3s ?? null,
+            gasto_toma_der_m3s: p.gasto_toma_der_m3s ?? null,
+            // Posición de compuerta por obra (ej. "1/10") — solo trazabilidad.
+            posiciones_compuerta: p.posiciones_compuerta ?? null,
             fuente_dato: 'SICA_CAPTURE'
         }));
 
@@ -844,6 +880,38 @@ export const syncPendingRecords = async () => {
                 });
             } else {
                 syncSuccessIds.push(...presasPending.map(p => p.id as string));
+            }
+        }
+
+        // 1F. Nivel de Embalse (van a lecturas_presas, upsert por presa_id + fecha)
+        const nivelesPending = pending.filter(p => p.tipo === 'presa' && p.presa_subtipo === 'nivel');
+        // Sin 'id' explícito: el conflicto se resuelve por (presa_id, fecha), no
+        // por PK — igual que el flujo de importación manual en ImportReport.tsx.
+        // Pasar un id de cliente aquí arriesgaría choque de PK si dos capturas del
+        // mismo día llegan con ids distintos.
+        const nivelesPayload = nivelesPending.map(p => ({
+            presa_id: p.punto_id,
+            fecha: p.fecha_captura,
+            escala_msnm: p.escala_msnm,
+            porcentaje_llenado: p.porcentaje_llenado,
+            almacenamiento_mm3: p.almacenamiento_mm3 ?? null,
+            responsable: p.responsable_nombre || null,
+        }));
+
+        if (nivelesPayload.length > 0) {
+            const { error: err } = await supabase
+                .from('lecturas_presas')
+                .upsert(nivelesPayload, { onConflict: 'presa_id,fecha' });
+            if (err) {
+                console.error('Error insertando lecturas_presas (nivel):', err.message);
+                const now = new Date().toISOString();
+                await db.records.where('id').anyOf(nivelesPending.map(p => p.id)).modify(r => {
+                    r.error_sync = err.message;
+                    r.retry_count = (r.retry_count ?? 0) + 1;
+                    if (!r.first_failed_at) r.first_failed_at = now;
+                });
+            } else {
+                syncSuccessIds.push(...nivelesPending.map(p => p.id as string));
             }
         }
 

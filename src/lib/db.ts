@@ -36,6 +36,11 @@ export interface OfflinePoint {
     // Aforo Extended
     foto_url?: string;
     caracteristicas_hidraulicas?: any;
+
+    // Nivel de embalse (presas) — última elevación/% conocidos, para mostrar
+    // referencia y calcular variación en cm al capturar el nivel de hoy.
+    porcentaje_llenado_actual?: number;
+    capacidad_max_mm3?: number;
 }
 
 // 2. Registro a Sincronizar (Mochila)
@@ -48,12 +53,30 @@ export interface SicaRecord {
     responsable_nombre?: string;
 
     // Payload Dinámico dependiendo del tipo
-    valor_q?: number; // Para tomas (L/s)
+    valor_q?: number; // Para tomas (L/s); para presas: gasto TOTAL (suma de obras de toma)
     nivel_m?: number; // Para escalas
     nivel_abajo_m?: number;
     apertura_radiales_m?: number;
     confirmada?: boolean;
     estado_operativo?: 'inicio' | 'suspension' | 'reabierto' | 'cierre' | 'continua' | 'modificacion';
+
+    // Desglose de obras de toma para presas (tipo === 'presa').
+    // valor_q sigue llevando el total para no romper lecturas legacy.
+    gasto_toma_baja_m3s?: number;
+    gasto_cfe_m3s?: number;
+    gasto_toma_izq_m3s?: number;
+    gasto_toma_der_m3s?: number;
+
+    // Posición de compuerta por obra (ej. "1/10") — solo trazabilidad, no hay
+    // curva calibrada posición→gasto para obras de toma de presa.
+    posiciones_compuerta?: { tomaBaja?: string; cfe?: string; tomaIzq?: string; tomaDer?: string };
+
+    // Para tipo === 'presa': distingue el sub-formulario capturado.
+    // 'obras' (default, va a movimientos_presas) vs 'nivel' (va a lecturas_presas).
+    presa_subtipo?: 'obras' | 'nivel';
+    escala_msnm?: number;
+    porcentaje_llenado?: number;
+    almacenamiento_mm3?: number; // derivado: % × capacidad_max_mm3 de la presa
 
     // Metadatos operacionales
     punto_id: string; // ID del punto (PE-xxx, ESC-xxx)
