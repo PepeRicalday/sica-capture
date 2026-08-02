@@ -72,7 +72,7 @@ export const TrapezoidalSchema: React.FC<TrapezoidalSchemaProps> = ({
 
     return (
         <div className="bg-slate-950 border border-slate-800 rounded-2xl p-4 mb-4 select-none shadow-2xl">
-            <h3 className="text-[11px] text-mobile-accent font-black uppercase tracking-widest mb-4 flex justify-between items-center px-1">
+            <h3 className="text-[11px] text-mobile-accent-text font-black uppercase tracking-widest mb-4 flex justify-between items-center px-1">
                 <span className="flex items-center gap-2">
                     <div className="w-2 h-2 rounded-full bg-mobile-accent animate-pulse" />
                     Gemelo Digital Hidráulico (Escala +15%)

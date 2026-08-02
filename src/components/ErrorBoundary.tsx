@@ -56,7 +56,7 @@ export class ErrorBoundary extends Component<Props, State> {
 
                     <button
                         onClick={this.handleReload}
-                        className="w-full max-w-xs bg-[#0ea5e9] hover:bg-[#0284c7] text-white font-bold py-4 rounded-2xl transition-all shadow-lg active:scale-95 flex items-center justify-center gap-2 text-lg mb-3"
+                        className="w-full max-w-xs bg-[#1d5c74] hover:bg-[#123e4f] text-white font-bold py-4 rounded-2xl transition-all shadow-lg active:scale-95 flex items-center justify-center gap-2 text-lg mb-3"
                     >
                         <RefreshCw size={20} /> Reiniciar SICA
                     </button>

@@ -7,6 +7,7 @@ import clsx from 'clsx';
 import { TomaHistoryModal } from '../components/TomaHistoryModal';
 import { formatCaudalLps } from '../lib/formatters';
 import StatusBanner from '../components/StatusBanner';
+import BrandStrip from '../components/BrandStrip';
 
 const STALE_HOURS = 8;
 
@@ -140,9 +141,10 @@ const Hidrometria: React.FC = () => {
         <div className="flex flex-col h-[100dvh] bg-mobile-dark">
             <header className="px-4 py-4 bg-slate-900 border-b border-mobile-accent/30 shrink-0 shadow-lg relative overflow-hidden">
                 <div className="absolute top-0 right-0 w-32 h-32 bg-mobile-accent/5 blur-3xl rounded-full -mr-16 -mt-16"></div>
+                <div className="relative z-10"><BrandStrip /></div>
                 <h1 className="text-base font-black text-white tracking-widest uppercase flex items-center justify-between relative z-10">
                     <div className="flex items-center gap-2">
-                        <Activity className="text-mobile-accent animate-pulse" size={20} />
+                        <Activity className="text-mobile-accent-text animate-pulse" size={20} />
                         Centro de Control Hidrométrico
                     </div>
                     {isOnline ? (
@@ -159,7 +161,7 @@ const Hidrometria: React.FC = () => {
                 </h1>
                 <div className="flex justify-between items-center mt-1 relative z-10 font-mono">
                     <p className="text-[10px] text-slate-400">Hidro-Sincronía Digital SRL </p>
-                    <p className="text-[9px] text-mobile-accent font-bold">V.1.3.4-PRO</p>
+                    <p className="text-[9px] text-mobile-accent-text font-bold">V.1.3.4-PRO</p>
                 </div>
             </header>
 

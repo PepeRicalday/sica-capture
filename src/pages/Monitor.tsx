@@ -7,6 +7,7 @@ import L from 'leaflet';
 import { Droplet, Activity, WifiOff, Scale, Calculator, AlertCircle } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import StatusBanner from '../components/StatusBanner';
+import BrandStrip from '../components/BrandStrip';
 import { useHydricStatus } from '../context/HydricStatusContext';
 import { getTodayString, getDaysAgoString } from '../lib/dateHelpers';
 import { calculateFlow, getFactorCorreccion } from '../lib/hydraulicCalculations';
@@ -21,34 +22,37 @@ const MapBounds = ({ bounds }: { bounds: [number, number][] }) => {
     return null;
 };
 
-// Fix para los iconos de leaflet en react (bug clásico)
-delete (L.Icon.Default.prototype as any)._getIconUrl;
-L.Icon.Default.mergeOptions({
-    iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
-    iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
-    shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
-});
-
 const getModuloTheme = (modulo: string) => {
     const mod = (modulo || '').toLowerCase();
-    if (mod.includes('12')) return { leafletColor: 'gold', twBg: 'bg-yellow-500/10', twBorder: 'border-yellow-500/40', twText: 'text-yellow-400' };
-    if (mod.includes('1') && !mod.includes('12')) return { leafletColor: 'blue', twBg: 'bg-blue-500/10', twBorder: 'border-blue-500/40', twText: 'text-blue-400' };
-    if (mod.includes('2')) return { leafletColor: 'green', twBg: 'bg-emerald-500/10', twBorder: 'border-emerald-500/40', twText: 'text-emerald-400' };
-    if (mod.includes('3')) return { leafletColor: 'orange', twBg: 'bg-orange-500/10', twBorder: 'border-orange-500/40', twText: 'text-orange-400' };
-    if (mod.includes('4')) return { leafletColor: 'red', twBg: 'bg-red-500/10', twBorder: 'border-red-500/40', twText: 'text-red-400' };
-    if (mod.includes('5')) return { leafletColor: 'violet', twBg: 'bg-violet-500/10', twBorder: 'border-violet-500/40', twText: 'text-violet-400' };
-    return { leafletColor: 'grey', twBg: 'bg-slate-500/10', twBorder: 'border-slate-500/40', twText: 'text-slate-400' };
+    if (mod.includes('12')) return { pinColor: '#eab308', twBg: 'bg-yellow-500/10', twBorder: 'border-yellow-500/40', twText: 'text-yellow-400' };
+    if (mod.includes('1') && !mod.includes('12')) return { pinColor: '#3b82f6', twBg: 'bg-blue-500/10', twBorder: 'border-blue-500/40', twText: 'text-blue-400' };
+    if (mod.includes('2')) return { pinColor: '#10b981', twBg: 'bg-emerald-500/10', twBorder: 'border-emerald-500/40', twText: 'text-emerald-400' };
+    if (mod.includes('3')) return { pinColor: '#f97316', twBg: 'bg-orange-500/10', twBorder: 'border-orange-500/40', twText: 'text-orange-400' };
+    if (mod.includes('4')) return { pinColor: '#ef4444', twBg: 'bg-red-500/10', twBorder: 'border-red-500/40', twText: 'text-red-400' };
+    if (mod.includes('5')) return { pinColor: '#8b5cf6', twBg: 'bg-violet-500/10', twBorder: 'border-violet-500/40', twText: 'text-violet-400' };
+    return { pinColor: '#64748b', twBg: 'bg-slate-500/10', twBorder: 'border-slate-500/40', twText: 'text-slate-400' };
 };
 
-// Generador de iconos dinámico para leaflet
-const createColoredIcon = (colorName: string) => new L.Icon({
-    iconUrl: `https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-${colorName}.png`,
-    shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
-    iconSize: [25, 41],
-    iconAnchor: [12, 41],
-    popupAnchor: [1, -34],
-    shadowSize: [41, 41]
-});
+// Pin de mapa como SVG inline (sin dependencia de red — antes se pedía a
+// raw.githubusercontent.com/pointhi/leaflet-color-markers, roto en modo offline).
+const iconCache = new Map<string, L.DivIcon>();
+const createColoredIcon = (hexColor: string) => {
+    const cached = iconCache.get(hexColor);
+    if (cached) return cached;
+    const icon = L.divIcon({
+        className: '',
+        html: `<svg width="25" height="34" viewBox="0 0 25 34" xmlns="http://www.w3.org/2000/svg">
+            <ellipse cx="12.5" cy="32" rx="6" ry="2" fill="rgba(0,0,0,0.35)" />
+            <path d="M12.5 0C5.6 0 0 5.6 0 12.5c0 9.4 12.5 21.5 12.5 21.5s12.5-12.1 12.5-21.5C25 5.6 19.4 0 12.5 0z" fill="${hexColor}" stroke="rgba(0,0,0,0.4)" stroke-width="1"/>
+            <circle cx="12.5" cy="12.5" r="5" fill="white" fill-opacity="0.92"/>
+        </svg>`,
+        iconSize: [25, 34],
+        iconAnchor: [12.5, 34],
+        popupAnchor: [0, -30],
+    });
+    iconCache.set(hexColor, icon);
+    return icon;
+};
 
 const STALE_HOURS = 8;
 
@@ -380,6 +384,7 @@ const Monitor = () => {
                 <div className="absolute top-0 left-0 w-32 h-32 bg-indigo-500/5 blur-3xl rounded-full -ml-16 -mt-16"></div>
                 <div className="flex justify-between items-center relative z-10">
                     <div className="flex flex-col">
+                        <BrandStrip />
                         <h1 className="text-base font-black text-white tracking-widest uppercase flex items-center gap-2">
                             <Scale className="text-indigo-400" size={18} />
                             Balance Hidrodinámico
@@ -506,7 +511,7 @@ const Monitor = () => {
                 {/* 1. Panel de Volumen por Módulo */}
                 <div className="p-4 flex-shrink-0">
                     <div className="flex items-center gap-2 mb-3">
-                        <Droplet className="text-mobile-accent" size={20} />
+                        <Droplet className="text-mobile-accent-text" size={20} />
                         <h2 className="text-white font-bold text-sm tracking-widest uppercase">
                             Volumen Entregado Hoy
                         </h2>
@@ -572,7 +577,7 @@ const Monitor = () => {
                                         })
                                         : null;
                                     return (
-                                        <Marker key={p.id} position={[p.lat!, p.lng!]} icon={createColoredIcon(theme.leafletColor)}>
+                                        <Marker key={p.id} position={[p.lat!, p.lng!]} icon={createColoredIcon(theme.pinColor)}>
                                             <Popup className="custom-popup">
                                                 <div className="text-xs text-slate-300">
                                                     <strong className={`block uppercase border-b border-slate-700 pb-1 mb-1 ${theme.twText}`}>{p.name}</strong>

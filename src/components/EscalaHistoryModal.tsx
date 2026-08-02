@@ -138,7 +138,7 @@ export const EscalaHistoryModal = ({ onClose, onEditRecord }: EscalaHistoryModal
                 <div className="p-5 border-b border-slate-800 bg-slate-800/40 flex justify-between items-center">
                     <div>
                         <h2 className="text-white font-black text-xl tracking-tighter flex items-center gap-2">
-                            <Scale className="text-mobile-accent" size={24} /> BITÁCORA DE NIVELES
+                            <Scale className="text-mobile-accent-text" size={24} /> BITÁCORA DE NIVELES
                         </h2>
                         <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mt-0.5">Historial Local de Lecturas</p>
                     </div>
@@ -208,7 +208,7 @@ export const EscalaHistoryModal = ({ onClose, onEditRecord }: EscalaHistoryModal
                                                     <div className="flex items-center gap-3">
                                                         <div className="flex flex-col">
                                                             <span className="text-slate-500 text-[9px] uppercase font-bold">Nivel Arriba</span>
-                                                            <span className="text-mobile-accent font-mono font-bold">{record.valor_q?.toFixed(2)} m</span>
+                                                            <span className="text-mobile-accent-text font-mono font-bold">{record.valor_q?.toFixed(2)} m</span>
                                                         </div>
                                                         {trend !== null && (
                                                             <div className={`flex items-center gap-1 px-1.5 py-0.5 rounded-lg ${trend > 0 ? 'bg-emerald-500/10 text-emerald-400' : trend < 0 ? 'bg-red-500/10 text-red-400' : 'bg-slate-500/10 text-slate-400'}`}>
@@ -217,7 +217,7 @@ export const EscalaHistoryModal = ({ onClose, onEditRecord }: EscalaHistoryModal
                                                             </div>
                                                         )}
                                                     </div>
-                                                    <ArrowRight size={14} className={`text-slate-600 group-hover:text-mobile-accent group-hover:translate-x-1 transition-all ${selectedDetail?.id === record.id ? 'text-mobile-accent translate-x-1' : ''}`} />
+                                                    <ArrowRight size={14} className={`text-slate-600 group-hover:text-mobile-accent-text group-hover:translate-x-1 transition-all ${selectedDetail?.id === record.id ? 'text-mobile-accent-text translate-x-1' : ''}`} />
                                                 </div>
                                             </div>
                                         );
@@ -318,7 +318,7 @@ export const EscalaHistoryModal = ({ onClose, onEditRecord }: EscalaHistoryModal
                     {selectedDetail && (
                         <div className="sm:hidden absolute inset-0 bg-slate-950 z-20 flex flex-col">
                             <div className="p-4 border-b border-slate-800 flex justify-between items-center bg-slate-900">
-                                <button onClick={() => setSelectedDetail(null)} className="text-mobile-accent font-bold text-sm">← Volver</button>
+                                <button onClick={() => setSelectedDetail(null)} className="text-mobile-accent-text font-bold text-sm">← Volver</button>
                                 <span className="text-xs font-black text-white uppercase">Detalle de Nivel</span>
                                 <div className="w-10"></div>
                             </div>
@@ -329,7 +329,7 @@ export const EscalaHistoryModal = ({ onClose, onEditRecord }: EscalaHistoryModal
                                 <div className="grid grid-cols-2 gap-4">
                                     <div className="bg-slate-900 p-3 rounded-xl">
                                         <p className="text-[9px] text-slate-500 uppercase font-black">Nivel Arriba</p>
-                                        <p className="text-xl font-black text-mobile-accent font-mono">{selectedDetail.valor_q?.toFixed(2)} m</p>
+                                        <p className="text-xl font-black text-mobile-accent-text font-mono">{selectedDetail.valor_q?.toFixed(2)} m</p>
                                     </div>
                                     <div className="bg-slate-900 p-3 rounded-xl">
                                         <p className="text-[9px] text-slate-500 uppercase font-black">Gasto</p>

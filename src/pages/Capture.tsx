@@ -21,6 +21,7 @@ import { RepresoSchema } from '../components/RepresoSchema';
 import { useHydricStatus } from '../context/HydricStatusContext';
 import StatusBanner from '../components/StatusBanner';
 import { ManagerAuthModal } from '../components/ManagerAuthModal';
+import BrandStrip from '../components/BrandStrip';
 
 // Función Haversine para cálculo de distancia en metros
 const getDistanceMeters = (lat1: number, lon1: number, lat2: number, lon2: number) => {
@@ -46,7 +47,7 @@ const LiveClock = () => {
     const dateStr = time.toLocaleDateString('es-MX', { weekday: 'short', day: '2-digit', month: 'short', timeZone: 'America/Chihuahua' }).replace('.', '').toUpperCase();
     const timeStr = time.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Chihuahua' });
     return (
-        <span className="text-mobile-accent font-mono text-[10px] font-semibold tracking-wider mt-0.5">
+        <span className="text-mobile-accent-text font-mono text-[10px] font-semibold tracking-wider mt-0.5">
             {dateStr} • {timeStr}
         </span>
     );
@@ -655,6 +656,7 @@ const Capture = () => {
             {/* Header Glassmorfico */}
             <header className="glass-panel px-3 py-2 flex justify-between items-center z-10 sticky top-0 pb-1 shrink-0 rounded-b-xl border-t-0 mx-[-1px]">
                 <div className="flex flex-col">
+                    <BrandStrip className="mb-1" />
                     <h1 className="text-lg font-bold leading-none">Captura de Campo</h1>
                     <LiveClock />
                 </div>
@@ -714,7 +716,7 @@ const Capture = () => {
                                 key={tab}
                                 onClick={() => { setActiveTab(tab); setRawValue(0); setEscalaData({ arriba: 0, abajo: 0, aperturas: [] }); setMetodoGasto('compuertas'); }}
                                 className={`flex-1 py-3 px-1 rounded-lg font-black uppercase tracking-wider transition-all duration-300 ${activeTab === tab
-                                    ? 'bg-mobile-accent text-slate-900 shadow-lg shadow-mobile-accent/30 scale-[1.02]'
+                                    ? 'bg-mobile-accent text-white shadow-md scale-[1.02]'
                                     : 'text-slate-500 hover:text-slate-300'
                                     }`}
                             >
@@ -884,7 +886,7 @@ const Capture = () => {
                                 key={m.id}
                                 onClick={() => setPresaModo(m.id)}
                                 className={`flex-1 py-2 rounded-md text-[10px] font-bold uppercase transition-all ${presaModo === m.id
-                                    ? 'bg-mobile-accent text-mobile-dark shadow-lg scale-105'
+                                    ? 'bg-mobile-accent text-white shadow-md scale-105'
                                     : 'bg-transparent text-slate-400 hover:bg-slate-700/50'
                                     }`}
                             >
@@ -1100,7 +1102,7 @@ const Capture = () => {
                                             if (isAvailable) setEstadoToma(estado);
                                         }}
                                         className={`flex-1 py-1 px-1 rounded-md text-[10px] font-bold uppercase transition-all ${estadoToma === estado
-                                            ? 'bg-mobile-accent text-mobile-dark shadow-lg scale-105'
+                                            ? 'bg-mobile-accent text-white shadow-md scale-105'
                                             : !isAvailable
                                                 ? 'bg-slate-900 text-slate-600 opacity-50 cursor-not-allowed'
                                                 : 'bg-slate-800 text-slate-400 border border-slate-700 hover:bg-slate-700'
@@ -1169,7 +1171,7 @@ const Capture = () => {
                                         key={f.id}
                                         onClick={() => setEscalaField(f.id)}
                                         className={`flex-1 py-2 px-1 rounded-md text-[10px] font-bold uppercase transition-all flex flex-col items-center ${escalaField === f.id
-                                            ? 'bg-mobile-accent text-mobile-dark shadow-lg scale-105'
+                                            ? 'bg-mobile-accent text-white shadow-md scale-105'
                                             : 'bg-transparent text-slate-400 hover:bg-slate-700/50'
                                             }`}
                                     >
@@ -1186,7 +1188,7 @@ const Capture = () => {
                                             const pt2 = puntos.find(p => p.id === selectedPoint);
                                             if (!pt2?.pzas_radiales || totalAp <= 0) return null;
                                             return (
-                                                <span className={`text-[9px] font-mono mt-0.5 opacity-90 ${escalaField === 'apertura' ? 'text-mobile-dark' : 'text-mobile-accent'}`}>
+                                                <span className={`text-[9px] font-mono mt-0.5 opacity-90 ${escalaField === 'apertura' ? 'text-white' : 'text-mobile-accent-text'}`}>
                                                     Σ {totalAp.toFixed(2)}m · {abiertas}/{pt2.pzas_radiales}
                                                 </span>
                                             );
@@ -1206,7 +1208,7 @@ const Capture = () => {
                                         key={f.id}
                                         onClick={() => setNivelField(f.id)}
                                         className={`flex-1 py-2 px-1 rounded-md text-[10px] font-bold uppercase transition-all flex flex-col items-center ${nivelField === f.id
-                                            ? 'bg-mobile-accent text-mobile-dark shadow-lg scale-105'
+                                            ? 'bg-mobile-accent text-white shadow-md scale-105'
                                             : 'bg-transparent text-slate-400 hover:bg-slate-700/50'
                                             }`}
                                     >
@@ -1231,7 +1233,7 @@ const Capture = () => {
                                         key={f.id}
                                         onClick={() => setPresaField(f.id)}
                                         className={`flex-1 py-2 px-1 rounded-md text-[10px] font-bold uppercase transition-all flex flex-col items-center ${presaField === f.id
-                                            ? 'bg-mobile-accent text-mobile-dark shadow-lg scale-105'
+                                            ? 'bg-mobile-accent text-white shadow-md scale-105'
                                             : 'bg-transparent text-slate-400 hover:bg-slate-700/50'
                                             }`}
                                     >
@@ -1249,7 +1251,7 @@ const Capture = () => {
                         )}
                         {activeTab === 'presas' && presaModo === 'obras' && (
                             <div className="flex items-center gap-2 mb-2 flex-shrink-0">
-                                <label className="text-slate-500 text-[9px] font-black uppercase tracking-wider whitespace-nowrap">
+                                <label className="text-slate-400 text-[9px] font-black uppercase tracking-wider whitespace-nowrap">
                                     Posición compuerta:
                                 </label>
                                 <input
@@ -1266,7 +1268,7 @@ const Capture = () => {
                         )}
                         <div className="flex flex-col items-end flex-shrink-0">
                             {selectedPoint && (
-                                <span className="text-[8px] sm:text-[10px] text-mobile-accent bg-mobile-accent/10 px-2 py-0.5 rounded uppercase font-black tracking-widest border border-mobile-accent/30 mb-1">
+                                <span className="text-[8px] sm:text-[10px] text-mobile-accent-text bg-mobile-accent/10 px-2 py-0.5 rounded uppercase font-black tracking-widest border border-mobile-accent/30 mb-1">
                                     REFERENCIA ÚLTIMA
                                 </span>
                             )}
@@ -1383,8 +1385,8 @@ const Capture = () => {
                                                                         className={`rounded-lg p-2 border text-left transition-all ${activo ? 'bg-mobile-accent/15 border-mobile-accent ring-1 ring-mobile-accent/40' : 'bg-slate-950/60 border-slate-700/50'}`}
                                                                     >
                                                                         <div className="flex items-center justify-between">
-                                                                            <span className={`text-[9px] font-black uppercase ${activo ? 'text-mobile-accent' : 'text-slate-400'}`}>{o.label}</span>
-                                                                            {activo && <span className="text-[8px] text-mobile-accent font-black">✓</span>}
+                                                                            <span className={`text-[9px] font-black uppercase ${activo ? 'text-mobile-accent-text' : 'text-slate-400'}`}>{o.label}</span>
+                                                                            {activo && <span className="text-[8px] text-mobile-accent-text font-black">✓</span>}
                                                                         </div>
                                                                         <div className={`font-mono font-bold text-lg ${activo ? 'text-white' : 'text-slate-400'}`}>{o.val.toFixed(3)}<span className="text-[9px] text-slate-500 ml-1">m³/s</span></div>
                                                                         <div className="text-[8px] text-slate-500 font-mono">{o.sub}</div>
@@ -1403,7 +1405,7 @@ const Capture = () => {
                                                 <span className="text-slate-500 text-xs mr-2">
                                                     {pt?.pzas_radiales && hasRadialesOpen ? 'Gasto Sumado (Radiales):' : 'Gasto Calculado:'}
                                                 </span>
-                                                <span className="text-mobile-accent font-mono font-bold text-lg">{q.toFixed(3)} m³/s</span>
+                                                <span className="text-mobile-accent-text font-mono font-bold text-lg">{q.toFixed(3)} m³/s</span>
                                             </div>
                                         )}
                                     </div>

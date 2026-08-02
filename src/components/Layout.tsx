@@ -39,10 +39,15 @@ const Layout = ({ children }: { children: ReactNode }) => {
 
             {/* Bottom Nav */}
             <nav className="fixed bottom-0 w-full bg-mobile-card border-t border-slate-800 pb-safe z-50">
+                <img
+                    src="/logo-srl.png"
+                    alt="Unidad Conchos"
+                    className="absolute -top-3.5 left-1/2 -translate-x-1/2 w-7 h-7 object-contain rounded-full bg-white p-1 shadow-md ring-2 ring-mobile-card"
+                />
                 <div className="flex justify-around items-center h-14">
                     <NavLink
                         to="/monitor"
-                        className={({ isActive }) => `flex flex-col items-center justify-center w-full h-full transition-colors ${isActive ? 'text-mobile-accent bg-slate-800/50' : 'text-slate-400'}`}
+                        className={({ isActive }) => `flex flex-col items-center justify-center w-full h-full transition-colors ${isActive ? 'text-mobile-accent-text bg-slate-800/50' : 'text-slate-400'}`}
                     >
                         {({ isActive }) => (
                             <>
@@ -53,7 +58,7 @@ const Layout = ({ children }: { children: ReactNode }) => {
                     </NavLink>
                     <NavLink
                         to="/hidrometria"
-                        className={({ isActive }) => `flex flex-col items-center justify-center w-full h-full transition-colors ${isActive ? 'text-mobile-accent bg-slate-800/50' : 'text-slate-400'}`}
+                        className={({ isActive }) => `flex flex-col items-center justify-center w-full h-full transition-colors ${isActive ? 'text-mobile-accent-text bg-slate-800/50' : 'text-slate-400'}`}
                     >
                         {({ isActive }) => (
                             <>
@@ -64,7 +69,7 @@ const Layout = ({ children }: { children: ReactNode }) => {
                     </NavLink>
                     <NavLink
                         to="/captura"
-                        className={({ isActive }) => `flex flex-col items-center justify-center w-full h-full transition-colors ${isActive ? 'text-mobile-accent bg-slate-800/50' : 'text-slate-400'}`}
+                        className={({ isActive }) => `flex flex-col items-center justify-center w-full h-full transition-colors ${isActive ? 'text-mobile-accent-text bg-slate-800/50' : 'text-slate-400'}`}
                     >
                         {({ isActive }) => (
                             <>

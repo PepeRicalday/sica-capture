@@ -46,7 +46,7 @@ function NukePage() {
   }, []);
 
   return (
-    <div className="flex items-center justify-center h-screen bg-mobile-dark text-mobile-accent">
+    <div className="flex items-center justify-center h-screen bg-mobile-dark text-mobile-accent-text">
       <div className="text-center">
         <div className="animate-spin text-4xl mb-4">⟳</div>
         <div className="font-bold text-sm uppercase tracking-widest">Limpiando caché...</div>
@@ -60,7 +60,7 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-screen bg-mobile-dark text-mobile-accent">
+      <div className="flex items-center justify-center h-screen bg-mobile-dark text-mobile-accent-text">
         <div className="animate-pulse font-bold">Iniciando SICA...</div>
       </div>
     );
@@ -140,7 +140,7 @@ function AppContent() {
   }, []);
 
   const LazyFallback = (
-    <div className="flex items-center justify-center h-screen bg-mobile-dark text-mobile-accent">
+    <div className="flex items-center justify-center h-screen bg-mobile-dark text-mobile-accent-text">
       <div className="animate-pulse font-bold text-sm uppercase tracking-widest">Cargando...</div>
     </div>
   );

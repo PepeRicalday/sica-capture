@@ -343,7 +343,7 @@ export const TomaHistoryModal: React.FC<TomaHistoryModalProps> = ({ isOpen, onCl
                                 type="button"
                                 onClick={() => handleEdit(ev)}
                                 aria-label="Corregir registro"
-                                className="text-mobile-accent p-1 hover:bg-mobile-accent/10 rounded-md transition-colors flex items-center gap-1 text-[10px] font-bold uppercase"
+                                className="text-mobile-accent-text p-1 hover:bg-mobile-accent/10 rounded-md transition-colors flex items-center gap-1 text-[10px] font-bold uppercase"
                             >
                                 <Edit3 size={14} /> Corregir
                             </button>

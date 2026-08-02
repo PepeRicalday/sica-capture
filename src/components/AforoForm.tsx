@@ -447,7 +447,7 @@ export const AforoForm = ({ selectedPoint, isOnline, onSaveSuccess, editRecord, 
         <div className="flex flex-col pb-12">
             <h2 className="text-lg font-bold mb-2 flex items-center justify-between px-1">
                 <div className="flex items-center gap-2">
-                    <Calculator size={20} className="text-mobile-accent" /> Captura Area-Velocidad
+                    <Calculator size={20} className="text-mobile-accent-text" /> Captura Area-Velocidad
                 </div>
                 {editRecord && <span className="text-[9px] bg-amber-500 text-white px-2 py-0.5 rounded-full animate-pulse uppercase font-black">Modo Corrección</span>}
             </h2>
@@ -466,7 +466,7 @@ export const AforoForm = ({ selectedPoint, isOnline, onSaveSuccess, editRecord, 
                         </div>
                     )}
                     <div className="flex-1">
-                        <p className="text-[10px] text-mobile-accent font-black uppercase">{selectedPtInfo.name}</p>
+                        <p className="text-[10px] text-mobile-accent-text font-black uppercase">{selectedPtInfo.name}</p>
                         {selectedPtInfo.caracteristicas_hidraulicas && (
                             <p className="text-[9px] text-slate-400 font-mono line-clamp-2">
                                 {Object.entries(selectedPtInfo.caracteristicas_hidraulicas).map(([k, v]) => `${k}: ${v}`).join(' | ')}
@@ -537,7 +537,7 @@ export const AforoForm = ({ selectedPoint, isOnline, onSaveSuccess, editRecord, 
             {/* SECCIÓN NUEVA: ASISTENTE DE GEOMETRÍA */}
             <div className="bg-slate-900/60 border border-slate-700/50 rounded-xl p-3 mb-3">
                 <div className="flex justify-between items-center mb-2 px-1">
-                    <h3 className="text-[9px] text-mobile-accent font-black uppercase flex items-center gap-1.5">
+                    <h3 className="text-[9px] text-mobile-accent-text font-black uppercase flex items-center gap-1.5">
                         <TrendingUp size={12} /> Parámetros de Sección Trapezoidal
                     </h3>
                     {channelProfile && (
@@ -760,7 +760,7 @@ export const AforoForm = ({ selectedPoint, isOnline, onSaveSuccess, editRecord, 
                         </div>
                     </div>
                     <div className="text-right flex flex-col items-end">
-                        <div className="text-[10px] text-mobile-accent font-black uppercase tracking-wider mb-0.5">GASTO CALCULADO</div>
+                        <div className="text-[10px] text-mobile-accent-text font-black uppercase tracking-wider mb-0.5">GASTO CALCULADO</div>
                         <div className="text-3xl font-black text-white leading-none tracking-tighter">
                             {datosCalculados.gastoTotal.toFixed(3)} <span className="text-[10px] text-slate-500 font-black">m³/s</span>
                         </div>

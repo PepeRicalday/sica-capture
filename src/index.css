@@ -4,7 +4,12 @@
 @theme {
   --color-mobile-dark: #0b1120;
   --color-mobile-card: #1e293b;
-  --color-mobile-accent: #0ea5e9;
+  --color-mobile-accent: #1d5c74;
+  /* Variante clara del acento — usar SIEMPRE que el color pinte texto/ícono
+     directo sobre fondo oscuro. #1D5C74 da 2.5:1 como texto (falla WCAG AA,
+     ilegible a sol directo); esta variante da 6.97:1. Reservar el token base
+     para fondos (botones, pestaña activa) donde el texto encima es blanco. */
+  --color-mobile-accent-text: #4fa8c9;
   --color-mobile-success: #10b981;
   --color-mobile-warning: #f59e0b;
   --color-mobile-danger: #ef4444;
@@ -78,8 +83,8 @@
 }
 
 .glow-btn-active {
-  box-shadow: 0 0 15px 0px rgba(14, 165, 233, 0.4);
-  @apply bg-gradient-to-br from-mobile-accent to-blue-600 border border-blue-400 text-white;
+  box-shadow: 0 0 15px 0px rgba(29, 92, 116, 0.4);
+  @apply bg-gradient-to-br from-mobile-accent to-blue-800 border border-blue-400 text-white;
 }
 
 .glow-btn-danger {
@@ -108,7 +113,7 @@
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(14, 165, 233, 0.8);
+  background: rgba(29, 92, 116, 0.8);
 }
 
 .custom-scrollbar::-webkit-scrollbar {

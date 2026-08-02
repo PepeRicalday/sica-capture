@@ -137,7 +137,7 @@ export const AforoHistoryModal = ({ onClose, onEditRecord }: AforoHistoryModalPr
                 <div className="p-5 border-b border-slate-800 bg-slate-800/40 flex justify-between items-center">
                     <div>
                         <h2 className="text-white font-black text-xl tracking-tighter flex items-center gap-2">
-                            <History className="text-mobile-accent" size={24} /> BITÁCORA DE AFOROS
+                            <History className="text-mobile-accent-text" size={24} /> BITÁCORA DE AFOROS
                         </h2>
                         <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mt-0.5">Historial Local y Sincronizado</p>
                     </div>
@@ -200,7 +200,7 @@ export const AforoHistoryModal = ({ onClose, onEditRecord }: AforoHistoryModalPr
                                                 <span className="text-slate-500 text-[9px] uppercase font-bold">Gasto</span>
                                                 <span className="text-emerald-400 font-mono font-bold">{record.gasto_total_m3s.toFixed(3)} m³/s</span>
                                             </div>
-                                            <ArrowRight size={14} className={`text-slate-600 group-hover:text-mobile-accent group-hover:translate-x-1 transition-all ${selectedDetail?.id === record.id ? 'text-mobile-accent translate-x-1' : ''}`} />
+                                            <ArrowRight size={14} className={`text-slate-600 group-hover:text-mobile-accent-text group-hover:translate-x-1 transition-all ${selectedDetail?.id === record.id ? 'text-mobile-accent-text translate-x-1' : ''}`} />
                                         </div>
                                     </div>
                                 ))
@@ -259,7 +259,7 @@ export const AforoHistoryModal = ({ onClose, onEditRecord }: AforoHistoryModalPr
 
                                     <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4">
                                         <h4 className="text-[10px] text-slate-500 font-black uppercase mb-3 flex items-center gap-2">
-                                            <TrendingUp size={12} className="text-mobile-accent" /> Perfil de la Medición
+                                            <TrendingUp size={12} className="text-mobile-accent-text" /> Perfil de la Medición
                                         </h4>
                                         <TrapezoidalSchema dobelasCount={selectedDetail.dobelas.length} />
 
@@ -286,7 +286,7 @@ export const AforoHistoryModal = ({ onClose, onEditRecord }: AforoHistoryModalPr
                     {selectedDetail && (
                         <div className="sm:hidden absolute inset-0 bg-slate-950 z-10 flex flex-col">
                             <div className="p-4 border-b border-slate-800 flex justify-between items-center bg-slate-900">
-                                <button onClick={() => setSelectedDetail(null)} className="text-mobile-accent font-bold text-sm">← Volver</button>
+                                <button onClick={() => setSelectedDetail(null)} className="text-mobile-accent-text font-bold text-sm">← Volver</button>
                                 <span className="text-xs font-black text-white">DETALLE DE AFORO</span>
                                 <div className="w-10"></div>
                             </div>
