@@ -12,6 +12,21 @@ import { useHydricStatus } from '../context/HydricStatusContext';
 import { getTodayString, getDaysAgoString } from '../lib/dateHelpers';
 import { calculateFlow, getFactorCorreccion } from '../lib/hydraulicCalculations';
 
+// Basemap CARTO: sin key, el tile legacy sigue sirviendo el PNG, pero el
+// navegador dibuja encima una marca de agua "API KEY REQUIRED" — CARTO
+// retiró el uso anónimo de basemaps.cartocdn.com. VITE_CARTO_ACCESS_TOKEN es
+// el "CARTO Basemaps API key" gratuito de carto.com/basemaps/apikey (sin
+// cuenta CARTO) — mismo key ya usado en conchos-digital/PublicMonitor.tsx,
+// reutilizado aquí (agregar el dominio de este deploy a la whitelist del key
+// en Carto). DISTINTO del "API Access Token" de Maps API v3 de una
+// organización CARTO — ese no autentica este endpoint pese al formato
+// similar. Sin la env var, cae al tile legacy con marca de agua en vez de
+// romper el mapa por completo.
+const CARTO_ACCESS_TOKEN = import.meta.env.VITE_CARTO_ACCESS_TOKEN as string | undefined;
+const CARTO_TILE_URL = CARTO_ACCESS_TOKEN
+    ? `https://basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}.png?key=${CARTO_ACCESS_TOKEN}`
+    : 'https://{s}.basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}{r}.png';
+
 const MapBounds = ({ bounds }: { bounds: [number, number][] }) => {
     const map = useMap();
     useEffect(() => {
@@ -558,8 +573,8 @@ const Monitor = () => {
                                 style={{ height: '100%', width: '100%', background: '#0f172a' }}
                             >
                                 <TileLayer
-                                    attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a>'
-                                    url="https://{s}.basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}{r}.png"
+                                    attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; CARTO'
+                                    url={CARTO_TILE_URL}
                                     className="map-tiles"
                                 />
                                 {puntosActivosMapa.length > 0 && <MapBounds bounds={puntosActivosMapa.map(p => [p.lat!, p.lng!] as [number, number])} />}
