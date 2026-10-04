@@ -208,9 +208,15 @@ export const AforoHistoryModal = ({ onClose, onEditRecord }: AforoHistoryModalPr
                         </div>
                     </div>
 
-                    {/* Detail View */}
-                    <div className="hidden sm:flex flex-1 bg-slate-950/50 flex-col overflow-y-auto custom-scrollbar p-5">
-                        {selectedDetail ? (
+                    {/* Detail View (desktop: panel lateral / mobile: overlay). Antes había
+                        dos JSX paralelos por breakpoint que divergieron: la vista mobile
+                        le faltaba el desglose de dobelas individuales (V1, V2...) y usaba
+                        "Escala Promedio" en vez de inicial/final por separado — justo el
+                        detalle que un Jefe de Zona necesita al corregir un aforo, y mobile
+                        (390px) es el 100% del hardware real de campo. Un solo bloque de
+                        contenido ahora alimenta ambos layouts. */}
+                    {(() => {
+                        const detailContent = selectedDetail ? (
                             <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
                                 <div>
                                     <div className="flex justify-between items-center mb-4">
@@ -274,48 +280,36 @@ export const AforoHistoryModal = ({ onClose, onEditRecord }: AforoHistoryModalPr
                                     </div>
                                 </div>
                             </div>
-                        ) : (
-                            <div className="flex-1 flex flex-col items-center justify-center text-slate-600 italic">
-                                <History size={48} className="mb-4 opacity-20" />
-                                <p>Selecciona un aforo para ver detalles gerenciales</p>
-                            </div>
-                        )}
-                    </div>
+                        ) : null;
 
-                    {/* Mobile Detail Overlay (If selected on small screen) */}
-                    {selectedDetail && (
-                        <div className="sm:hidden absolute inset-0 bg-slate-950 z-10 flex flex-col">
-                            <div className="p-4 border-b border-slate-800 flex justify-between items-center bg-slate-900">
-                                <button onClick={() => setSelectedDetail(null)} className="text-mobile-accent-text font-bold text-sm">← Volver</button>
-                                <span className="text-xs font-black text-white">DETALLE DE AFORO</span>
-                                <div className="w-10"></div>
-                            </div>
-                            <div className="flex-1 overflow-y-auto p-5">
-                                <h3 className="text-xl font-black text-white mb-4">
-                                    {puntosMap[selectedDetail.punto_id] || selectedDetail.punto_id}
-                                </h3>
-                                <TrapezoidalSchema dobelasCount={selectedDetail.dobelas.length} />
-                                <div className="grid grid-cols-2 gap-3 mt-6">
-                                    <div className="bg-slate-900 p-3 rounded-xl">
-                                        <p className="text-[9px] text-slate-500 uppercase font-black">Caudal</p>
-                                        <p className="text-xl font-black text-emerald-400">{selectedDetail.gasto_total_m3s.toFixed(3)} <span className="text-[10px]">m³/s</span></p>
-                                    </div>
-                                    <div className="bg-slate-900 p-3 rounded-xl">
-                                        <p className="text-[9px] text-slate-500 uppercase font-black">Escala Promedio</p>
-                                        <p className="text-xl font-black text-white">{((selectedDetail.tirante_inicial_m + selectedDetail.tirante_final_m) / 2).toFixed(2)} <span className="text-[10px]">m</span></p>
-                                    </div>
+                        return (
+                            <>
+                                {/* Desktop: panel lateral */}
+                                <div className="hidden sm:flex flex-1 bg-slate-950/50 flex-col overflow-y-auto custom-scrollbar p-5">
+                                    {detailContent || (
+                                        <div className="flex-1 flex flex-col items-center justify-center text-slate-600 italic">
+                                            <History size={48} className="mb-4 opacity-20" />
+                                            <p>Selecciona un aforo para ver detalles gerenciales</p>
+                                        </div>
+                                    )}
                                 </div>
-                                {isGerente && (
-                                    <button
-                                        onClick={() => onEditRecord(selectedDetail)}
-                                        className="w-full mt-8 bg-mobile-accent py-4 rounded-2xl font-black text-white shadow-xl shadow-mobile-accent/30 active:scale-95 transition-all"
-                                    >
-                                        EDITAR Y RE-CAPTURAR
-                                    </button>
+
+                                {/* Mobile: overlay de pantalla completa con el mismo contenido */}
+                                {selectedDetail && (
+                                    <div className="sm:hidden absolute inset-0 bg-slate-950 z-10 flex flex-col">
+                                        <div className="p-4 border-b border-slate-800 flex justify-between items-center bg-slate-900 shrink-0">
+                                            <button onClick={() => setSelectedDetail(null)} className="text-mobile-accent-text font-bold text-sm">← Volver</button>
+                                            <span className="text-xs font-black text-white">DETALLE DE AFORO</span>
+                                            <div className="w-10"></div>
+                                        </div>
+                                        <div className="flex-1 overflow-y-auto p-5">
+                                            {detailContent}
+                                        </div>
+                                    </div>
                                 )}
-                            </div>
-                        </div>
-                    )}
+                            </>
+                        );
+                    })()}
 
                 </div>
             </div>

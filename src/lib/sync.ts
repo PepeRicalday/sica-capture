@@ -633,7 +633,19 @@ function isChronicError(record: { error_sync?: string; retry_count?: number; fir
 
 // -- 2. SUBIDA DE REGISTROS (DE NORTE A SUR) --
 // Llama a esto cuando vuelva la conexión (Listener)
-export const syncPendingRecords = async () => {
+// Lock: con el heartbeat periódico (App.tsx) sumado a 'online'/visibilitychange,
+// puede invocarse desde varios disparadores casi al mismo tiempo — si una subida
+// tarda más que el intervalo del heartbeat, una llamada concurrente reintentaría
+// los mismos registros pendientes antes de que la primera los marque sincronizados.
+let _syncLock: Promise<void> | null = null;
+
+export const syncPendingRecords = async (): Promise<void> => {
+    if (_syncLock) return _syncLock;
+    _syncLock = _syncPendingRecords().finally(() => { _syncLock = null; });
+    return _syncLock;
+};
+
+const _syncPendingRecords = async () => {
     if (!navigator.onLine) return;
 
     try {

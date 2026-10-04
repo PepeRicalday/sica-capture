@@ -226,9 +226,14 @@ export const EscalaHistoryModal = ({ onClose, onEditRecord }: EscalaHistoryModal
                         </div>
                     </div>
 
-                    {/* Detail View */}
-                    <div className="hidden sm:flex flex-1 bg-slate-950/50 flex-col overflow-y-auto custom-scrollbar p-5">
-                        {selectedDetail ? (
+                    {/* Detail View (desktop: panel lateral / mobile: overlay). Antes había
+                        dos JSX paralelos (uno por breakpoint) que divergieron con el tiempo:
+                        la vista mobile le faltaba Nivel Abajo, Apertura Máx, Tendencia y
+                        Metadatos — justo lo que un Jefe de Zona necesita para corregir un
+                        registro, y mobile (390px) es el 100% del hardware real de campo.
+                        Un solo bloque de contenido ahora alimenta ambos layouts. */}
+                    {(() => {
+                        const detailContent = selectedDetail ? (
                             <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
                                 <div>
                                     <div className="flex justify-between items-center mb-4">
@@ -277,10 +282,10 @@ export const EscalaHistoryModal = ({ onClose, onEditRecord }: EscalaHistoryModal
                                                 {(() => {
                                                     const idx = history.findIndex(r => r.id === selectedDetail.id);
                                                     const nextOldest = history.slice(idx + 1).find(r => r.punto_id === selectedDetail.punto_id);
-                                                    const trend = (nextOldest && selectedDetail.valor_q && nextOldest.valor_q) 
-                                                        ? selectedDetail.valor_q - nextOldest.valor_q 
+                                                    const trend = (nextOldest && selectedDetail.valor_q && nextOldest.valor_q)
+                                                        ? selectedDetail.valor_q - nextOldest.valor_q
                                                         : null;
-                                                    
+
                                                     if (trend === null) return null;
 
                                                     return (
@@ -306,47 +311,36 @@ export const EscalaHistoryModal = ({ onClose, onEditRecord }: EscalaHistoryModal
                                     </div>
                                 </div>
                             </div>
-                        ) : (
-                            <div className="flex-1 flex flex-col items-center justify-center text-slate-600 italic">
-                                <History size={48} className="mb-4 opacity-20" />
-                                <p>Selecciona una lectura para ver detalles</p>
-                            </div>
-                        )}
-                    </div>
+                        ) : null;
 
-                    {/* Mobile Detail Overlay */}
-                    {selectedDetail && (
-                        <div className="sm:hidden absolute inset-0 bg-slate-950 z-20 flex flex-col">
-                            <div className="p-4 border-b border-slate-800 flex justify-between items-center bg-slate-900">
-                                <button onClick={() => setSelectedDetail(null)} className="text-mobile-accent-text font-bold text-sm">← Volver</button>
-                                <span className="text-xs font-black text-white uppercase">Detalle de Nivel</span>
-                                <div className="w-10"></div>
-                            </div>
-                            <div className="flex-1 overflow-y-auto p-5 space-y-6">
-                                <h3 className="text-xl font-black text-white">
-                                    {puntosMap[selectedDetail.punto_id] || selectedDetail.punto_id}
-                                </h3>
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div className="bg-slate-900 p-3 rounded-xl">
-                                        <p className="text-[9px] text-slate-500 uppercase font-black">Nivel Arriba</p>
-                                        <p className="text-xl font-black text-mobile-accent-text font-mono">{selectedDetail.valor_q?.toFixed(2)} m</p>
-                                    </div>
-                                    <div className="bg-slate-900 p-3 rounded-xl">
-                                        <p className="text-[9px] text-slate-500 uppercase font-black">Gasto</p>
-                                        <p className="text-xl font-black text-emerald-400 font-mono">{selectedDetail.gasto_calculado_m3s?.toFixed(3)} m³/s</p>
-                                    </div>
+                        return (
+                            <>
+                                {/* Desktop: panel lateral */}
+                                <div className="hidden sm:flex flex-1 bg-slate-950/50 flex-col overflow-y-auto custom-scrollbar p-5">
+                                    {detailContent || (
+                                        <div className="flex-1 flex flex-col items-center justify-center text-slate-600 italic">
+                                            <History size={48} className="mb-4 opacity-20" />
+                                            <p>Selecciona una lectura para ver detalles</p>
+                                        </div>
+                                    )}
                                 </div>
-                                {isGerente && (
-                                    <button
-                                        onClick={() => onEditRecord(selectedDetail)}
-                                        className="w-full bg-mobile-accent py-4 rounded-2xl font-black text-white shadow-xl shadow-mobile-accent/30 active:scale-95 transition-all flex items-center justify-center gap-2"
-                                    >
-                                        <Edit3 size={20} /> CORREGIR LECTURA
-                                    </button>
+
+                                {/* Mobile: overlay de pantalla completa con el mismo contenido */}
+                                {selectedDetail && (
+                                    <div className="sm:hidden absolute inset-0 bg-slate-950 z-20 flex flex-col">
+                                        <div className="p-4 border-b border-slate-800 flex justify-between items-center bg-slate-900 shrink-0">
+                                            <button onClick={() => setSelectedDetail(null)} className="text-mobile-accent-text font-bold text-sm">← Volver</button>
+                                            <span className="text-xs font-black text-white uppercase">Detalle de Nivel</span>
+                                            <div className="w-10"></div>
+                                        </div>
+                                        <div className="flex-1 overflow-y-auto p-5">
+                                            {detailContent}
+                                        </div>
+                                    </div>
                                 )}
-                            </div>
-                        </div>
-                    )}
+                            </>
+                        );
+                    })()}
 
                 </div>
             </div>

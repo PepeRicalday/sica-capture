@@ -169,7 +169,12 @@ export const VersionGuard = ({ children }: { children: ReactNode }) => {
                 ) : (
                     // Hay captura en curso: avisar sin estorbar. La actualización
                     // se aplica sola en cuanto el operador guarde.
-                    <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[10000] w-[90%] max-w-md animate-in fade-in slide-in-from-bottom-4 duration-300">
+                    // bottom-24 (no bottom-6): la nav inferior fija (Layout.tsx) mide
+                    // ~80px con el badge de versión/sync — con bottom-6 este banner
+                    // (z-[10000], por encima de la nav en z-50) quedaba flotando
+                    // justo sobre Monitor/Hidro/Captura/Salir, tapando la navegación
+                    // global durante toda la sesión hasta que el operador tocara "Ahora".
+                    <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-[10000] w-[90%] max-w-md animate-in fade-in slide-in-from-bottom-4 duration-300">
                         <div className="bg-[#1e293b] border border-orange-500/50 rounded-2xl p-4 shadow-2xl flex items-center justify-between gap-4">
                             <div className="flex items-center gap-3">
                                 <div className="bg-orange-500/20 p-2 rounded-xl shrink-0">

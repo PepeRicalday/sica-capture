@@ -491,21 +491,21 @@ export const AforoForm = ({ selectedPoint, isOnline, onSaveSuccess, editRecord, 
                 <div className="grid grid-cols-2 gap-2">
                     <div>
                         <label className="text-[10px] text-slate-400 font-bold uppercase">Escala In. (m)</label>
-                        <input type="number" step="0.01" value={escalaInicial} onChange={e => setEscalaInicial(parseFloat(e.target.value))} className="w-full bg-slate-900 border border-slate-700 rounded p-1.5 text-white text-sm" placeholder="Ej. 2.65" />
+                        <input type="number" inputMode="decimal" step="0.01" value={escalaInicial} onChange={e => setEscalaInicial(parseFloat(e.target.value))} className="w-full bg-slate-900 border border-slate-700 rounded p-1.5 text-white text-sm" placeholder="Ej. 2.65" />
                     </div>
                     <div>
                         <label className="text-[10px] text-slate-400 font-bold uppercase">Escala Fin. (m)</label>
-                        <input type="number" step="0.01" value={escalaFinal} onChange={e => setEscalaFinal(parseFloat(e.target.value))} className="w-full bg-slate-900 border border-slate-700 rounded p-1.5 text-white text-sm" placeholder="Ej. 2.65" />
+                        <input type="number" inputMode="decimal" step="0.01" value={escalaFinal} onChange={e => setEscalaFinal(parseFloat(e.target.value))} className="w-full bg-slate-900 border border-slate-700 rounded p-1.5 text-white text-sm" placeholder="Ej. 2.65" />
                     </div>
                 </div>
                 <div className="grid grid-cols-2 gap-2">
                     <div>
                         <label className="text-[10px] text-slate-400 font-bold uppercase">Espejo T (m)</label>
-                        <input type="number" step="0.01" value={espejo} onChange={e => setEspejo(parseFloat(e.target.value))} className="w-full bg-slate-900 border border-slate-700 rounded p-1.5 text-white text-sm" placeholder="Espejo real" />
+                        <input type="number" inputMode="decimal" step="0.01" value={espejo} onChange={e => setEspejo(parseFloat(e.target.value))} className="w-full bg-slate-900 border border-slate-700 rounded p-1.5 text-white text-sm" placeholder="Espejo real" />
                     </div>
                     <div>
                         <label className="text-[10px] text-slate-400 font-bold uppercase">Tirante y (m)</label>
-                        <input type="number" step="0.01" value={tirante} onChange={e => setTirante(parseFloat(e.target.value))} className="w-full bg-slate-900 border border-slate-700 rounded p-1.5 text-white text-sm" placeholder="Tirante medido" />
+                        <input type="number" inputMode="decimal" step="0.01" value={tirante} onChange={e => setTirante(parseFloat(e.target.value))} className="w-full bg-slate-900 border border-slate-700 rounded p-1.5 text-white text-sm" placeholder="Tirante medido" />
                     </div>
                 </div>
                 <div className="grid grid-cols-2 gap-2">
@@ -564,14 +564,14 @@ export const AforoForm = ({ selectedPoint, isOnline, onSaveSuccess, editRecord, 
                     <div>
                         <label className="text-[8px] text-slate-500 uppercase font-black ml-1">Plantilla (b)</label>
                         <div className="relative">
-                            <input type="number" step="0.01" value={plantilla} onChange={e => setPlantilla(parseFloat(e.target.value) || '')} className="w-full bg-slate-800 border-0 rounded-lg p-2.5 text-white text-sm font-mono text-center" placeholder="Ancho fondo (m)" />
+                            <input type="number" inputMode="decimal" step="0.01" value={plantilla} onChange={e => setPlantilla(parseFloat(e.target.value) || '')} className="w-full bg-slate-800 border-0 rounded-lg p-2.5 text-white text-sm font-mono text-center" placeholder="Ancho fondo (m)" />
                             <span className="absolute right-2 top-2.5 text-[8px] text-slate-600 font-bold uppercase">m</span>
                         </div>
                     </div>
                     <div>
                         <label className="text-[8px] text-slate-500 uppercase font-black ml-1">Talud (z:1)</label>
                         <div className="relative">
-                            <input type="number" step="0.1" value={talud} onChange={e => setTalud(parseFloat(e.target.value) || '')} className="w-full bg-slate-800 border-0 rounded-lg p-2.5 text-white text-sm font-mono text-center" placeholder="z (Horiz)" />
+                            <input type="number" inputMode="decimal" step="0.1" value={talud} onChange={e => setTalud(parseFloat(e.target.value) || '')} className="w-full bg-slate-800 border-0 rounded-lg p-2.5 text-white text-sm font-mono text-center" placeholder="z (Horiz)" />
                             <span className="absolute right-2 top-2.5 text-[8px] text-slate-600 font-bold uppercase">z</span>
                         </div>
                     </div>
@@ -580,7 +580,7 @@ export const AforoForm = ({ selectedPoint, isOnline, onSaveSuccess, editRecord, 
                     <div>
                         <label className="text-[8px] text-sky-400 uppercase font-black ml-1 italic">Tirante de Diseño para T</label>
                         <div className="relative">
-                            <input type="number" step="0.01" value={tiranteCalc} onChange={e => setTiranteCalc(parseFloat(e.target.value) || '')} className="w-full bg-sky-950/30 border border-sky-500/20 rounded-lg p-2.5 text-sky-300 text-sm font-mono text-center" placeholder="y (m)" />
+                            <input type="number" inputMode="decimal" step="0.01" value={tiranteCalc} onChange={e => setTiranteCalc(parseFloat(e.target.value) || '')} className="w-full bg-sky-950/30 border border-sky-500/20 rounded-lg p-2.5 text-sky-300 text-sm font-mono text-center" placeholder="y (m)" />
                             <span className="absolute right-2 top-2.5 text-[8px] text-sky-600 font-bold">m</span>
                         </div>
                     </div>
@@ -603,6 +603,7 @@ export const AforoForm = ({ selectedPoint, isOnline, onSaveSuccess, editRecord, 
                     </label>
                     <input
                         type="number"
+                        inputMode="numeric"
                         min="1"
                         max="20"
                         value={numDobelasInput}
@@ -664,7 +665,7 @@ export const AforoForm = ({ selectedPoint, isOnline, onSaveSuccess, editRecord, 
                         <div>
                             <label className="text-[10px] text-amber-400 font-bold">Base 'b' en V{activeDobelaIdx + 1} (m)</label>
                             <input
-                                type="number" step="0.01"
+                                type="number" inputMode="decimal" step="0.01"
                                 value={dobelas[activeDobelaIdx].base_m || ''}
                                 onChange={e => updateDobela(activeDobelaIdx, 'base_m', parseFloat(e.target.value))}
                                 className="w-full bg-slate-950 border border-slate-700/50 rounded-lg px-2 text-lg font-mono py-2 text-white placeholder-slate-600 focus:border-amber-500 outline-none transition-colors"
@@ -674,7 +675,7 @@ export const AforoForm = ({ selectedPoint, isOnline, onSaveSuccess, editRecord, 
                         <div>
                             <label className="text-[10px] text-amber-400 font-bold">Tirante 'y' en V{activeDobelaIdx + 1} (m)</label>
                             <input
-                                type="number" step="0.01"
+                                type="number" inputMode="decimal" step="0.01"
                                 value={dobelas[activeDobelaIdx].tirante_m || ''}
                                 onChange={e => updateDobela(activeDobelaIdx, 'tirante_m', parseFloat(e.target.value))}
                                 className="w-full bg-slate-950 border border-slate-700/50 rounded-lg px-2 text-lg font-mono py-2 text-white placeholder-slate-600 focus:border-amber-500 outline-none transition-colors"
@@ -701,7 +702,7 @@ export const AforoForm = ({ selectedPoint, isOnline, onSaveSuccess, editRecord, 
                                         </div>
                                         <div className="relative">
                                             <input
-                                                type="number" title="Revoluciones" placeholder="Rev"
+                                                type="number" inputMode="decimal" title="Revoluciones" placeholder="Rev"
                                                 value={(dobelas[activeDobelaIdx].velocidades_revoluciones ?? [])[lecIdx] || ''}
                                                 onChange={e => updateMolinete(activeDobelaIdx, lecIdx, parseFloat(e.target.value), (dobelas[activeDobelaIdx].velocidades_segundos ?? [])[lecIdx])}
                                                 className="w-full bg-slate-950 border border-slate-800 text-sm text-indigo-300 font-mono rounded px-1.5 py-1 text-center focus:border-indigo-500 outline-none"
@@ -709,7 +710,7 @@ export const AforoForm = ({ selectedPoint, isOnline, onSaveSuccess, editRecord, 
                                         </div>
                                         <div className="relative">
                                             <input
-                                                type="number" title="Segundos" placeholder="Seg"
+                                                type="number" inputMode="decimal" title="Segundos" placeholder="Seg"
                                                 value={(dobelas[activeDobelaIdx].velocidades_segundos ?? [])[lecIdx] || ''}
                                                 onChange={e => updateMolinete(activeDobelaIdx, lecIdx, (dobelas[activeDobelaIdx].velocidades_revoluciones ?? [])[lecIdx], parseFloat(e.target.value))}
                                                 className="w-full bg-slate-950 border border-slate-800 text-sm text-blue-300 font-mono rounded px-1.5 py-1 text-center focus:border-blue-500 outline-none"

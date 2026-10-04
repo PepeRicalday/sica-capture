@@ -116,6 +116,16 @@ function AppContent() {
     const handleOnline = () => syncPendingRecords();
     window.addEventListener('online', handleOnline);
 
+    // Reintento periódico: 'online'/visibilitychange no cubren señal débil que
+    // fluctúa sin que el navegador emita esos eventos (común en campo). Late
+    // cada 90s mientras la pestaña sigue abierta; syncPendingRecords ya es un
+    // no-op instantáneo si no hay red o no quedan registros pendientes, y los
+    // errores estructurales se marcan crónicos (retry_count/isChronicError)
+    // así que este latido no los reintenta indefinidamente.
+    const syncHeartbeat = setInterval(() => {
+      if (navigator.onLine) syncPendingRecords();
+    }, 90 * 1000);
+
     // C-4: Realtime — refresh catalogs when another operator syncs measurements
     const channel = supabase.channel('capture_realtime')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'mediciones' }, () => {
@@ -135,6 +145,7 @@ function AppContent() {
     return () => {
       window.removeEventListener('online', handleOnline);
       document.removeEventListener('visibilitychange', handleVisibility);
+      clearInterval(syncHeartbeat);
       supabase.removeChannel(channel);
     };
   }, []);

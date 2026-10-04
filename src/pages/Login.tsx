@@ -42,7 +42,7 @@ const Login = () => {
             <div className="absolute inset-0 pointer-events-none" style={{ background: 'radial-gradient(circle at 50% 0%, rgba(30, 58, 138, 0.3) 0%, transparent 60%)' }}></div>
 
             <div className="w-full max-w-[420px] bg-[#111827]/80 backdrop-blur-md border border-slate-800 rounded-3xl p-6 md:p-8 shadow-2xl z-10 my-4 md:my-0">
-                <div className="flex justify-center mb-5 shrink-0">
+                <div className="flex justify-center mb-3 shrink-0">
                     <div className="bg-white p-3 rounded-2xl shadow-lg ring-1 ring-white/10 flex items-center justify-center">
                         <img src="/logo-srl.png" alt="SRL Unidad Conchos" className="max-w-[140px] w-auto h-auto max-h-[120px] object-contain" />
                     </div>
@@ -58,9 +58,9 @@ const Login = () => {
                     </p>
                 </div>
 
-                <div className="w-full h-px bg-slate-700/50 my-6"></div>
+                <div className="w-full h-px bg-slate-700/50 my-4"></div>
 
-                <div className="text-center mb-6">
+                <div className="text-center mb-4">
                     <h3 className="text-[17px] font-bold text-white mb-2">Centro de Control Operativo</h3>
                     <p className="text-slate-400 text-[13px]">
                         Ingresa tus credenciales para acceder al sistema
@@ -134,13 +134,18 @@ const Login = () => {
                             SICA v{APP_VERSION} • {BUILD_HASH}
                         </span>
 
+                        {/* py-3 (no solo el texto text-[9px]): esta acción borra caché y
+                            sesión — antes el hitbox medía ~13px de alto pegado al borde
+                            inferior de la pantalla, la zona donde iOS/Android reservan el
+                            gesto de home/back. El confirm() ya protege del toque accidental,
+                            pero el objetivo táctil en sí debe llegar al mínimo usable. */}
                         <button
                             onClick={() => {
                                 if (window.confirm('¿Deseas FORZAR la limpieza de la aplicación? Se borrará el caché y tendrás que volver a iniciar sesión.')) {
                                     window.location.href = "/nuke";
                                 }
                             }}
-                            className="text-[9px] text-orange-500/80 hover:text-orange-400 font-bold uppercase tracking-tighter underline underline-offset-4 decoration-orange-500/30"
+                            className="text-[9px] text-orange-500/80 hover:text-orange-400 font-bold uppercase tracking-tighter underline underline-offset-4 decoration-orange-500/30 py-3 px-4"
                         >
                             Limpiar Caché y Actualizar
                         </button>

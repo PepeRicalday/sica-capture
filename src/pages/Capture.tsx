@@ -652,7 +652,7 @@ const Capture = () => {
     };
 
     return (
-        <div className="flex flex-col min-h-full bg-mobile-dark relative">
+        <div className="flex flex-col h-full bg-mobile-dark relative">
             {/* Header Glassmorfico */}
             <header className="glass-panel px-3 py-2 flex justify-between items-center z-10 sticky top-0 pb-1 shrink-0 rounded-b-xl border-t-0 mx-[-1px]">
                 <div className="flex flex-col">
@@ -698,10 +698,10 @@ const Capture = () => {
 
             <StatusBanner />
 
-            <div className="flex-1 flex flex-col p-3 pb-8">
+            <div className="flex-1 min-h-0 overflow-y-auto flex flex-col px-3 pt-2 pb-1">
 
                 {/* 1. Selector de Tipo (Rediseñado Gerencial: Alto Contraste Solar) */}
-                <div className="flex bg-slate-900/90 rounded-xl p-1 mb-4 flex-shrink-0 text-[10px] sm:text-xs shadow-inner ring-1 ring-slate-800">
+                <div className="flex bg-slate-900/90 rounded-xl p-1 mb-2 flex-shrink-0 text-[10px] sm:text-xs shadow-inner ring-1 ring-slate-800">
                     {(['escala', 'toma', 'aforo', 'presas', 'entrega'] as const).map(tab => {
                         // MEJ-4: Ocultar o deshabilitar tabs no relevantes
                         const isRelevant = !(activeEvent?.evento_tipo === 'LLENADO' && tab === 'aforo');
@@ -715,7 +715,7 @@ const Capture = () => {
                             <button
                                 key={tab}
                                 onClick={() => { setActiveTab(tab); setRawValue(0); setEscalaData({ arriba: 0, abajo: 0, aperturas: [] }); setMetodoGasto('compuertas'); }}
-                                className={`flex-1 py-3 px-1 rounded-lg font-black uppercase tracking-wider transition-all duration-300 ${activeTab === tab
+                                className={`flex-1 min-h-11 py-2.5 px-1 rounded-lg font-black uppercase tracking-wider transition-all duration-300 ${activeTab === tab
                                     ? 'bg-mobile-accent text-white shadow-md scale-[1.02]'
                                     : 'text-slate-500 hover:text-slate-300'
                                     }`}
@@ -930,7 +930,7 @@ const Capture = () => {
                                     value={manualDate}
                                     onChange={(e) => setManualDate(e.target.value)}
                                     max={getTodayString()}
-                                    className="bg-slate-900 border border-slate-800 text-white text-xs px-3 py-2.5 rounded-xl outline-none focus:border-mobile-accent focus:ring-1 focus:ring-mobile-accent/50 font-mono shadow-inner w-full"
+                                    className="bg-slate-900 border border-slate-800 text-white text-xs px-3 py-1.5 rounded-xl outline-none focus:border-mobile-accent focus:ring-1 focus:ring-mobile-accent/50 font-mono shadow-inner w-full"
                                 />
                             </div>
                             <div className="flex flex-col gap-1">
@@ -941,7 +941,7 @@ const Capture = () => {
                                     aria-label="Hora de Captura"
                                     value={manualTime || getCurrentTimeStr24()}
                                     onChange={(e) => setManualTime(e.target.value)}
-                                    className="bg-slate-900 border border-slate-800 text-white text-xs px-3 py-2.5 rounded-xl outline-none focus:border-mobile-accent focus:ring-1 focus:ring-mobile-accent/50 font-mono shadow-inner w-full"
+                                    className="bg-slate-900 border border-slate-800 text-white text-xs px-3 py-1.5 rounded-xl outline-none focus:border-mobile-accent focus:ring-1 focus:ring-mobile-accent/50 font-mono shadow-inner w-full"
                                 />
                             </div>
                         </div>
@@ -1157,9 +1157,9 @@ const Capture = () => {
 
                 {/* 3. Main Display Numérico (SOLO SI NO ES AFORO NI ENTREGA) */}
                 {activeTab !== 'aforo' && activeTab !== 'entrega' && (
-                    <div className="flex-1 flex flex-col justify-end mt-4">
+                    <div className="flex flex-col mt-2">
                         {activeTab === 'escala' ? (
-                            <div className="flex bg-slate-800 rounded-lg p-1 mb-2">
+                            <div className="flex bg-slate-800 rounded-lg p-1 mb-1.5">
                                 {(
                                     [
                                         { id: 'arriba', title: 'Nivel Arriba' },
@@ -1170,7 +1170,7 @@ const Capture = () => {
                                     <button
                                         key={f.id}
                                         onClick={() => setEscalaField(f.id)}
-                                        className={`flex-1 py-2 px-1 rounded-md text-[10px] font-bold uppercase transition-all flex flex-col items-center ${escalaField === f.id
+                                        className={`flex-1 py-1.5 px-1 rounded-md text-[10px] font-bold uppercase transition-all flex flex-col items-center ${escalaField === f.id
                                             ? 'bg-mobile-accent text-white shadow-md scale-105'
                                             : 'bg-transparent text-slate-400 hover:bg-slate-700/50'
                                             }`}
@@ -1414,50 +1414,57 @@ const Capture = () => {
                         })()}
                         {activeTab === 'toma' && <div className="mb-4"></div>}
 
-                        {/* Guardar Button Movido Arriba del Numpad para Accesibilidad (Alto Contraste UI) */}
-                        <div className="mb-6 flex-shrink-0 relative">
-                            {showSuccessAnim && (
-                                <div className="absolute inset-0 z-10 flex items-center justify-center glow-btn-success rounded-xl animate-in zoom-in spin-in-12 duration-300">
-                                    <svg className="w-10 h-10 text-white drop-shadow-md" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                                    </svg>
-                                </div>
-                            )}
-                            <button
-                                className={`w-full text-lg sm:text-xl h-14 rounded-xl flex items-center justify-center gap-2 font-black tracking-widest transition-all outline-none ${editingRecord ? 'bg-mobile-accent text-white shadow-[0_4px_14px_0_rgba(6,182,212,0.39)]' : 'bg-mobile-warning text-slate-900 shadow-[0_4px_14px_0_rgba(245,158,11,0.39)] hover:shadow-[0_6px_20px_rgba(245,158,11,0.6)]'}`}
-                                onClick={() => handleSave()}
-                            >
-                                <Save size={24} className="drop-shadow-sm" /> {editingRecord ? 'APLICAR CORRECCIÓN' : 'GUARDAR CAPTURA'}
-                            </button>
-                            {editingRecord && (
+                        {/* Guardar + Numpad: antes el numpad crecía libremente (flex-1) y
+                            empujaba "0"/"⌫"/Guardar fuera del viewport, con scroll invisible
+                            (sin affordance) por debajo de la nav fija. Ahora el numpad tiene
+                            alto fijo dimensionado para que TODO el bloque (selector fecha/hora
+                            + toggles + display + Guardar + numpad) quepa en el viewport de
+                            campo de referencia (390×844) sin scroll, con teclas ≥44px
+                            (mínimo táctil iOS/Android). */}
+                        <div className="shrink-0">
+                            <div className="mb-3 relative">
+                                {showSuccessAnim && (
+                                    <div className="absolute inset-0 z-10 flex items-center justify-center glow-btn-success rounded-xl animate-in zoom-in spin-in-12 duration-300">
+                                        <svg className="w-10 h-10 text-white drop-shadow-md" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                                        </svg>
+                                    </div>
+                                )}
                                 <button
-                                    onClick={() => {
-                                        setEditingRecord(undefined);
-                                        setRawValue(0);
-                                        setEscalaData({ arriba: 0, abajo: 0, aperturas: [] });
-                                        toast.info('Edición cancelada');
-                                    }}
-                                    className="w-full mt-2 text-[10px] text-red-400 font-bold uppercase underline"
+                                    className={`w-full text-lg sm:text-xl h-14 rounded-xl flex items-center justify-center gap-2 font-black tracking-widest transition-all outline-none ${editingRecord ? 'bg-mobile-accent text-white shadow-[0_4px_14px_0_rgba(6,182,212,0.39)]' : 'bg-mobile-warning text-slate-900 shadow-[0_4px_14px_0_rgba(245,158,11,0.39)] hover:shadow-[0_6px_20px_rgba(245,158,11,0.6)]'}`}
+                                    onClick={() => handleSave()}
                                 >
-                                    Cancelar Corrección
+                                    <Save size={24} className="drop-shadow-sm" /> {editingRecord ? 'APLICAR CORRECCIÓN' : 'GUARDAR CAPTURA'}
                                 </button>
-                            )}
-                        </div>
+                                {editingRecord && (
+                                    <button
+                                        onClick={() => {
+                                            setEditingRecord(undefined);
+                                            setRawValue(0);
+                                            setEscalaData({ arriba: 0, abajo: 0, aperturas: [] });
+                                            toast.info('Edición cancelada');
+                                        }}
+                                        className="w-full mt-2 text-[10px] text-red-400 font-bold uppercase underline"
+                                    >
+                                        Cancelar Corrección
+                                    </button>
+                                )}
+                            </div>
 
-                        {/* Numpad */}
-                        <div className="grid grid-cols-3 grid-rows-4 gap-2 mb-2 flex-1">
-                            {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((num) => (
-                                <button
-                                    key={num}
-                                    className="btn-calc"
-                                    onClick={() => handleKeypad(num)}
-                                >
-                                    {num}
-                                </button>
-                            ))}
-                            <button className="btn-calc danger" onClick={handleClear}>C</button>
-                            <button className="btn-calc" onClick={() => handleKeypad(0)}>0</button>
-                            <button className="btn-calc text-slate-400" onClick={handleBackspace}>⌫</button>
+                            <div className="grid grid-cols-3 grid-rows-4 gap-1.5 mb-0 h-[11.5rem]"> {/* 4 filas ≥ 44 px (objetivo táctil iOS) */}
+                                {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((num) => (
+                                    <button
+                                        key={num}
+                                        className="btn-calc"
+                                        onClick={() => handleKeypad(num)}
+                                    >
+                                        {num}
+                                    </button>
+                                ))}
+                                <button className="btn-calc danger" onClick={handleClear}>C</button>
+                                <button className="btn-calc" onClick={() => handleKeypad(0)}>0</button>
+                                <button className="btn-calc text-slate-400" onClick={handleBackspace}>⌫</button>
+                            </div>
                         </div>
                     </div>
                 )}

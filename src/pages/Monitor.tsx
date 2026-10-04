@@ -76,7 +76,7 @@ const Monitor = () => {
     const puntos = useLiveQuery(() => db.puntos.toArray()) || [];
     const [currentTime, setCurrentTime] = useState<Date>(() => new Date());
     const [isOnline, setIsOnline] = useState(navigator.onLine);
-    const [balanceCanal, setBalanceCanal] = useState({ entrada000: 0, salida104: 0 });
+    const [balanceCanal, setBalanceCanal] = useState<{ entrada000: number | null; salida104: number | null }>({ entrada000: null, salida104: null });
     const [entregasHoy, setEntregasHoy] = useState<{ gasto_m3s: number | null; modulo_id: string; tipo_entrega: string; volumen_m3: number; codigo_corto?: string }[]>([]);
     const [ultimasMediciones, setUltimasMediciones] = useState<Record<string, { fechaHora: string; aperturaTotal: number }>>({});
 
@@ -131,8 +131,8 @@ const Monitor = () => {
             const latest000Aforo = aforos?.find(d => d.punto_control_id === 'CANAL-000');
             const latest104Aforo = aforos?.find(d => d.punto_control_id === 'CANAL-104');
 
-            let theoreticalFlow000 = 0;
-            let theoreticalFlow104 = 0;
+            let theoreticalFlow000: number | null = null;
+            let theoreticalFlow104: number | null = null;
 
             const needs000 = !(latest000Aforo?.gasto_calculado_m3s && latest000Aforo.gasto_calculado_m3s > 0);
             const needs104 = !(latest104Aforo?.gasto_calculado_m3s && latest104Aforo.gasto_calculado_m3s > 0);
@@ -167,17 +167,21 @@ const Monitor = () => {
                     // por fórmula de orificio en el cliente — eso ignora la calibración y
                     // sobreestima (ver comentario en hydraulicCalculations.ts RATING_CURVES).
                     // Solo se recalcula por compuertas si la lectura no trae gasto guardado.
-                    const recalcQ = (r: any, escala: any): number => {
-                        if (!r || !escala) return 0;
+                    // null (no 0) cuando la lectura no trae gasto guardado NI las
+                    // aperturas/nivel_abajo para recalcularlo por compuertas — una
+                    // lectura de solo nivel_m (aún sin detalle de compuertas del día)
+                    // no equivale a "compuertas cerradas, gasto 0".
+                    const recalcQ = (r: any, escala: any): number | null => {
+                        if (!r || !escala) return null;
                         if (r.gasto_calculado_m3s && r.gasto_calculado_m3s > 0) {
                             return r.gasto_calculado_m3s;
                         }
-                        const aperturas = Array.isArray(r.radiales_json)
-                            ? Array.from({ length: escala.pzas_radiales || 0 }, (_: any, i: number) => {
-                                const g = r.radiales_json.find((x: any) => x.index === i);
-                                return g ? (g.apertura_m || 0) : 0;
-                            })
-                            : [];
+                        const tieneAperturas = Array.isArray(r.radiales_json) && r.radiales_json.length > 0;
+                        if (!tieneAperturas || !r.nivel_abajo_m) return null;
+                        const aperturas = Array.from({ length: escala.pzas_radiales || 0 }, (_: any, i: number) => {
+                            const g = r.radiales_json.find((x: any) => x.index === i);
+                            return g ? (g.apertura_m || 0) : 0;
+                        });
                         const fc = getFactorCorreccion(escala.nombre, escala.km);
                         const res = calculateFlow({
                             hArriba: r.nivel_m || 0,
@@ -206,7 +210,7 @@ const Monitor = () => {
 
             // TIER 3: movimientos_presas (capturado desde SICA Capture → Presas)
             // Se usa cuando no hay aforo ni lectura_escala con gasto para K-0+000
-            if (needs000 && theoreticalFlow000 === 0 && presaIds.length > 0) {
+            if (needs000 && !theoreticalFlow000 && presaIds.length > 0) {
                 const { data: movPresas } = await supabase
                     .from('movimientos_presas')
                     .select('gasto_m3s, fecha_hora')
@@ -387,7 +391,13 @@ const Monitor = () => {
         : entregasLocalesHoy.reduce((acc, r) => acc + (r.volumen_m3 ?? 0), 0);
 
     // 4. Balance: Diferencia No Contabilizada = Entrada - Entregado - Salida
-    const diferenciaGasto = balanceCanal.entrada000 - entregadoModulosM3s - balanceCanal.salida104;
+    // Requiere Entrada Y Salida con dato real (no null): sin uno de los dos
+    // extremos no hay balance posible — mostrar 0 lo haría ver como "pérdida
+    // total" o "sin pérdidas" cuando en realidad es falta de medición (S/D).
+    const balanceDisponible = balanceCanal.entrada000 !== null && balanceCanal.salida104 !== null;
+    const diferenciaGasto = balanceDisponible
+        ? balanceCanal.entrada000! - entregadoModulosM3s - balanceCanal.salida104!
+        : null;
 
     const dateStr = currentTime.toLocaleDateString('es-MX', { weekday: 'short', day: '2-digit', month: 'short', timeZone: 'America/Chihuahua' }).replace('.', '').toUpperCase();
     const timeStr = currentTime.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Chihuahua' });
@@ -436,7 +446,7 @@ const Monitor = () => {
                     <div className="bg-slate-800 rounded-xl p-3 shadow-inner border border-slate-700">
                         <div className="flex justify-between items-center mb-2 pb-2 border-b border-slate-700/50">
                             <span className="text-xs text-slate-400 font-bold uppercase"><span className="text-green-400">⬇️ ENTRADA</span> (K- 0+000)</span>
-                            <span className="text-sm font-mono text-white font-bold">{balanceCanal.entrada000.toFixed(3)} <span className="text-[9px] text-slate-500">m³/s</span></span>
+                            <span className="text-sm font-mono text-white font-bold">{balanceCanal.entrada000 !== null ? balanceCanal.entrada000.toFixed(3) : 'S/D'} <span className="text-[9px] text-slate-500">m³/s</span></span>
                         </div>
                         <div className="flex justify-between items-center mb-2 pb-2 border-b border-slate-700/50">
                             <div>
@@ -451,22 +461,22 @@ const Monitor = () => {
                         </div>
                         <div className="flex justify-between items-center mb-3">
                             <span className="text-xs text-slate-400 font-bold uppercase"><span className="text-blue-400">⬇️ SALIDA</span> (K-104+000)</span>
-                            <span className="text-sm font-mono text-white font-bold">{balanceCanal.salida104.toFixed(3)} <span className="text-[9px] text-slate-500">m³/s</span></span>
+                            <span className="text-sm font-mono text-white font-bold">{balanceCanal.salida104 !== null ? balanceCanal.salida104.toFixed(3) : 'S/D'} <span className="text-[9px] text-slate-500">m³/s</span></span>
                         </div>
 
                         {(() => {
-                            const esPerdida = Math.abs(diferenciaGasto) > (balanceCanal.entrada000 * 0.1);
+                            const esPerdida = balanceDisponible && Math.abs(diferenciaGasto!) > (balanceCanal.entrada000! * 0.1);
                             const hayExtraccion = entregadoModulosM3s > 0;
                             return (
                                 <div className={`p-2 rounded-lg flex justify-between items-center border ${esPerdida && !hayExtraccion ? 'bg-red-500/10 border-red-500/30' : 'bg-slate-900 border-slate-700'}`}>
                                     <div className="flex items-center gap-1.5">
                                         <Calculator size={14} className={esPerdida && !hayExtraccion ? 'text-red-400' : 'text-slate-400'} />
                                         <span className={`text-[10px] font-bold tracking-wider ${esPerdida && !hayExtraccion ? 'text-red-300' : 'text-slate-400'}`}>
-                                            {hayExtraccion ? 'DIFERENCIA HIDRÁULICA' : 'DIFERENCIA (PÉRDIDA)'}
+                                            {!balanceDisponible ? 'DIFERENCIA (SIN DATO)' : hayExtraccion ? 'DIFERENCIA HIDRÁULICA' : 'DIFERENCIA (PÉRDIDA)'}
                                         </span>
                                     </div>
                                     <span className={`text-base font-mono font-bold ${esPerdida && !hayExtraccion ? 'text-red-400' : 'text-white'}`}>
-                                        {diferenciaGasto.toFixed(3)} <span className="text-[10px] opacity-70">m³/s</span>
+                                        {balanceDisponible ? diferenciaGasto!.toFixed(3) : 'S/D'} <span className="text-[10px] opacity-70">m³/s</span>
                                     </span>
                                 </div>
                             );
