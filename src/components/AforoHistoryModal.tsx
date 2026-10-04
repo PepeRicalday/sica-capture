@@ -131,7 +131,7 @@ export const AforoHistoryModal = ({ onClose, onEditRecord }: AforoHistoryModalPr
 
     return (
         <div className="fixed inset-0 bg-slate-950/90 z-50 flex items-center justify-center p-4 backdrop-blur-md">
-            <div className="bg-slate-900 border border-slate-700 w-full max-w-2xl rounded-3xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] overflow-hidden flex flex-col max-h-[90vh]">
+            <div className="bg-slate-900 border border-slate-700 w-full max-w-2xl rounded-3xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] overflow-hidden flex flex-col max-h-[90dvh]">
 
                 {/* Header */}
                 <div className="p-5 border-b border-slate-800 bg-slate-800/40 flex justify-between items-center">

@@ -31,9 +31,9 @@ const Layout = ({ children }: { children: ReactNode }) => {
     };
 
     return (
-        <div className="flex flex-col h-[100dvh] fixed inset-0 overflow-hidden bg-mobile-dark">
+        <div className="flex flex-col h-[100dvh] fixed inset-0 overflow-hidden bg-mobile-dark pt-safe">
             {/* Main Content */}
-            <main className="flex-1 overflow-y-auto pb-20">
+            <main className="flex-1 overflow-y-auto pb-[calc(5rem+var(--sab))]">
                 {children}
             </main>
 
