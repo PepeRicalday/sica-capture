@@ -206,7 +206,7 @@ const Hidrometria: React.FC = () => {
                                 Sincroniza para descargar las escalas
                             </div>
                         ) : (
-                            <ResponsiveContainer>
+                            <ResponsiveContainer initialDimension={{ width: 1, height: 1 }}>
                                 <ComposedChart data={escalasGraphData} margin={{ top: 5, right: 10, left: -25, bottom: 0 }}>
                                     <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
                                     <XAxis
