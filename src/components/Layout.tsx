@@ -42,7 +42,7 @@ const Layout = ({ children }: { children: ReactNode }) => {
                 <img
                     src="/logo-srl.png"
                     alt="Unidad Conchos"
-                    className="absolute -top-3.5 left-1/2 -translate-x-1/2 w-7 h-7 object-contain rounded-full bg-white p-1 shadow-md ring-2 ring-mobile-card"
+                    className="hidden absolute -top-3.5 left-1/2 -translate-x-1/2 w-7 h-7 object-contain rounded-full bg-white p-1 shadow-md ring-2 ring-mobile-card"
                 />
                 <div className="flex justify-around items-center h-14">
                     <NavLink
@@ -52,7 +52,7 @@ const Layout = ({ children }: { children: ReactNode }) => {
                         {({ isActive }) => (
                             <>
                                 <Activity size={22} className={isActive ? '-translate-y-0.5 transition-transform' : ''} />
-                                <span className={`text-[9px] mt-0.5 ${isActive ? 'font-bold' : ''}`}>Monitor</span>
+                                <span className={`text-[11px] mt-0.5 ${isActive ? 'font-bold' : ''}`}>Monitor</span>
                             </>
                         )}
                     </NavLink>
@@ -63,7 +63,7 @@ const Layout = ({ children }: { children: ReactNode }) => {
                         {({ isActive }) => (
                             <>
                                 <Droplets size={22} className={isActive ? '-translate-y-0.5 transition-transform' : ''} />
-                                <span className={`text-[9px] mt-0.5 ${isActive ? 'font-bold' : ''}`}>Hidro</span>
+                                <span className={`text-[11px] mt-0.5 ${isActive ? 'font-bold' : ''}`}>Hidro</span>
                             </>
                         )}
                     </NavLink>
@@ -74,7 +74,7 @@ const Layout = ({ children }: { children: ReactNode }) => {
                         {({ isActive }) => (
                             <>
                                 <MapPin size={22} className={isActive ? '-translate-y-0.5 transition-transform' : ''} />
-                                <span className={`text-[9px] mt-0.5 ${isActive ? 'font-bold' : ''}`}>Captura</span>
+                                <span className={`text-[11px] mt-0.5 ${isActive ? 'font-bold' : ''}`}>Captura</span>
                             </>
                         )}
                     </NavLink>
@@ -83,16 +83,16 @@ const Layout = ({ children }: { children: ReactNode }) => {
                         className="flex flex-col items-center justify-center w-full h-full text-slate-400 hover:text-red-400 transition-colors"
                     >
                         <LogOut size={22} />
-                        <span className="text-[9px] mt-0.5">Salir</span>
+                        <span className="text-[11px] mt-0.5">Salir</span>
                     </button>
                 </div>
                 {/* Version Badge & Sync Latency (MEJ-1) */}
                 <div className="flex justify-between items-center px-4 pb-1 -mt-1">
-                    <span className="text-[8px] text-slate-600 font-mono tracking-wider">
+                    <span className="text-[10px] text-slate-400 font-mono tracking-wider">
                         SICA v{APP_VERSION} 
                     </span>
                     {lastSync && (
-                        <span className={`text-[8px] font-mono tracking-wider px-1.5 py-0.5 rounded-sm ${
+                        <span className={`text-[10px] font-mono tracking-wider px-1.5 py-0.5 rounded-sm ${
                             syncLatency > 30 ? 'bg-amber-500/10 text-amber-500' : 'text-slate-500'
                         }`}>
                             Sync: {syncLatency}m

@@ -47,7 +47,7 @@ const LiveClock = () => {
     const dateStr = time.toLocaleDateString('es-MX', { weekday: 'short', day: '2-digit', month: 'short', timeZone: 'America/Chihuahua' }).replace('.', '').toUpperCase();
     const timeStr = time.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Chihuahua' });
     return (
-        <span className="text-mobile-accent-text font-mono text-[10px] font-semibold tracking-wider mt-0.5">
+        <span className="text-mobile-accent-text font-mono text-xs font-semibold tracking-wider mt-0.5">
             {dateStr} • {timeStr}
         </span>
     );
@@ -701,7 +701,7 @@ const Capture = () => {
             <div className="flex-1 min-h-0 overflow-y-auto flex flex-col px-3 pt-2 pb-1">
 
                 {/* 1. Selector de Tipo (Rediseñado Gerencial: Alto Contraste Solar) */}
-                <div className="flex bg-slate-900/90 rounded-xl p-1 mb-2 flex-shrink-0 text-[10px] sm:text-xs shadow-inner ring-1 ring-slate-800">
+                <div className="flex bg-slate-900/90 rounded-xl p-1 mb-2 flex-shrink-0 text-xs sm:text-xs shadow-inner ring-1 ring-slate-800">
                     {(['escala', 'toma', 'aforo', 'presas', 'entrega'] as const).map(tab => {
                         // MEJ-4: Ocultar o deshabilitar tabs no relevantes
                         const isRelevant = !(activeEvent?.evento_tipo === 'LLENADO' && tab === 'aforo');
@@ -735,7 +735,7 @@ const Capture = () => {
 
                 {/* 2. Selector de Punto (no aplica a tab entrega) */}
                 <div className={`mb-2 relative flex-shrink-0 ${activeTab === 'entrega' ? 'hidden' : ''}`}>
-                    <label className="block text-slate-400 text-[10px] mb-0.5 uppercase tracking-wider font-semibold">
+                    <label className="block text-slate-400 text-xs mb-0.5 uppercase tracking-wider font-semibold">
                         SELECCIONAR UBICACIÓN
                     </label>
                     <div className="relative">
@@ -869,7 +869,7 @@ const Capture = () => {
                         <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
                     </div>
                     {puntos.length === 0 && (
-                        <p className="text-mobile-warning text-[10px] mt-1">Buscando catálogos en caché...</p>
+                        <p className="text-mobile-warning text-xs mt-1">Buscando catálogos en caché...</p>
                     )}
                 </div>
 
@@ -885,7 +885,7 @@ const Capture = () => {
                             <button
                                 key={m.id}
                                 onClick={() => setPresaModo(m.id)}
-                                className={`flex-1 py-2 rounded-md text-[10px] font-bold uppercase transition-all ${presaModo === m.id
+                                className={`flex-1 py-2 rounded-md text-xs font-bold uppercase transition-all ${presaModo === m.id
                                     ? 'bg-mobile-accent text-white shadow-md scale-105'
                                     : 'bg-transparent text-slate-400 hover:bg-slate-700/50'
                                     }`}
@@ -905,15 +905,15 @@ const Capture = () => {
                                     if (activeTab === 'escala') setShowEscalaHistoryModal(true);
                                     if (activeTab === 'toma') setShowTomaHistoryModal(true);
                                 }}
-                                className={`text-[9px] bg-slate-800 text-slate-400 px-3 py-1.5 rounded-lg border border-slate-700 flex items-center gap-1.5 font-bold ${(activeTab === 'presas') ? 'invisible' : ''}`}
+                                className={`text-[11px] bg-slate-800 text-slate-400 px-3 py-1.5 rounded-lg border border-slate-700 flex items-center gap-1.5 font-bold ${(activeTab === 'presas') ? 'invisible' : ''}`}
                             >
                                 <HistoryIcon size={14} /> VER HISTORIAL
                             </button>
                             <div className="flex items-center gap-2 bg-slate-900 ring-1 ring-slate-800 rounded-lg p-1">
-                                <span className="text-slate-500 text-[9px] font-black uppercase px-2">Modo Manual</span>
+                                <span className="text-slate-500 text-[11px] font-black uppercase px-2">Modo Manual</span>
                                 <div className="flex bg-slate-800 rounded-md p-0.5">
                                      <button 
-                                        className={`px-2 py-1 rounded text-[9px] font-bold ${(!manualTime && manualDate === getTodayString()) ? 'bg-mobile-accent text-slate-900 shadow-sm' : 'text-slate-500'}`}
+                                        className={`px-2 py-1 rounded text-[11px] font-bold ${(!manualTime && manualDate === getTodayString()) ? 'bg-mobile-accent text-slate-900 shadow-sm' : 'text-slate-500'}`}
                                         onClick={() => { setManualTime(''); setManualDate(getTodayString()); }}
                                     >AHORA</button>
                                 </div>
@@ -922,7 +922,7 @@ const Capture = () => {
                         
                         <div className="grid grid-cols-2 gap-2">
                             <div className="flex flex-col gap-1">
-                                <label className="text-slate-500 text-[9px] font-black uppercase tracking-wider ml-1">Fecha de Captura:</label>
+                                <label className="text-slate-500 text-[11px] font-black uppercase tracking-wider ml-1">Fecha de Captura:</label>
                                 <input
                                     type="date"
                                     title="Fecha de Captura"
@@ -934,7 +934,7 @@ const Capture = () => {
                                 />
                             </div>
                             <div className="flex flex-col gap-1">
-                                <label className="text-slate-500 text-[9px] font-black uppercase tracking-wider ml-1">Hora de Captura:</label>
+                                <label className="text-slate-500 text-[11px] font-black uppercase tracking-wider ml-1">Hora de Captura:</label>
                                 <input
                                     type="time"
                                     title="Hora de Captura"
@@ -969,12 +969,12 @@ const Capture = () => {
                                     <div className="flex items-center gap-2">
                                         <span className="inline-block w-2 h-2 rounded-full bg-green-400 animate-pulse flex-shrink-0"></span>
                                         <div className="flex flex-col">
-                                            <span className="text-green-400 text-[9px] font-black uppercase tracking-widest">Toma Abierta</span>
+                                            <span className="text-green-400 text-[11px] font-black uppercase tracking-widest">Toma Abierta</span>
                                             <span className="text-white font-mono font-bold text-sm">{caudalLps > 0 ? `${caudalLps} L/s` : '— L/s'}</span>
                                         </div>
                                     </div>
                                     {diasAbierta >= 1 && (
-                                        <span className="text-[10px] bg-cyan-500/20 text-cyan-300 px-2 py-1 rounded-lg font-bold border border-cyan-500/30 font-mono">
+                                        <span className="text-xs bg-cyan-500/20 text-cyan-300 px-2 py-1 rounded-lg font-bold border border-cyan-500/30 font-mono">
                                             {diasAbierta}d abierta
                                         </span>
                                     )}
@@ -982,12 +982,12 @@ const Capture = () => {
                             ) : (
                                 <div className="glass-pill px-3 py-2 rounded-xl flex items-center gap-2">
                                     <span className="inline-block w-2 h-2 rounded-full bg-red-400 flex-shrink-0"></span>
-                                    <span className="text-red-400 text-[9px] font-black uppercase tracking-widest">Toma Cerrada</span>
+                                    <span className="text-red-400 text-[11px] font-black uppercase tracking-widest">Toma Cerrada</span>
                                 </div>
                             )}
                             {/* Fila inferior: volumen de sección */}
                             <div className="glass-pill p-1.5 px-3 rounded-lg flex items-center justify-between">
-                                <span className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">
+                                <span className="text-xs text-slate-400 font-semibold uppercase tracking-wider">
                                     Vol. Hoy · {currentPt?.seccion || 'Zona General'}
                                 </span>
                                 <span className="text-white text-xs font-bold font-mono">
@@ -1001,7 +1001,7 @@ const Capture = () => {
                 {activeTab === 'escala' && selectedPoint && puntos.find(p => p.id === selectedPoint)?.escala_confirmada === false && (
                     <div className="mb-2 bg-amber-500/10 text-amber-500 p-2 rounded-lg border border-amber-500/30 flex items-center gap-2 animate-pulse flex-shrink-0">
                         <AlertTriangle size={16} className="flex-shrink-0" />
-                        <span className="text-[10px] font-black uppercase tracking-wider">Confirmación de escala requerida - Ratificar nivel en campo</span>
+                        <span className="text-xs font-black uppercase tracking-wider">Confirmación de escala requerida - Ratificar nivel en campo</span>
                     </div>
                 )}
 
@@ -1058,7 +1058,7 @@ const Capture = () => {
                             <span className="text-2xl drop-shadow-md">{activeEvent.hora_apertura_real ? "🌊" : "🔒"}</span> 
                             <span>{activeEvent.hora_apertura_real ? "¡Confirmar LLEGADA del Agua!" : "Esperando Apertura de Presa"}</span>
                         </button>
-                        <p className="text-[9px] text-blue-400 mt-2 text-center italic tracking-wider">
+                        <p className="text-[11px] text-blue-400 mt-2 text-center italic tracking-wider">
                             {activeEvent.hora_apertura_real 
                             ? "Esto enviará tu GPS a Conchos Digital en tiempo real." 
                             : "La Gerencia de la SRL aún no confirma la apertura física de la obra de toma."}
@@ -1077,7 +1077,7 @@ const Capture = () => {
                                         if (selectedPoint) setShowTomaHistoryModal(true);
                                         else toast.error('Selecciona una toma primero');
                                     }}
-                                    className="bg-slate-800 text-[9px] px-2 py-0.5 rounded border border-slate-700 text-slate-400"
+                                    className="bg-slate-800 text-[11px] px-2 py-0.5 rounded border border-slate-700 text-slate-400"
                                 >
                                     Bitácora
                                 </button>
@@ -1101,7 +1101,7 @@ const Capture = () => {
                                         onClick={() => {
                                             if (isAvailable) setEstadoToma(estado);
                                         }}
-                                        className={`flex-1 py-1 px-1 rounded-md text-[10px] font-bold uppercase transition-all ${estadoToma === estado
+                                        className={`flex-1 py-1 px-1 rounded-md text-xs font-bold uppercase transition-all ${estadoToma === estado
                                             ? 'bg-mobile-accent text-white shadow-md scale-105'
                                             : !isAvailable
                                                 ? 'bg-slate-900 text-slate-600 opacity-50 cursor-not-allowed'
@@ -1124,7 +1124,7 @@ const Capture = () => {
                             <div className="h-1 w-1"></div>
                             <button
                                 onClick={() => setShowHistoryModal(true)}
-                                className="text-[10px] bg-slate-800 text-slate-400 px-3 py-1.5 rounded-lg border border-slate-700 flex items-center gap-1.5 font-bold hover:bg-slate-700 hover:text-white transition-all shadow-sm"
+                                className="text-xs bg-slate-800 text-slate-400 px-3 py-1.5 rounded-lg border border-slate-700 flex items-center gap-1.5 font-bold hover:bg-slate-700 hover:text-white transition-all shadow-sm"
                             >
                                 <HistoryIcon size={14} /> VER BITÁCORA ANTERIOR
                             </button>
@@ -1170,7 +1170,7 @@ const Capture = () => {
                                     <button
                                         key={f.id}
                                         onClick={() => setEscalaField(f.id)}
-                                        className={`flex-1 py-1.5 px-1 rounded-md text-[10px] font-bold uppercase transition-all flex flex-col items-center ${escalaField === f.id
+                                        className={`flex-1 py-1.5 px-1 rounded-md text-xs font-bold uppercase transition-all flex flex-col items-center ${escalaField === f.id
                                             ? 'bg-mobile-accent text-white shadow-md scale-105'
                                             : 'bg-transparent text-slate-400 hover:bg-slate-700/50'
                                             }`}
@@ -1188,7 +1188,7 @@ const Capture = () => {
                                             const pt2 = puntos.find(p => p.id === selectedPoint);
                                             if (!pt2?.pzas_radiales || totalAp <= 0) return null;
                                             return (
-                                                <span className={`text-[9px] font-mono mt-0.5 opacity-90 ${escalaField === 'apertura' ? 'text-white' : 'text-mobile-accent-text'}`}>
+                                                <span className={`text-[11px] font-mono mt-0.5 opacity-90 ${escalaField === 'apertura' ? 'text-white' : 'text-mobile-accent-text'}`}>
                                                     Σ {totalAp.toFixed(2)}m · {abiertas}/{pt2.pzas_radiales}
                                                 </span>
                                             );
@@ -1207,7 +1207,7 @@ const Capture = () => {
                                     <button
                                         key={f.id}
                                         onClick={() => setNivelField(f.id)}
-                                        className={`flex-1 py-2 px-1 rounded-md text-[10px] font-bold uppercase transition-all flex flex-col items-center ${nivelField === f.id
+                                        className={`flex-1 py-2 px-1 rounded-md text-xs font-bold uppercase transition-all flex flex-col items-center ${nivelField === f.id
                                             ? 'bg-mobile-accent text-white shadow-md scale-105'
                                             : 'bg-transparent text-slate-400 hover:bg-slate-700/50'
                                             }`}
@@ -1232,7 +1232,7 @@ const Capture = () => {
                                     <button
                                         key={f.id}
                                         onClick={() => setPresaField(f.id)}
-                                        className={`flex-1 py-2 px-1 rounded-md text-[10px] font-bold uppercase transition-all flex flex-col items-center ${presaField === f.id
+                                        className={`flex-1 py-2 px-1 rounded-md text-xs font-bold uppercase transition-all flex flex-col items-center ${presaField === f.id
                                             ? 'bg-mobile-accent text-white shadow-md scale-105'
                                             : 'bg-transparent text-slate-400 hover:bg-slate-700/50'
                                             }`}
@@ -1251,7 +1251,7 @@ const Capture = () => {
                         )}
                         {activeTab === 'presas' && presaModo === 'obras' && (
                             <div className="flex items-center gap-2 mb-2 flex-shrink-0">
-                                <label className="text-slate-400 text-[9px] font-black uppercase tracking-wider whitespace-nowrap">
+                                <label className="text-slate-400 text-[11px] font-black uppercase tracking-wider whitespace-nowrap">
                                     Posición compuerta:
                                 </label>
                                 <input
@@ -1263,16 +1263,16 @@ const Capture = () => {
                                     onChange={(e) => setPresaPosicion(prev => ({ ...prev, [presaField]: e.target.value }))}
                                     className="bg-slate-900 border border-slate-800 text-white text-xs px-2 py-1.5 rounded-lg outline-none focus:border-mobile-accent focus:ring-1 focus:ring-mobile-accent/50 font-mono w-24"
                                 />
-                                <span className="text-slate-600 text-[9px] italic">solo referencia — no calcula gasto</span>
+                                <span className="text-slate-600 text-[11px] italic">solo referencia — no calcula gasto</span>
                             </div>
                         )}
                         <div className="flex flex-col items-end flex-shrink-0">
                             {selectedPoint && (
-                                <span className="text-[8px] sm:text-[10px] text-mobile-accent-text bg-mobile-accent/10 px-2 py-0.5 rounded uppercase font-black tracking-widest border border-mobile-accent/30 mb-1">
+                                <span className="text-[11px] sm:text-xs text-mobile-accent-text bg-mobile-accent/10 px-2 py-0.5 rounded uppercase font-black tracking-widest border border-mobile-accent/30 mb-1">
                                     REFERENCIA ÚLTIMA
                                 </span>
                             )}
-                            <div className="text-right text-5xl sm:text-6xl font-mono font-bold text-white mb-1 tracking-tighter truncate w-full">
+                            <div className="text-right text-4xl sm:text-5xl font-mono font-bold text-white mb-1 tracking-tighter truncate w-full">
                                 {val}
                             </div>
                         </div>
@@ -1280,7 +1280,7 @@ const Capture = () => {
                             const total = (presaData.tomaBaja + presaData.cfe + presaData.tomaIzq + presaData.tomaDer) / 100;
                             return (
                                 <div className="flex items-center justify-between bg-slate-900/50 rounded p-2 mb-2 flex-shrink-0">
-                                    <span className="text-[10px] text-slate-500 uppercase tracking-wide font-bold">Gasto Total (Σ obras)</span>
+                                    <span className="text-xs text-slate-500 uppercase tracking-wide font-bold">Gasto Total (Σ obras)</span>
                                     <span className="font-mono font-bold text-sm text-cyan-300">{total.toFixed(2)} m³/s</span>
                                 </div>
                             );
@@ -1292,7 +1292,7 @@ const Capture = () => {
                             const diffM = (elevAnterior != null && elevActual > 0) ? elevActual - elevAnterior : null;
                             return (
                                 <div className="flex items-center justify-between bg-slate-900/50 rounded p-2 mb-2 flex-shrink-0">
-                                    <span className="text-[10px] text-slate-500 uppercase tracking-wide font-bold">Variación vs. última lectura</span>
+                                    <span className="text-xs text-slate-500 uppercase tracking-wide font-bold">Variación vs. última lectura</span>
                                     <span className="font-mono font-bold text-sm text-cyan-300">
                                         {diffM != null ? `${diffM >= 0 ? '+' : ''}${(diffM * 100).toFixed(0)} cm` : 'Sin referencia'}
                                     </span>
@@ -1346,10 +1346,10 @@ const Capture = () => {
                                             const abiertas = realAps.filter(a => a > 0).length;
                                             return (
                                                 <div className="flex items-center justify-between border-b border-slate-700/50 pb-1 mb-1">
-                                                    <span className="text-[10px] text-slate-500 uppercase tracking-wide font-bold">Apertura Total Acumulada</span>
+                                                    <span className="text-xs text-slate-500 uppercase tracking-wide font-bold">Apertura Total Acumulada</span>
                                                     <span className="font-mono font-bold text-sm text-cyan-300">
                                                         {totalAp.toFixed(2)} m
-                                                        <span className="text-slate-500 font-normal text-[10px] ml-1">· {abiertas}/{pt.pzas_radiales} abiertas</span>
+                                                        <span className="text-slate-500 font-normal text-xs ml-1">· {abiertas}/{pt.pzas_radiales} abiertas</span>
                                                     </span>
                                                 </div>
                                             );
@@ -1369,9 +1369,9 @@ const Capture = () => {
                                                 return (
                                                     <div>
                                                         <div className="flex items-center justify-between mb-1.5">
-                                                            <span className="text-[9px] text-amber-400 uppercase tracking-wide font-black">Elige gasto a guardar</span>
+                                                            <span className="text-[11px] text-amber-400 uppercase tracking-wide font-black">Elige gasto a guardar</span>
                                                             {divergPct > 15 && (
-                                                                <span className="text-[8px] text-amber-500 font-bold uppercase">⚠ divergen {divergPct.toFixed(0)}%</span>
+                                                                <span className="text-[11px] text-amber-500 font-bold uppercase">⚠ divergen {divergPct.toFixed(0)}%</span>
                                                             )}
                                                         </div>
                                                         <div className="grid grid-cols-2 gap-2">
@@ -1385,17 +1385,17 @@ const Capture = () => {
                                                                         className={`rounded-lg p-2 border text-left transition-all ${activo ? 'bg-mobile-accent/15 border-mobile-accent ring-1 ring-mobile-accent/40' : 'bg-slate-950/60 border-slate-700/50'}`}
                                                                     >
                                                                         <div className="flex items-center justify-between">
-                                                                            <span className={`text-[9px] font-black uppercase ${activo ? 'text-mobile-accent-text' : 'text-slate-400'}`}>{o.label}</span>
-                                                                            {activo && <span className="text-[8px] text-mobile-accent-text font-black">✓</span>}
+                                                                            <span className={`text-[11px] font-black uppercase ${activo ? 'text-mobile-accent-text' : 'text-slate-400'}`}>{o.label}</span>
+                                                                            {activo && <span className="text-[11px] text-mobile-accent-text font-black">✓</span>}
                                                                         </div>
-                                                                        <div className={`font-mono font-bold text-lg ${activo ? 'text-white' : 'text-slate-400'}`}>{o.val.toFixed(3)}<span className="text-[9px] text-slate-500 ml-1">m³/s</span></div>
-                                                                        <div className="text-[8px] text-slate-500 font-mono">{o.sub}</div>
+                                                                        <div className={`font-mono font-bold text-lg ${activo ? 'text-white' : 'text-slate-400'}`}>{o.val.toFixed(3)}<span className="text-[11px] text-slate-500 ml-1">m³/s</span></div>
+                                                                        <div className="text-[11px] text-slate-500 font-mono">{o.sub}</div>
                                                                     </button>
                                                                 );
                                                             })}
                                                         </div>
                                                         {curva!.fueraDeRango && metodoGasto === 'curva' && (
-                                                            <div className="text-[8px] text-amber-500/80 mt-1 font-bold uppercase">⚠ nivel fuera del rango aforado — curva extrapolada</div>
+                                                            <div className="text-[11px] text-amber-500/80 mt-1 font-bold uppercase">⚠ nivel fuera del rango aforado — curva extrapolada</div>
                                                         )}
                                                     </div>
                                                 );
@@ -1444,7 +1444,7 @@ const Capture = () => {
                                             setEscalaData({ arriba: 0, abajo: 0, aperturas: [] });
                                             toast.info('Edición cancelada');
                                         }}
-                                        className="w-full mt-2 text-[10px] text-red-400 font-bold uppercase underline"
+                                        className="w-full mt-2 text-xs text-red-400 font-bold uppercase underline"
                                     >
                                         Cancelar Corrección
                                     </button>
@@ -1556,12 +1556,12 @@ const Capture = () => {
 
             {/* Version Footer & Force Update */}
             <div className="fixed bottom-1 left-3 flex items-center gap-3 opacity-30 hover:opacity-100 transition-opacity z-10">
-                <span className="text-[9px] font-bold text-slate-500 tracking-tighter">SICA v2.4.8</span>
+                <span className="text-[11px] font-bold text-slate-500 tracking-tighter">SICA v2.4.8</span>
                 <button 
                     onClick={() => {
                         window.location.replace('/?v=248&t=' + Date.now());
                     }}
-                    className="text-[9px] font-bold text-cyan-500 uppercase cursor-pointer hover:underline"
+                    className="text-[11px] font-bold text-cyan-500 uppercase cursor-pointer hover:underline"
                 >
                     Actualizar Ahora
                 </button>
