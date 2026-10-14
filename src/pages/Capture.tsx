@@ -385,10 +385,28 @@ const Capture = () => {
                     if (!confirmed) return;
                 }
                 
-                // Si hArriba es 0 y es normal, avisar
-                if (hArriba === 0 && !isLlenado && (isGerente || isAuthorized)) {
+                // Un nivel 0 casi nunca es una medición: pedir confirmación a TODOS los roles (antes solo a gerente/SRL).
+                if (hArriba === 0 && !isLlenado) {
                     const confirmed = window.confirm("¿Seguro que desea guardar nivel 0.00m? (Afectará cálculos de volumen)");
                     if (!confirmed) return;
+                }
+
+                // Compuertas con apertura 0 SIN lectura previa: ese 0 no es un dato, es el valor inicial del teclado.
+                // Guardarlo en silencio declararía la compuerta "cerrada". Se pide confirmación explícita.
+                if (pt?.pzas_radiales && pt.pzas_radiales > 0) {
+                    const conLecturaPrevia = new Set<number>(
+                        Array.isArray(pt.radiales_json) ? pt.radiales_json.filter((r: any) => r?.index !== undefined && r?.apertura_m != null).map((r: any) => Number(r.index)) : []
+                    );
+                    const implicitas: number[] = [];
+                    for (let i = 0; i < pt.pzas_radiales; i++) {
+                        if ((escalaData.aperturas[i] || 0) === 0 && !conLecturaPrevia.has(i)) implicitas.push(i + 1);
+                    }
+                    if (implicitas.length > 0) {
+                        const confirmadas = window.confirm(`La${implicitas.length > 1 ? 's compuertas' : ' compuerta'} ${implicitas.join(', ')} no ${implicitas.length > 1 ? 'tienen' : 'tiene'} apertura previa ni capturada.
+¿Confirmas que ${implicitas.length > 1 ? 'están CERRADAS' : 'está CERRADA'} (0.00 m)?
+Si no, cancela y captura la apertura.`);
+                        if (!confirmadas) return;
+                    }
                 }
 
                 const realAperturasStr: any[] = [];
