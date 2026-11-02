@@ -2,19 +2,38 @@
 @import "./assets/fonts/fonts.css";
 
 @theme {
-  --color-mobile-dark: #0b1120;
-  --color-mobile-card: #1e293b;
-  --color-mobile-accent: #1d5c74;
+  /* Paleta del logo SICA 005 (conchos-digital/scripts/logo/generar-logo-sica.mjs) */
+  --color-mobile-dark: #061532;
+  --color-mobile-card: #0B2147;
+  --color-mobile-accent: #0A5BB0;
   /* Variante clara del acento — usar SIEMPRE que el color pinte texto/ícono
      directo sobre fondo oscuro. #1D5C74 da 2.5:1 como texto (falla WCAG AA,
      ilegible a sol directo); esta variante da 6.97:1. Reservar el token base
      para fondos (botones, pestaña activa) donde el texto encima es blanco. */
-  --color-mobile-accent-text: #4fa8c9;
-  --color-mobile-success: #10b981;
+  --color-mobile-accent-text: #3FB2F3;
+  --color-mobile-success: #7CC520;
   --color-mobile-warning: #f59e0b;
   --color-mobile-danger: #ef4444;
-  --color-mobile-primary: #ea580c;
-  --color-mobile-primary-hover: #c2410c;
+  --color-mobile-primary: #0A5BB0;
+  --color-mobile-primary-hover: #0B3170;
+  --font-display: 'Montserrat', 'Inter', ui-sans-serif, system-ui, sans-serif;
+  /* slate a navy y azules/verdes a agua y hoja del logo, para bg-slate-*, text-emerald-*, etc. */
+  --color-slate-100: #E6EEF8;
+  --color-slate-200: #CBD9EC;
+  --color-slate-300: #B4C6DD;
+  --color-slate-400: #9FB6D6;
+  --color-slate-500: #7B93B8;
+  --color-slate-600: #3B5A8C;
+  --color-slate-700: #1E3E70;
+  --color-slate-800: #0B2147;
+  --color-slate-900: #061532;
+  --color-slate-950: #040E22;
+  --color-blue-400: #3FB2F3;
+  --color-blue-500: #0A7FDB;
+  --color-blue-600: #0A5BB0;
+  --color-emerald-400: #7CC520;
+  --color-emerald-500: #5DB22A;
+  --color-emerald-600: #2E9A1E;
   --font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, sans-serif;
   --font-mono: 'IBM Plex Mono', ui-monospace, SFMono-Regular, 'Courier New', monospace;
 }

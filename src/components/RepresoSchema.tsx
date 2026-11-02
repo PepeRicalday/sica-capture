@@ -77,7 +77,7 @@ export const RepresoSchema: React.FC<RepresoSchemaProps> = ({
                     <text x={20} y={waterY - 8} fill="#38bdf8" fontSize="10" fontWeight="bold">Nivel: {nivelArriba.toFixed(2)}m</text>
 
                     {/* Piso Base */}
-                    <rect x={0} y={baseLine} width={W} height={H - baseLine} fill="#1e293b" />
+                    <rect x={0} y={baseLine} width={W} height={H - baseLine} fill="#0B2147" />
                     <line x1={0} y1={baseLine} x2={W} y2={baseLine} stroke="#475569" strokeWidth="4" />
 
                     {/* Pilares y Compuertas */}

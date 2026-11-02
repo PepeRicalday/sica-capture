@@ -37,31 +37,29 @@ const Login = () => {
     };
 
     return (
-        <div className="min-h-[100dvh] w-full flex items-center justify-center bg-[#0b1120] p-4 relative overflow-hidden font-sans">
+        <div className="min-h-[100dvh] w-full flex items-center justify-center bg-mobile-dark p-4 relative overflow-hidden font-sans">
             {/* Subtle background glow */}
-            <div className="absolute inset-0 pointer-events-none" style={{ background: 'radial-gradient(circle at 50% 0%, rgba(30, 58, 138, 0.3) 0%, transparent 60%)' }}></div>
+            <div className="absolute inset-0 pointer-events-none" style={{ background: 'radial-gradient(circle at 50% 0%, rgba(11, 49, 112, 0.65) 0%, transparent 60%)' }}></div>
 
-            <div className="w-full max-w-[420px] bg-[#111827]/80 backdrop-blur-md border border-slate-800 rounded-3xl p-6 md:p-8 shadow-2xl z-10 my-4 md:my-0">
+            <div className="w-full max-w-[420px] bg-mobile-card/80 backdrop-blur-md border border-[#1E4A8C] rounded-3xl p-6 md:p-8 shadow-2xl z-10 my-4 md:my-0">
                 <div className="flex justify-center mb-3 shrink-0">
-                    <div className="bg-white p-3 rounded-2xl shadow-lg ring-1 ring-white/10 flex items-center justify-center">
-                        <img src="/logo-srl.png" alt="SRL Unidad Conchos" className="max-w-[140px] w-auto h-auto max-h-[120px] object-contain" />
-                    </div>
+                    <img src="/sica005-emblema.svg" alt="SICA 005" width={112} height={112} className="w-28 h-28 object-contain" />
                 </div>
 
                 <div className="text-center mb-6">
-                    <h1 className="text-[28px] md:text-3xl font-extrabold text-white tracking-tight mb-2">Unidad Conchos</h1>
-                    <h2 className="text-[#f59e0b] text-[10px] font-bold tracking-[0.15em] uppercase mb-4">
-                        HIDRO-SINCRONÍA DIGITAL
+                    <h1 className="font-display text-[30px] md:text-3xl font-extrabold text-white tracking-tight mb-1">SICA 005</h1>
+                    <h2 className="text-[#3FB2F3] text-[12px] font-bold tracking-[0.12em] uppercase mb-3">
+                        Captura de campo
                     </h2>
-                    <p className="text-slate-300 text-[11px] leading-relaxed px-2">
-                        Sociedad de Asociaciones de Usuarios Unidad<br />Conchos S.R.L. De I.P. y C.V.
+                    <p className="text-[#CBEAF9] text-[13px] leading-relaxed px-2">
+                        Distrito de Riego 005 · Delicias, Chihuahua
                     </p>
                 </div>
 
                 <div className="w-full h-px bg-slate-700/50 my-4"></div>
 
                 <div className="text-center mb-4">
-                    <h3 className="text-[17px] font-bold text-white mb-2">Centro de Control Operativo</h3>
+                    <h3 className="text-[17px] font-bold text-white mb-2">Acceso de operadores</h3>
                     <p className="text-slate-400 text-[13px]">
                         Ingresa tus credenciales para acceder al sistema
                     </p>
@@ -80,7 +78,7 @@ const Login = () => {
                                 value={email}
                                 onChange={(e) => setEmail(e.target.value)}
                                 required
-                                className="w-full bg-[#1e293b] border border-slate-700 text-white rounded-2xl py-3.5 pl-11 pr-4 text-[15px] focus:outline-none focus:border-mobile-primary focus:ring-1 focus:ring-mobile-primary transition-all shadow-inner"
+                                className="w-full bg-[#10284F] border border-[#1E4A8C] text-white rounded-2xl py-3.5 pl-11 pr-4 text-[15px] focus:outline-none focus:border-[#3FB2F3] focus:ring-2 focus:ring-[#3FB2F3]/50 transition-all shadow-inner"
                             />
                         </div>
                     </div>
@@ -97,7 +95,7 @@ const Login = () => {
                                 value={password}
                                 onChange={(e) => setPassword(e.target.value)}
                                 required
-                                className="w-full bg-[#1e293b] border border-slate-700 text-white rounded-2xl py-3.5 pl-11 pr-4 text-[15px] focus:outline-none focus:border-mobile-primary focus:ring-1 focus:ring-mobile-primary transition-all shadow-inner"
+                                className="w-full bg-[#10284F] border border-[#1E4A8C] text-white rounded-2xl py-3.5 pl-11 pr-4 text-[15px] focus:outline-none focus:border-[#3FB2F3] focus:ring-2 focus:ring-[#3FB2F3]/50 transition-all shadow-inner"
                             />
                         </div>
                     </div>
@@ -111,7 +109,7 @@ const Login = () => {
                     <button
                         type="submit"
                         disabled={loading}
-                        className={`w-full mt-4 bg-mobile-primary hover:bg-mobile-primary-hover shadow-lg shadow-orange-900/20 text-white font-bold py-4 rounded-2xl flex items-center justify-center gap-2 transition-all active:scale-[0.98] ${loading ? 'opacity-70 cursor-not-allowed' : ''}`}
+                        className={`w-full mt-4 bg-mobile-primary hover:bg-mobile-primary-hover shadow-lg shadow-black/30 text-white font-display font-extrabold py-4 rounded-2xl flex items-center justify-center gap-2 transition-all active:scale-[0.98] ${loading ? 'opacity-70 cursor-not-allowed' : ''}`}
                     >
                         {loading ? (
                             <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
@@ -124,14 +122,16 @@ const Login = () => {
                     </button>
                 </form>
 
-                {/* SICA Logo Pequeño en la parte inferior */}
+                {/* Operador: SRL Unidad Conchos (su logo lleva su propio recuadro blanco). El emblema SICA va arriba, a color y sin opacidad. */}
                 <div className="mt-8 pt-2 flex flex-col items-center">
-                    <span className="text-[9px] text-slate-500 mb-2 uppercase tracking-widest font-bold">Respaldo Tecnológico</span>
-                    <img src="/SICA005.png" alt="SICA Captura" className="h-6 w-auto object-contain opacity-50 grayscale hover:grayscale-0 hover:opacity-100 transition-all duration-300" />
+                    <span className="text-[11px] text-slate-400 mb-2 uppercase tracking-widest font-bold">Operado por</span>
+                    <div className="bg-white rounded-xl p-1.5 flex items-center justify-center">
+                        <img src="/logo-srl.png" alt="SRL Unidad Conchos" className="h-9 w-auto object-contain" />
+                    </div>
 
                     <div className="mt-4 flex flex-col items-center gap-2">
                         <span className="text-[10px] text-white/50 font-mono bg-white/5 px-2 py-0.5 rounded-full border border-white/10">
-                            SICA v{APP_VERSION} • {BUILD_HASH}
+                            v{APP_VERSION}{BUILD_HASH.replace(/^v/, '') === APP_VERSION ? '' : ` • ${BUILD_HASH}`}
                         </span>
 
                         {/* py-3 (no solo el texto text-[9px]): esta acción borra caché y
@@ -145,7 +145,7 @@ const Login = () => {
                                     window.location.href = "/nuke";
                                 }
                             }}
-                            className="text-[9px] text-orange-500/80 hover:text-orange-400 font-bold uppercase tracking-tighter underline underline-offset-4 decoration-orange-500/30 py-3 px-4"
+                            className="text-[11px] text-[#3FB2F3] hover:text-white font-bold uppercase tracking-tight underline underline-offset-4 decoration-[#3FB2F3]/40 py-3 px-4"
                         >
                             Limpiar Caché y Actualizar
                         </button>

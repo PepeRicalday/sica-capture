@@ -142,26 +142,25 @@ const Hidrometria: React.FC = () => {
             <header className="px-4 py-4 bg-slate-900 border-b border-mobile-accent/30 shrink-0 shadow-lg relative overflow-hidden">
                 <div className="absolute top-0 right-0 w-32 h-32 bg-mobile-accent/5 blur-3xl rounded-full -mr-16 -mt-16"></div>
                 <div className="relative z-10"><BrandStrip /></div>
-                <h1 className="text-base font-black text-white tracking-widest uppercase flex items-center justify-between relative z-10">
+                <h1 className="font-display text-base font-extrabold text-white tracking-wide uppercase flex items-center justify-between relative z-10">
                     <div className="flex items-center gap-2">
                         <Activity className="text-mobile-accent-text animate-pulse" size={20} />
-                        Centro de Control Hidrométrico
+                        Hidrometría
                     </div>
                     {isOnline ? (
                         <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/30">
                             <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></div>
-                            <span className="text-[8px] text-emerald-400 font-black">ONLINE</span>
+                            <span className="text-[11px] text-emerald-400 font-black">EN LÍNEA</span>
                         </div>
                     ) : (
                         <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-slate-800 border border-slate-700">
                             <WifiOff size={10} className="text-slate-400" />
-                            <span className="text-[8px] text-slate-400 font-black">OFFLINE</span>
+                            <span className="text-[11px] text-slate-400 font-black">SIN RED</span>
                         </div>
                     )}
                 </h1>
                 <div className="flex justify-between items-center mt-1 relative z-10 font-mono">
-                    <p className="text-[10px] text-slate-400">Hidro-Sincronía Digital SRL </p>
-                    <p className="text-[9px] text-mobile-accent-text font-bold">V.1.3.4-PRO</p>
+                    <p className="text-[12px] text-slate-300">Centro de control hidrométrico</p>
                 </div>
             </header>
 
@@ -200,7 +199,7 @@ const Hidrometria: React.FC = () => {
                         <p className="text-[9px] text-slate-500 font-mono mt-0.5">Comportamiento del Canal Principal Conchos</p>
                     </div>
 
-                    <div className="p-2 pt-4 bg-[#0b1120]/50" style={{ height: 220, width: '100%' }}>
+                    <div className="p-2 pt-4 bg-[#061532]/50" style={{ height: 220, width: '100%' }}>
                         {escalasGraphData.length === 0 ? (
                             <div className="h-full flex items-center justify-center text-slate-500 text-xs italic">
                                 Sincroniza para descargar las escalas
@@ -208,7 +207,7 @@ const Hidrometria: React.FC = () => {
                         ) : (
                             <ResponsiveContainer initialDimension={{ width: 1, height: 1 }}>
                                 <ComposedChart data={escalasGraphData} margin={{ top: 5, right: 10, left: -25, bottom: 0 }}>
-                                    <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
+                                    <CartesianGrid strokeDasharray="3 3" stroke="#0B2147" vertical={false} />
                                     <XAxis
                                         dataKey="km"
                                         type="number"
@@ -329,7 +328,7 @@ const Hidrometria: React.FC = () => {
                                 className={clsx(
                                     "px-3 py-1.5 rounded-full text-[10px] font-bold whitespace-nowrap transition-all duration-300",
                                     selectedZonaFiltro === 'Todas'
-                                        ? "bg-cyan-500 text-[#0b1120] shadow-[0_0_10px_rgba(6,182,212,0.4)]"
+                                        ? "bg-cyan-500 text-[#061532] shadow-[0_0_10px_rgba(6,182,212,0.4)]"
                                         : "bg-slate-800/80 text-slate-400 border border-slate-700 hover:bg-slate-700"
                                 )}
                             >
@@ -342,14 +341,14 @@ const Hidrometria: React.FC = () => {
                                     className={clsx(
                                         "px-3 py-1.5 rounded-full text-[10px] font-bold whitespace-nowrap transition-all duration-300 flex items-center gap-1.5",
                                         selectedZonaFiltro === z
-                                            ? "bg-cyan-500 text-[#0b1120] shadow-[0_0_10px_rgba(6,182,212,0.4)]"
+                                            ? "bg-cyan-500 text-[#061532] shadow-[0_0_10px_rgba(6,182,212,0.4)]"
                                             : "bg-slate-800/80 text-slate-400 border border-slate-700 hover:bg-slate-700"
                                     )}
                                 >
                                     {z}
                                     <span className={clsx(
                                         "px-1.5 py-0.5 rounded-full text-[8px]",
-                                        selectedZonaFiltro === z ? "bg-[#0b1120]/20 text-[#0b1120]" : "bg-slate-900 text-cyan-500"
+                                        selectedZonaFiltro === z ? "bg-[#061532]/20 text-[#061532]" : "bg-slate-900 text-cyan-500"
                                     )}>
                                         {tomasPorZona[z].length}
                                     </span>

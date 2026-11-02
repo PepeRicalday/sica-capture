@@ -183,7 +183,7 @@ function App() {
       <AuthProvider>
         <VersionGuard>
           <HydricStatusProvider>
-            <Toaster position="top-center" theme="dark" toastOptions={{ style: { background: '#1e293b', border: '1px solid #334155', color: '#f8fafc' } }} />
+            <Toaster position="top-center" theme="dark" toastOptions={{ style: { background: '#0B2147', border: '1px solid #334155', color: '#f8fafc' } }} />
             <AppContent />
           </HydricStatusProvider>
         </VersionGuard>

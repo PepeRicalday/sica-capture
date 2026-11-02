@@ -37,7 +37,7 @@ export class ErrorBoundary extends Component<Props, State> {
     render() {
         if (this.state.hasError) {
             return (
-                <div className="min-h-[100dvh] bg-[#0b1120] flex flex-col items-center justify-center p-6 text-center">
+                <div className="min-h-[100dvh] bg-[#061532] flex flex-col items-center justify-center p-6 text-center">
                     <div className="bg-red-500/10 p-5 rounded-full mb-6">
                         <AlertTriangle size={48} className="text-red-500" />
                     </div>
@@ -56,7 +56,7 @@ export class ErrorBoundary extends Component<Props, State> {
 
                     <button
                         onClick={this.handleReload}
-                        className="w-full max-w-xs bg-[#1d5c74] hover:bg-[#123e4f] text-white font-bold py-4 rounded-2xl transition-all shadow-lg active:scale-95 flex items-center justify-center gap-2 text-lg mb-3"
+                        className="w-full max-w-xs bg-[#0A5BB0] hover:bg-[#123e4f] text-white font-bold py-4 rounded-2xl transition-all shadow-lg active:scale-95 flex items-center justify-center gap-2 text-lg mb-3"
                     >
                         <RefreshCw size={20} /> Reiniciar SICA
                     </button>

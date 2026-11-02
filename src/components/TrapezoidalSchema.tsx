@@ -100,7 +100,7 @@ export const TrapezoidalSchema: React.FC<TrapezoidalSchemaProps> = ({
                     <polyline
                         points={`${leftCrownX - 30},${crownY} ${leftCrownX},${crownY} ${leftBottomX},${bottomY_val} ${rightBottomX},${bottomY_val} ${rightCrownX},${crownY} ${rightCrownX + 30},${crownY}`}
                         fill="none"
-                        stroke="#1e293b"
+                        stroke="#0B2147"
                         strokeWidth="6"
                         strokeLinejoin="round"
                         strokeLinecap="round"
@@ -204,7 +204,7 @@ export const TrapezoidalSchema: React.FC<TrapezoidalSchemaProps> = ({
 
                                         {/* Placa de datos XL/XR (Evita empalme con Plantilla) */}
                                         <g>
-                                            <rect x={dob.cx - 50} y={dob.bottomY + 10} width="100" height="20" rx="4" fill="#1e293b" stroke="#334155" strokeWidth="1" />
+                                            <rect x={dob.cx - 50} y={dob.bottomY + 10} width="100" height="20" rx="4" fill="#0B2147" stroke="#334155" strokeWidth="1" />
                                             <text x={dob.cx} y={dob.bottomY + 23} textAnchor="middle" fill="#fbbf24" fontSize="8" fontWeight="900">
                                                 L:{activeX.toFixed(2)}m | R:{(espejoDiseno - activeX).toFixed(2)}m
                                             </text>

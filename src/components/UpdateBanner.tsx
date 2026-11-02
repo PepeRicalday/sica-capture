@@ -9,7 +9,7 @@ interface UpdateBannerProps {
 export const UpdateBanner: React.FC<UpdateBannerProps> = ({ onUpdate, onClose }) => {
     return (
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[10000] w-[90%] max-w-md animate-in fade-in slide-in-from-bottom-4 duration-300">
-            <div className="bg-[#1e293b] border border-orange-500/50 rounded-2xl p-4 shadow-2xl flex items-center justify-between gap-4">
+            <div className="bg-[#0B2147] border border-orange-500/50 rounded-2xl p-4 shadow-2xl flex items-center justify-between gap-4">
                 <div className="flex items-center gap-3">
                     <div className="bg-orange-500/20 p-2 rounded-xl">
                         <RefreshCw className="text-orange-500 animate-spin-slow" size={20} />
